@@ -1,5 +1,4 @@
 from fastapi import Depends, FastAPI
-from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import ORJSONResponse
 
 from app.core.auth import require_api_key, validate_api_key_configuration
@@ -32,9 +31,9 @@ app = FastAPI(
     title="RAG Agent Workbench API",
     version=settings.APP_VERSION,
     default_response_class=ORJSONResponse,
-    docs_url=None,
-    redoc_url=None,
-    openapi_url=None,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
 )
 
 # Core app configuration
@@ -53,42 +52,6 @@ app.include_router(metrics_router, tags=["metrics"], dependencies=[Depends(requi
 
 # Register exception handlers
 setup_exception_handlers(app)
-
-
-@app.get(
-    "/openapi.json",
-    include_in_schema=False,
-    dependencies=[Depends(require_api_key)],
-)
-async def secured_openapi_json() -> dict:
-    """Return the OpenAPI schema, protected by API key when configured."""
-    return app.openapi()
-
-
-@app.get(
-    "/docs",
-    include_in_schema=False,
-    dependencies=[Depends(require_api_key)],
-)
-async def secured_swagger_ui():
-    """Serve Swagger UI, protected by API key when configured."""
-    return get_swagger_ui_html(
-        openapi_url="/openapi.json",
-        title="RAG Agent Workbench API Docs",
-    )
-
-
-@app.get(
-    "/redoc",
-    include_in_schema=False,
-    dependencies=[Depends(require_api_key)],
-)
-async def secured_redoc():
-    """Serve ReDoc UI, protected by API key when configured."""
-    return get_redoc_html(
-        openapi_url="/openapi.json",
-        title="RAG Agent Workbench API ReDoc",
-    )
 
 
 @app.on_event("startup")

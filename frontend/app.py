@@ -104,6 +104,7 @@ def init_session_state() -> None:
         st.session_state.show_sources = True
     if "supports_stream" not in st.session_state:
         st.session_state.supports_stream = True
+    # Namespace is fixed for now; default to "dev".
     if "namespace" not in st.session_state:
         st.session_state.namespace = "dev"
 
@@ -132,13 +133,6 @@ def render_sidebar(backend_base_url: str, api_key: Optional[str]) -> Dict[str, A
         st.markdown("---")
         st.subheader("Chat settings")
 
-        namespace = st.text_input(
-            "Namespace",
-            value=st.session_state.get("namespace", "dev"),
-            help="Pinecone namespace to query.",
-        )
-        st.session_state.namespace = namespace.strip() or "dev"
-
         top_k = st.slider("Top K", min_value=1, max_value=20, value=5, step=1)
         min_score = st.slider(
             "Minimum relevance score",
@@ -161,7 +155,6 @@ def render_sidebar(backend_base_url: str, api_key: Optional[str]) -> Dict[str, A
             st.session_state.messages = []
 
     return {
-        "namespace": st.session_state.namespace,
         "top_k": top_k,
         "min_score": float(min_score),
         "use_web_fallback": bool(use_web_fallback),
@@ -225,7 +218,7 @@ def main() -> None:
     ]
     payload: Dict[str, Any] = {
         "query": user_message,
-        "namespace": settings["namespace"],
+        "namespace": st.session_state.namespace,
         "top_k": int(settings["top_k"]),
         "use_web_fallback": settings["use_web_fallback"],
         "min_score": float(settings["min_score"]),

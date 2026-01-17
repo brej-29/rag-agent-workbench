@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+pydantic-settings
+python-dotenv
+httpx
+tenacity
+orjson
+feedparser
+beautifulsoup4
+pinecone
+langchain-core
+langchain-text-splitters
+langgraph

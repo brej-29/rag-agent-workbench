@@ -13,7 +13,15 @@ logger = get_logger(__name__)
 router = APIRouter(tags=["search"])
 
 
-@router.post("/search", response_model=SearchResponse)
+@router.post(
+    "/search",
+    response_model=SearchResponse,
+    summary="Semantic search over ingested documents",
+    description=(
+        "Performs integrated embedding search over documents stored in Pinecone and "
+        "returns the top matching chunks."
+    ),
+)
 async def search(payload: SearchRequest) -> SearchResponse:
     settings = get_settings()
     namespace = payload.namespace or settings.PINECONE_NAMESPACE

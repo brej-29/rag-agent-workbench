@@ -5,7 +5,11 @@ from app.core.config import get_settings
 router = APIRouter(tags=["health"])
 
 
-@router.get("/health")
+@router.get(
+    "/health",
+    summary="Health check",
+    description="Returns service status, name, and version.",
+)
 async def health() -> dict:
     settings = get_settings()
     return {

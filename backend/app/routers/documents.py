@@ -22,7 +22,15 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
-@router.post("/upload-text", response_model=UploadTextResponse)
+@router.post(
+    "/upload-text",
+    response_model=UploadTextResponse,
+    summary="Upload raw text or Docling output",
+    description=(
+        "Accepts manual text uploads or Docling-converted content, normalizes and "
+        "chunks the text, and upserts it into Pinecone."
+    ),
+)
 async def upload_text(payload: UploadTextRequest) -> UploadTextResponse:
     settings = get_settings()
     namespace = payload.namespace or settings.PINECONE_NAMESPACE
@@ -70,7 +78,12 @@ async def upload_text(payload: UploadTextRequest) -> UploadTextResponse:
     )
 
 
-@router.get("/stats", response_model=DocumentsStatsResponse)
+@router.get(
+    "/stats",
+    response_model=DocumentsStatsResponse,
+    summary="Get document statistics",
+    description="Returns vector counts per namespace from the configured Pinecone index.",
+)
 async def documents_stats(
     namespace: str | None = Query(
         default=None,

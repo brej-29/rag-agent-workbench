@@ -15,16 +15,19 @@ configure_logging(settings.LOG_LEVEL)
 logger = get_logger(__name__)
 
 app = FastAPI(
-    title=settings.APP_NAME,
+    title="RAG Agent Workbench API",
     version=settings.APP_VERSION,
     default_response_class=ORJSONResponse,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
 )
 
-# Register routers
-app.include_router(health_router)
-app.include_router(ingest_router)
-app.include_router(search_router)
-app.include_router(documents_router)
+# Register routers with tags and ensure they are included in the schema
+app.include_router(health_router, tags=["health"])
+app.include_router(ingest_router, tags=["ingest"])
+app.include_router(search_router, tags=["search"])
+app.include_router(documents_router, tags=["documents"])
 
 # Register exception handlers
 setup_exception_handlers(app)

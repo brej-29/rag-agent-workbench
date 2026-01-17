@@ -232,6 +232,15 @@ def upload_dialog(backend_base_url: str, api_key: Optional[str]) -> None:
         tags = st.text_input("Tags (comma separated)", value="")
         notes = st.text_area("Notes", value="", height=80)
 
+        high_fidelity = st.checkbox(
+            "High-fidelity Docling mode (slower)",
+            value=False,
+            help=(
+                "When enabled, skip the fast text extractor and use Docling directly. "
+                "Useful for complex layouts, but slower."
+            ),
+        )
+
         upload_anyway = st.checkbox(
             "Upload even if extracted text is very short",
             value=False,
@@ -254,10 +263,14 @@ def upload_dialog(backend_base_url: str, api_key: Optional[str]) -> None:
         st.error("API_KEY is not configured; cannot upload to a protected backend.")
         return
 
-    with st.spinner("Converting and uploading document..."):
+    with st.spinner("Converting and uploading document (fast text extraction first, "
+                    "Docling fallback may take up to ~45s for complex PDFs)..."):
         try:
             uploaded_file.seek(0)
-            text, conv_meta = convert_uploaded_file_to_text(uploaded_file)
+            text, conv_meta = convert_uploaded_file_to_text(
+                uploaded_file,
+                use_high_fidelity=high_fidelity,
+            )
         except Exception as exc:  # noqa: BLE001
             st.error(f"Error converting file: {exc}")
             return

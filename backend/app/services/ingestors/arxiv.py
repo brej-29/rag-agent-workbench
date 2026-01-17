@@ -1,4 +1,4 @@
-from typing import BaseException, List, Optional
+from typing import List, Optional
 
 import feedparser
 import httpx
@@ -22,7 +22,7 @@ def _get_arxiv_query_url() -> str:
     return os.getenv("ARXIV_QUERY_URL") or ARXIV_QUERY_URL_DEFAULT
 
 
-def _is_retryable_arxiv_error(exc: BaseException) -> bool:
+def _is_retryable_arxiv_error(exc: Exception) -> bool:
     """Return True if an exception should trigger a retry."""
     if isinstance(exc, httpx.RequestError):
         # Network issues / timeouts

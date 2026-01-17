@@ -2,7 +2,7 @@ from typing import Any, Dict, List
 from collections import Counter
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from langchain_core.documents import Document
 
@@ -66,7 +66,7 @@ async def _process_and_upsert(
     description="Fetches recent arXiv entries for a query and upserts them into Pinecone.",
 )
 @limiter.limit("10/minute")
-async def ingest_arxiv(payload: ArxivIngestRequest) -> IngestResponse:
+async def ingest_arxiv(request: Request, payload: ArxivIngestRequest) -> IngestResponse:  # noqa: ARG001
     settings = get_settings()
     namespace = payload.namespace or settings.PINECONE_NAMESPACE
     max_docs = min(payload.max_docs, 20)
@@ -121,7 +121,7 @@ async def ingest_arxiv(payload: ArxivIngestRequest) -> IngestResponse:
     description="Fetches works from OpenAlex for a query and upserts them into Pinecone.",
 )
 @limiter.limit("10/minute")
-async def ingest_openalex(payload: OpenAlexIngestRequest) -> IngestResponse:
+async def ingest_openalex(request: Request, payload: OpenAlexIngestRequest) -> IngestResponse:  # noqa: ARG001
     settings = get_settings()
     namespace = payload.namespace or settings.PINECONE_NAMESPACE
     max_docs = min(payload.max_docs, 20)
@@ -160,7 +160,7 @@ async def ingest_openalex(payload: OpenAlexIngestRequest) -> IngestResponse:
     ),
 )
 @limiter.limit("10/minute")
-async def ingest_wiki(payload: WikiIngestRequest) -> IngestResponse:
+async def ingest_wiki(request: Request, payload: WikiIngestRequest) -> IngestResponse:  # noqa: ARG001
     settings = get_settings()
     namespace = payload.namespace or settings.PINECONE_NAMESPACE
 

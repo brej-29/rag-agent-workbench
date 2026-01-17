@@ -1,6 +1,6 @@
 from typing import Any, Dict, List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.concurrency import run_in_threadpool
 
 from app.core.cache import get_search_cached, set_search_cached
@@ -25,7 +25,7 @@ router = APIRouter(tags=["search"])
     ),
 )
 @limiter.limit("60/minute")
-async def search(payload: SearchRequest) -> SearchResponse:
+async def search(request: Request, payload: SearchRequest) -> SearchResponse:  # noqa: ARG001
     settings = get_settings()
     namespace = payload.namespace or settings.PINECONE_NAMESPACE
     text_field = settings.PINECONE_TEXT_FIELD

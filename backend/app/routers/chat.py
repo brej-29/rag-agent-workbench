@@ -2,7 +2,7 @@ import json
 from time import perf_counter
 from typing import AsyncGenerator, Dict, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 
@@ -74,7 +74,7 @@ def _build_chat_response(state: Dict) -> ChatResponse:
     ),
 )
 @limiter.limit("30/minute")
-async def chat(payload: ChatRequest) -> ChatResponse:
+async def chat(request: Request, payload: ChatRequest) -> ChatResponse:  # noqa: ARG001
     settings = get_settings()
     namespace = payload.namespace or settings.PINECONE_NAMESPACE
 
@@ -197,7 +197,7 @@ async def chat(payload: ChatRequest) -> ChatResponse:
     ),
 )
 @limiter.limit("30/minute")
-async def chat_stream(payload: ChatRequest) -> StreamingResponse:
+async def chat_stream(request: Request, payload: ChatRequest) -> StreamingResponse:  # noqa: ARG001
     settings = get_settings()
     namespace = payload.namespace or settings.PINECONE_NAMESPACE
 

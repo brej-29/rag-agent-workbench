@@ -2,12 +2,13 @@ from typing import Any, Dict, List
 from collections import Counter
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from langchain_core.documents import Document
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.core.rate_limit import limiter
 from app.schemas.ingest import (
     ArxivIngestRequest,
     IngestResponse,
@@ -64,7 +65,8 @@ async def _process_and_upsert(
     summary="Ingest documents from arXiv",
     description="Fetches recent arXiv entries for a query and upserts them into Pinecone.",
 )
-async def ingest_arxiv(payload: ArxivIngestRequest) -> IngestResponse:
+@limiter.limit("10/minute")
+async def ingest_arxiv(request: Request, payload: ArxivIngestRequest) -> IngestResponse:  # noqa: ARG001
     settings = get_settings()
     namespace = payload.namespace or settings.PINECONE_NAMESPACE
     max_docs = min(payload.max_docs, 20)
@@ -118,7 +120,8 @@ async def ingest_arxiv(payload: ArxivIngestRequest) -> IngestResponse:
     summary="Ingest documents from OpenAlex",
     description="Fetches works from OpenAlex for a query and upserts them into Pinecone.",
 )
-async def ingest_openalex(payload: OpenAlexIngestRequest) -> IngestResponse:
+@limiter.limit("10/minute")
+async def ingest_openalex(request: Request, payload: OpenAlexIngestRequest) -> IngestResponse:  # noqa: ARG001
     settings = get_settings()
     namespace = payload.namespace or settings.PINECONE_NAMESPACE
     max_docs = min(payload.max_docs, 20)
@@ -156,7 +159,8 @@ async def ingest_openalex(payload: OpenAlexIngestRequest) -> IngestResponse:
         "and upserts them into Pinecone."
     ),
 )
-async def ingest_wiki(payload: WikiIngestRequest) -> IngestResponse:
+@limiter.limit("10/minute")
+async def ingest_wiki(request: Request, payload: WikiIngestRequest) -> IngestResponse:  # noqa: ARG001
     settings = get_settings()
     namespace = payload.namespace or settings.PINECONE_NAMESPACE
 

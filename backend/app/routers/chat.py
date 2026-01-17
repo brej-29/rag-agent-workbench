@@ -1,13 +1,16 @@
 import json
 from time import perf_counter
-from typing import AsyncGenerator, Dict, List
+from typing import AsyncGenerator, Dict, List, Optional
 
 from fastapi import APIRouter
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 
+from app.core.cache import cache_enabled, get_chat_cached, set_chat_cached
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.core.metrics import record_chat_timings
+from app.core.rate_limit import limiter
 from app.core.tracing import (
     get_tracing_callbacks,
     get_tracing_response_metadata,
@@ -70,6 +73,7 @@ def _build_chat_response(state: Dict) -> ChatResponse:
         "Returns the answer, source snippets, timings, and LangSmith trace metadata."
     ),
 )
+@limiter.limit("30/minute")
 async def chat(payload: ChatRequest) -> ChatResponse:
     settings = get_settings()
     namespace = payload.namespace or settings.PINECONE_NAMESPACE
@@ -80,6 +84,36 @@ async def chat(payload: ChatRequest) -> ChatResponse:
         payload.top_k,
         payload.use_web_fallback,
     )
+
+    use_cache = cache_enabled() and not payload.chat_history
+    cached_response: Optional[ChatResponse] = None
+    if use_cache:
+        cached = get_chat_cached(
+            namespace=namespace,
+            query=payload.query,
+            top_k=payload.top_k,
+            min_score=payload.min_score,
+            use_web_fallback=payload.use_web_fallback,
+        )
+        if cached is not None:
+            logger.info(
+                "Serving /chat response from cache namespace='%s' query='%s'",
+                namespace,
+                payload.query,
+            )
+            cached_response = cached
+
+    if cached_response is not None:
+        # Still record timings and metrics based on the cached response.
+        record_chat_timings(
+            {
+                "retrieve_ms": cached_response.timings.retrieve_ms,
+                "web_ms": cached_response.timings.web_ms,
+                "generate_ms": cached_response.timings.generate_ms,
+                "total_ms": cached_response.timings.total_ms,
+            }
+        )
+        return cached_response
 
     graph = get_chat_graph()
     callbacks = get_tracing_callbacks()
@@ -127,7 +161,30 @@ async def chat(payload: ChatRequest) -> ChatResponse:
         top_score,
     )
 
-    return _build_chat_response(state)
+    response_model = _build_chat_response(state)
+
+    # Record metrics based on this response.
+    record_chat_timings(
+        {
+            "retrieve_ms": response_model.timings.retrieve_ms,
+            "web_ms": response_model.timings.web_ms,
+            "generate_ms": response_model.timings.generate_ms,
+            "total_ms": response_model.timings.total_ms,
+        }
+    )
+
+    # Cache only when chat_history is empty.
+    if use_cache:
+        set_chat_cached(
+            namespace=namespace,
+            query=payload.query,
+            top_k=payload.top_k,
+            min_score=payload.min_score,
+            use_web_fallback=payload.use_web_fallback,
+            value=response_model,
+        )
+
+    return response_model
 
 
 @router.post(
@@ -139,6 +196,7 @@ async def chat(payload: ChatRequest) -> ChatResponse:
         "timings, and trace metadata."
     ),
 )
+@limiter.limit("30/minute")
 async def chat_stream(payload: ChatRequest) -> StreamingResponse:
     settings = get_settings()
     namespace = payload.namespace or settings.PINECONE_NAMESPACE
@@ -198,6 +256,16 @@ async def chat_stream(payload: ChatRequest) -> StreamingResponse:
 
     response_model = _build_chat_response(state)
     answer_text = response_model.answer
+
+    # Record metrics based on this response as well.
+    record_chat_timings(
+        {
+            "retrieve_ms": response_model.timings.retrieve_ms,
+            "web_ms": response_model.timings.web_ms,
+            "generate_ms": response_model.timings.generate_ms,
+            "total_ms": response_model.timings.total_ms,
+        }
+    )
 
     async def event_generator() -> AsyncGenerator[str, None]:
         # Stream the answer token-by-token (space-delimited) as simple SSE events.

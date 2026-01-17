@@ -252,10 +252,343 @@ RAG Agent Workbench is a lightweight experimentation backend for retrieval-augme
 
 ---
 
-## Next Steps (Work Package C – Proposed)
+## Work Package C
 
-- Add lightweight evaluation endpoints (e.g. scoring relevance or answer quality).
-- Introduce conversation/session management for multi-turn chat.
-- Add optional caching of retrieval results and/or LLM responses.
-- Provide a minimal web UI for interactive exploration of the RAG pipeline.
-- Extend observability (metrics, tracing details) around LangGraph nodes and external calls.
+### Scope
+
+- Make the backend deploy-ready on Hugging Face Spaces using Docker.
+- Add a minimal Streamlit frontend suitable for Streamlit Community Cloud (no Docker).
+- Add production polish: basic API protection, rate limiting, caching, metrics, and a small benchmarking script.
+- Keep configuration sane by default, with environment variables as overrides rather than hard requirements.
+
+### Backend changes (HF Spaces deploy + runtime)
+
+- **Docker / port behaviour**
+  - `backend/Dockerfile` now:
+    - Exposes port **7860** (the default for many Hugging Face Spaces deployments).
+    - Uses a shell-form `CMD` so `PORT` can be honoured when set:
+      - `uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-7860}`
+  - New helper: `backend/app/core/runtime.py`
+    - `get_port()`:
+      - Reads `PORT` from the environment.
+      - Defaults to `7860` when unset or invalid.
+      - Logs: `Starting on port=<port> hf_spaces_mode=<bool>` using a simple heuristic (`SPACE_ID` / `SPACE_REPO_ID` env vars).
+    - Called from `app.main` at import time so the log line is visible in container logs during startup.
+
+### API key middleware and CORS
+
+- **API key protection**
+  - New module: `backend/app/core/security.py`
+    - `configure_security(app)`:
+      - Configures CORS.
+      - Installs optional `APIKeyMiddleware` when `API_KEY` env var is set.
+    - `APIKeyMiddleware` rules:
+      - If `API_KEY` is set:
+        - Require header `X-API-Key` on:
+          - `/ingest/*`
+          - `/documents/*`
+          - `/search`
+          - `/chat*` (both `/chat` and `/chat/stream`)
+        - Public endpoints (no key required):
+          - `/health`
+          - `/docs`
+          - `/openapi.json`
+          - `/redoc`
+          - `/metrics`
+        - Requests with missing/invalid key receive:
+          - HTTP `401` with JSON `{"detail": "Missing or invalid API key. ..."}`.
+      - If `API_KEY` is **not** set:
+        - Middleware is not installed.
+        - A warning is logged:
+          - `"API key disabled; protected endpoints are open. Set API_KEY..."`.
+  - Intended use:
+    - For public demos, set a simple API key and configure the frontend to pass it.
+    - For local development, leaving `API_KEY` unset keeps the API open.
+
+- **CORS configuration**
+  - Also in `core/security.py`:
+    - Reads `ALLOWED_ORIGINS` env var as a comma-separated list.
+    - If unset or empty:
+      - Defaults to `["*"]` (permissive, useful for local dev and quick demos).
+    - Applies FastAPI `CORSMiddleware` with:
+      - `allow_origins=origins`
+      - `allow_methods=["*"]`
+      - `allow_headers=["*"]`
+  - Documented in `.env.example` and README so operators can lock this down for real deployments.
+
+### Rate limiting (SlowAPI)
+
+- New module: `backend/app/core/rate_limit.py`
+  - Uses `slowapi.Limiter` with `get_remote_address` as the key function.
+  - `setup_rate_limiter(app)`:
+    - Reads `RATE_LIMIT_ENABLED` from `Settings` (defaults to `True`).
+    - If disabled:
+      - Logs `"Rate limiting is disabled via settings."`
+      - Does **not** attach middleware (decorators become no-ops at runtime).
+    - If enabled:
+      - Attaches SlowAPI middleware: `app.middleware("http")(limiter.middleware)`.
+      - Registers a custom `RateLimitExceeded` handler returning JSON:
+        - HTTP `429`
+        - Body: `{"detail": "Rate limit exceeded. Please slow down your requests.", "retry_after": ...}` when available.
+      - Logs violations with client IP and path.
+
+- Endpoint-specific limits (per IP):
+  - `/chat` and `/chat/stream`:
+    - Decorated with `@limiter.limit("30/minute")`.
+  - `/ingest` endpoints:
+    - `/ingest/arxiv`, `/ingest/openalex`, `/ingest/wiki`:
+      - `@limiter.limit("10/minute")`.
+  - `/search`:
+    - `@limiter.limit("60/minute")`.
+
+- Operational toggle:
+  - New config flag in `Settings`:
+    - `RATE_LIMIT_ENABLED: bool = True`
+  - `.env.example`:
+    - `RATE_LIMIT_ENABLED=true` (set to `false` to disable entirely).
+
+### Caching (cachetools, in-memory)
+
+- New module: `backend/app/core/cache.py`
+  - Uses `cachetools.TTLCache` with short in-memory TTLs (no external store):
+    - **Search cache**:
+      - `TTL = 60s`, `maxsize = 1024`.
+      - Keys: `(namespace, query, top_k, filters_json)` where `filters_json` is a JSON-serialised, sorted representation of the `filters` dict.
+    - **Chat cache**:
+      - `TTL = 60s`, `maxsize = 512`.
+      - Keys: `(namespace, query, top_k, min_score, use_web_fallback)`.
+      - Only used when **no chat history** is provided.
+
+  - API:
+    - `cache_enabled() -> bool` (reads `CACHE_ENABLED` from settings, default `True`).
+    - `get_search_cached(...)` / `set_search_cached(...)`.
+    - `get_chat_cached(...)` / `set_chat_cached(...)`.
+    - `get_cache_stats()` returns hit/miss counters:
+      - `search_hits`, `search_misses`, `chat_hits`, `chat_misses`.
+
+  - Hit/miss logging:
+    - Each cache lookup logs a hit or miss with namespace and query for observability.
+
+- Integration into endpoints:
+  - `/search` (`backend/app/routers/search.py`):
+    - On each request:
+      1. Check `get_search_cached(...)`.
+      2. If hit: use cached `hits_raw` list.
+      3. If miss: call Pinecone search and then `set_search_cached(...)`.
+    - Response construction (mapping text field to `chunk_text`) remains unchanged.
+
+  - `/chat` (`backend/app/routers/chat.py`):
+    - Caching is **only considered** when `chat_history` is empty and caching is enabled.
+    - Flow:
+      1. Test `cache_enabled()` and `not payload.chat_history`.
+      2. Attempt `get_chat_cached(...)`.
+      3. On hit:
+         - Log and return the cached `ChatResponse`.
+         - Still call `record_chat_timings(...)` so `/metrics` reflects cached responses.
+      4. On miss:
+         - Run the LangGraph pipeline as before.
+         - Record timings via `record_chat_timings(...)`.
+         - Store the `ChatResponse` in the chat cache via `set_chat_cached(...)`.
+
+- Operational toggle:
+  - New config flag in `Settings`:
+    - `CACHE_ENABLED: bool = True`
+  - `.env.example`:
+    - `CACHE_ENABLED=true` (set to `false` to fully disable caching).
+
+### Metrics and observability
+
+- New module: `backend/app/core/metrics.py`
+  - In-memory metrics only, with a small footprint and no external dependencies beyond stdlib.
+  - Tracks:
+    - **Request counts by path**:
+      - `_request_counts[path]` incremented for every request, via `metrics_middleware`.
+    - **Error counts by path**:
+      - `_error_counts[path]` incremented for any response with `status_code >= 400` or for unhandled exceptions.
+    - **Chat timing metrics**:
+      - Focused on `/chat` and `/chat/stream`.
+      - Expected fields:
+        - `retrieve_ms`, `web_ms`, `generate_ms`, `total_ms`.
+      - Stored in:
+        - `_timing_samples`: `deque(maxlen=20)` for the last 20 samples.
+        - `_timing_sums` and `_timing_count` for averages.
+
+  - Middleware:
+    - `metrics_middleware(request, call_next)`:
+      - Records per-path request and error counts.
+      - Logs debug-level timing for each request.
+
+  - API functions:
+    - `record_chat_timings(timings: Mapping[str, float])`:
+      - Updates sums, counts, and the ring buffer.
+      - Called from both `/chat` and `/chat/stream` after timings are known.
+    - `get_metrics_snapshot()`:
+      - Builds a snapshot dictionary containing:
+        - `requests_by_path`
+        - `errors_by_path`
+        - `timings`:
+          - `average_ms` for each timing field.
+          - `p50_ms` and `p95_ms` based on the last 20 samples.
+        - `cache`:
+          - `search_hits`, `search_misses`, `chat_hits`, `chat_misses` from `core.cache`.
+        - `sample_count` and `samples` (the last 20 timing entries).
+
+- `/metrics` endpoint
+  - New router: `backend/app/routers/metrics.py`
+    - `GET /metrics` returns `get_metrics_snapshot()` as JSON.
+  - Registered in `app.main` with tag `["metrics"]`.
+  - Left **public** (not behind API key) to simplify monitoring and demos.
+
+- App wiring (`backend/app/main.py`)
+  - After creating the FastAPI app:
+    - `configure_security(app)` – CORS + optional API key.
+    - `setup_rate_limiter(app)` – SlowAPI middleware when enabled.
+    - `setup_metrics(app)` – metrics middleware.
+  - Routers:
+    - `health`, `ingest`, `search`, `documents`, `chat`, `metrics` all included.
+  - Exception handlers:
+    - Still configured via `setup_exception_handlers(app)`.
+
+### Benchmarking script
+
+- New script: `scripts/bench_local.py`
+  - Purpose:
+    - Provide a simple, cross-platform (including Windows) asyncio load tester for the backend.
+    - Focused on `/chat`, with optional `/search` benchmarking.
+  - Implementation:
+    - Uses `httpx.AsyncClient` and `asyncio`.
+    - Command-line arguments:
+      - `--backend-url` (default: `http://localhost:8000`)
+      - `--namespace` (default: `dev`)
+      - `--concurrency` (default: `10`)
+      - `--requests` (default: `50`)
+      - `--include-search` (optional flag to also benchmark `/search`)
+      - `--api-key` (optional `X-API-Key` value)
+    - For each benchmark:
+      - Issues the specified number of requests with the provided concurrency.
+      - Records per-request latency (ms) and whether an error occurred.
+    - Outputs:
+      - Total requests, successes, errors, and error rate.
+      - Average latency.
+      - p50 and p95 latencies.
+  - Entrypoint:
+    - `python scripts/bench_local.py --backend-url http://localhost:8000 --namespace dev --concurrency 10 --requests 50`
+
+### Streamlit frontend (Streamlit Community Cloud)
+
+- New directory: `frontend/`
+  - Main app: `frontend/app.py`
+    - Dependencies:
+      - `streamlit`
+      - `httpx`
+    - Backend configuration:
+      - Reads `BACKEND_BASE_URL` from `st.secrets["BACKEND_BASE_URL"]` or the `BACKEND_BASE_URL` environment variable.
+      - Reads optional `API_KEY` from `st.secrets["API_KEY"]` or the `API_KEY` environment variable.
+    - Connectivity panel (sidebar):
+      - Displays the configured backend URL.
+      - Indicates whether an API key is configured.
+      - Provides a "Ping /health" button that calls the backend and shows the JSON response.
+    - Chat UI:
+      - Text input for namespace (`dev` by default).
+      - Text area for user question.
+      - On "Send":
+        - Calls backend `/chat` with:
+          - `query`, `namespace`, `top_k=5`, `use_web_fallback=true`.
+          - Includes `X-API-Key` header when configured.
+        - Displays:
+          - Answer text.
+          - Timings JSON.
+          - Up to 5 sources with titles, URLs, and snippet text (in expanders).
+
+- Root-level `requirements.txt`
+  - Added to support Streamlit Community Cloud, where the root requirements file is used:
+    - `streamlit`
+    - `httpx`
+  - Backend Docker image continues to use `backend/requirements.txt`, keeping the backend container small and independent.
+
+---
+
+## Operational Runbook
+
+### Rotating keys and secrets
+
+- **Backend (Hugging Face Spaces or other container hosts)**
+  - Update environment variables / secrets:
+    - `PINECONE_API_KEY`, `PINECONE_HOST`, `PINECONE_INDEX_NAME`, `PINECONE_NAMESPACE`, `PINECONE_TEXT_FIELD`
+    - `GROQ_API_KEY`, `GROQ_BASE_URL`, `GROQ_MODEL`
+    - `TAVILY_API_KEY`
+    - `LANGCHAIN_API_KEY`, `LANGCHAIN_TRACING_V2`, `LANGCHAIN_PROJECT`
+    - `API_KEY` for HTTP clients
+  - Redeploy or restart the Space to apply changes.
+  - Verify:
+    - `GET /health` returns `status: ok`.
+    - `/chat` and `/search` work as expected.
+    - `/metrics` shows traffic and cache counters updating.
+
+- **Frontend (Streamlit Community Cloud)**
+  - Use Streamlit Secrets manager (no secrets in repo):
+    - `BACKEND_BASE_URL` – full URL of the backend (e.g. HF Spaces URL).
+    - `API_KEY` – must match backend `API_KEY` if API protection is enabled.
+  - After rotating backend keys:
+    - If `API_KEY` changed, update it in Streamlit secrets.
+    - No code changes required.
+
+### Disabling rate limiting and caching
+
+- **Rate limiting**
+  - Set `RATE_LIMIT_ENABLED=false` in the backend environment (or `.env` for local).
+  - Restart the backend.
+  - SlowAPI middleware will not be attached; `@limiter.limit(...)` decorators become effectively no-op for enforcement.
+  - `/metrics` will still track request counts and errors.
+
+- **Caching**
+  - Set `CACHE_ENABLED=false` in the backend environment.
+  - Restart the backend.
+  - Search and chat endpoints will bypass in-memory TTL caches entirely.
+  - `get_cache_stats()` will still report counters, which will stop increasing.
+
+### Diagnosing common deployment issues
+
+- **Symptom: 404 / connection errors on Hugging Face Spaces**
+  - Check:
+    - The Space is configured as **Docker** and points to the `backend/` subdirectory (or uses the provided `backend/Dockerfile`).
+    - Logs show the startup message:
+      - `"Starting on port=... hf_spaces_mode=..."`.
+    - HF Spaces sets `PORT` automatically; the Docker `CMD` will honour it.
+  - Verify:
+    - Open `/docs` and `/health` in the browser using the Space URL.
+    - If 404/500 persists:
+      - Ensure `PINECONE_*` and `GROQ_API_KEY` are set.
+      - Check logs for `PineconeIndexConfigError` or missing LLM configuration.
+
+- **Symptom: 401 Unauthorized from frontend**
+  - Ensure:
+    - Backend `API_KEY` is set and matches the `API_KEY` in Streamlit secrets.
+    - Requests include `X-API-Key` header (Streamlit app does this automatically when `API_KEY` is present).
+  - Confirm `/health` is still reachable without a key (by design).
+
+- **Symptom: 429 Too Many Requests**
+  - Indicates SlowAPI rate limiting is active.
+  - Options:
+    - Reduce load (e.g. from `bench_local.py`).
+    - Temporarily set `RATE_LIMIT_ENABLED=false` for heavy local testing.
+  - Inspect `/metrics`:
+    - Check request counts and error counts for affected paths.
+
+- **Symptom: Stale results after ingestion**
+  - By default, caches are short-lived (60 seconds) but may briefly serve stale results:
+    - When ingesting new documents, `/search` or `/chat` responses may not immediately reflect new content.
+  - Workarounds:
+    - Wait a minute for TTL expiry.
+    - For strict freshness, disable caching with `CACHE_ENABLED=false`.
+
+- **Symptom: Streamlit frontend cannot reach backend**
+  - Verify:
+    - `BACKEND_BASE_URL` in Streamlit secrets is correct and publicly reachable.
+    - CORS config on the backend:
+      - For debugging, keep `ALLOWED_ORIGINS` unset (defaults to `"*"`).
+      - For locked-down deployment, ensure the Streamlit app origin is included.
+  - Use the Connectivity panel:
+    - Click "Ping /health" and inspect the response or error message.
+
+---

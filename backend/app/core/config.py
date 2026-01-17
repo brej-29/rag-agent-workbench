@@ -87,6 +87,16 @@ class Settings(BaseSettings):
         description="Maximum number of web search results to fetch when using Tavily",
     )
 
+    # Operational toggles
+    RATE_LIMIT_ENABLED: bool = Field(
+        default=True,
+        description="Enable SlowAPI rate limiting middleware when true.",
+    )
+    CACHE_ENABLED: bool = Field(
+        default=True,
+        description="Enable in-memory TTL caching for /search and /chat when true.",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

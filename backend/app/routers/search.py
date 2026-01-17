@@ -3,8 +3,10 @@ from typing import Any, Dict, List
 from fastapi import APIRouter
 from fastapi.concurrency import run_in_threadpool
 
+from app.core.cache import get_search_cached, set_search_cached
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.core.rate_limit import limiter
 from app.schemas.search import SearchHit, SearchRequest, SearchResponse
 from app.services.pinecone_store import search as pinecone_search
 
@@ -22,6 +24,7 @@ router = APIRouter(tags=["search"])
         "returns the top matching chunks."
     ),
 )
+@limiter.limit("60/minute")
 async def search(payload: SearchRequest) -> SearchResponse:
     settings = get_settings()
     namespace = payload.namespace or settings.PINECONE_NAMESPACE
@@ -33,14 +36,30 @@ async def search(payload: SearchRequest) -> SearchResponse:
         payload.top_k,
     )
 
-    hits_raw: List[Dict[str, Any]] = await run_in_threadpool(
-        pinecone_search,
-        namespace,
-        payload.query,
-        payload.top_k,
-        payload.filters,
-        None,
+    cached = get_search_cached(
+        namespace=namespace,
+        query=payload.query,
+        top_k=payload.top_k,
+        filters=payload.filters,
     )
+    if cached is not None:
+        hits_raw = cached
+    else:
+        hits_raw: List[Dict[str, Any]] = await run_in_threadpool(
+            pinecone_search,
+            namespace,
+            payload.query,
+            payload.top_k,
+            payload.filters,
+            None,
+        )
+        set_search_cached(
+            namespace=namespace,
+            query=payload.query,
+            top_k=payload.top_k,
+            filters=payload.filters,
+            value=hits_raw,
+        )
 
     hits: List[SearchHit] = []
     for hit in hits_raw:

@@ -83,11 +83,30 @@ async def ingest_arxiv(payload: ArxivIngestRequest) -> IngestResponse:
             category=payload.category,
         )
     except (httpx.HTTPStatusError, httpx.RequestError) as exc:
-        logger.error("Upstream arXiv error: %s", exc)
+        status = None
+        reason = ""
+        url = None
+        if isinstance(exc, httpx.HTTPStatusError):
+            if exc.response is not None:
+                status = exc.response.status_code
+                reason = exc.response.reason_phrase
+                url = str(exc.response.url)
+        if hasattr(exc, "request") and getattr(exc, "request") is not None and url is None:
+            try:
+                url = str(exc.request.url)
+            except Exception:  # noqa: BLE001
+                url = None
+
+        logger.error(
+            "Upstream arXiv error (url=%s): %s",
+            url or "unknown",
+            exc,
+        )
+        status_display = status if status is not None else "unknown"
+        detail = f"Upstream arXiv error: {status_display} {reason}".strip()
         raise HTTPException(
             status_code=502,
-            detail="Upstream arXiv error: unable to retrieve content. "
-            "Try again later.",
+            detail=detail,
         ) from exc
 
     return await _process_and_upsert(documents, namespace=namespace, source="arxiv")

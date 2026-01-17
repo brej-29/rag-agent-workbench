@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from pinecone import Index, Pinecone
+from pinecone import Pinecone
 
 from app.core.config import Settings, get_settings
 from app.core.errors import PineconeIndexConfigError
@@ -10,8 +10,8 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-_index: Optional[Index] = None
-_pc: Optional[Pinecone] = None
+_index: Optional[Any] = None
+_pc: Optional[Pinenecone] = None
 _default_namespace: str = "dev"
 
 
@@ -75,7 +75,7 @@ def init_pinecone(settings: Optional[Settings] = None) -> None:
     )
 
 
-def get_index() -> Index:
+def get_index() -> Any:
     """Return the initialised Pinecone Index client."""
     if _index is None:
         raise RuntimeError("Pinecone index has not been initialised")

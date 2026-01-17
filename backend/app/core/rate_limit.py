@@ -1,9 +1,10 @@
-from typing import Any, Callable
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
 from app.core.config import get_settings
@@ -54,4 +55,4 @@ def setup_rate_limiter(app: FastAPI) -> None:
         return JSONResponse(status_code=429, content=content)
 
     # Attach SlowAPI middleware
-    app.middleware("http")(limiter.middleware)
+    app.add_middleware(SlowAPIMiddleware)

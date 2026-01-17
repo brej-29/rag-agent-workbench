@@ -44,17 +44,20 @@
 ## 2026-01-17 – Security + UI + Ingestion Hardening
 
 - **Summary**
-  - Hardened the backend for public deployment by enforcing API key protection for all non-health endpoints and for the OpenAPI/Swagger documentation.
+  - Hardened the backend for public deployment by enforcing API key protection for all non-health endpoints and (initially) for the OpenAPI/Swagger documentation, then relaxed docs to be publicly viewable while keeping all functional endpoints protected.
   - Upgraded the Streamlit frontend to a conversational chat UI using Streamlit's chat primitives.
   - Improved local document ingestion workflows with Docling-aware scripts for single files and batch folder ingestion.
+  - Added a UI-based document upload dialog in the Streamlit app that ingests files via `/documents/upload-text`.
 
 - **Key Files Changed**
   - Backend authentication and wiring:
     - `backend/app/core/auth.py`
     - `backend/app/core/security.py`
     - `backend/app/main.py`
-  - Frontend chatbot UI:
+  - Frontend chatbot UI and upload:
     - `frontend/app.py`
+    - `frontend/services/file_convert.py`
+    - `frontend/services/backend_client.py`
   - Local ingestion scripts:
     - `scripts/docling_convert_and_upload.py`
     - `scripts/batch_ingest_local_folder.py`
@@ -64,7 +67,9 @@
     - `docs/WORKLOG.md` (this file)
 
 - **Major Decisions**
-  - In production-like environments (`ENV=production` or on Hugging Face Spaces), require `API_KEY` and fail fast at startup when it is missing.
-  - Use a single `require_api_key` dependency (based on `APIKeyHeader`) to protect all routers except `/health`, and to guard `/openapi.json`, `/docs`, and `/redoc`.
+  - In production-like environments (`ENV=production` or on Hugging Face Spaces), require `API_KEY` and fail fast at startup when it is missing; Swagger/OpenAPI remain publicly accessible but all non-health API endpoints still enforce `X-API-Key`.
+  - Use a single `require_api_key` dependency (based on `APIKeyHeader`) to protect all routers except `/health`.
   - Treat Streamlit as a first-class chat client, using `st.chat_message`/`st.chat_input` with session-based history and optional streaming from `/chat/stream`.
-  - Keep Docling as an optional local-only dependency and reuse its conversion logic via scripts that upload text to `/documents/upload-text` rather than extending the backend container.
+  - Keep Docling as an optional dependency used in:
+    - Local ingestion scripts that upload text to `/documents/upload-text`.
+    - The frontend upload dialog for converting PDFs/Office/HTML when available, while falling back to raw `.md`/`.txt` and showing clear errors otherwise.

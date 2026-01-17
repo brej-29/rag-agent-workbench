@@ -42,7 +42,7 @@ setup_rate_limiter(app)
 setup_metrics(app)
 
 # Register routers with tags and ensure they are included in the schema.
-# Health remains public; all other routers are protected by API key dependency when configured.
+# Health and docs remain public; all other routers are protected by API key dependency when configured.
 app.include_router(health_router, tags=["health"])
 app.include_router(ingest_router, tags=["ingest"], dependencies=[Depends(require_api_key)])
 app.include_router(search_router, tags=["search"], dependencies=[Depends(require_api_key)])

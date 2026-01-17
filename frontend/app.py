@@ -1,9 +1,14 @@
 import json
 import os
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
 import httpx
 import streamlit as st
+
+from services.backend_client import post_upload_text
+from services.file_convert import convert_uploaded_file_to_text
 
 
 def get_backend_base_url() -> str:
@@ -107,6 +112,10 @@ def init_session_state() -> None:
     # Namespace is fixed for now; default to "dev".
     if "namespace" not in st.session_state:
         st.session_state.namespace = "dev"
+    if "recent_uploads" not in st.session_state:
+        st.session_state.recent_uploads: List[Dict[str, Any]] = []
+    if "chat_prefill" not in st.session_state:
+        st.session_state.chat_prefill = None
 
 
 def render_sidebar(backend_base_url: str, api_key: Optional[str]) -> Dict[str, Any]:
@@ -154,6 +163,20 @@ def render_sidebar(backend_base_url: str, api_key: Optional[str]) -> Dict[str, A
         if st.button("Clear chat"):
             st.session_state.messages = []
 
+        st.markdown("---")
+        st.subheader("Recent uploads")
+        recent = st.session_state.get("recent_uploads", [])
+        if not recent:
+            st.caption("No documents uploaded yet.")
+        else:
+            for idx, item in enumerate(recent):
+                title = item.get("title") or "Untitled"
+                ns = item.get("namespace") or st.session_state.get("namespace", "dev")
+                ts = item.get("timestamp", "")
+                st.markdown(f"- **{title}**  \n  Namespace: `{ns}`  \n  Uploaded: {ts}")
+                if st.button("Search this document", key=f"search_upload_{idx}"):
+                    st.session_state.chat_prefill = f"Summarize: {title}"
+
     return {
         "top_k": top_k,
         "min_score": float(min_score),
@@ -183,6 +206,113 @@ def render_chat_history(show_sources: bool) -> None:
                                 st.write(chunk_text[:1000] + ("..." if len(chunk_text) > 1000 else ""))
 
 
+@st.dialog("Upload document")
+def upload_dialog(backend_base_url: str, api_key: Optional[str]) -> None:
+    """Modal dialog for uploading and ingesting a document via /documents/upload-text."""
+    st.write("Upload a document to ingest it into the RAG backend.")
+
+    with st.form("upload_form"):
+        uploaded_file = st.file_uploader(
+            "Choose a file",
+            type=["pdf", "md", "txt", "docx", "pptx", "xlsx", "html", "htm"],
+            accept_multiple_files=False,
+        )
+
+        default_title = ""
+        if uploaded_file is not None:
+            default_title = Path(uploaded_file.name).stem
+
+        title = st.text_input("Title", value=default_title)
+        namespace = st.text_input(
+            "Namespace",
+            value=st.session_state.get("namespace", "dev"),
+            help="Target Pinecone namespace.",
+        )
+        source = st.text_input("Source label", value="ui-upload")
+        tags = st.text_input("Tags (comma separated)", value="")
+        notes = st.text_area("Notes", value="", height=80)
+
+        upload_anyway = st.checkbox(
+            "Upload even if extracted text is very short",
+            value=False,
+            help="Enable to upload even when the extracted text is shorter than 200 characters.",
+        )
+
+        submit = st.form_submit_button("Upload")
+    if not submit:
+        return
+
+    if uploaded_file is None:
+        st.error("Please select a file to upload.")
+        return
+
+    if not title.strip():
+        st.error("Please provide a title.")
+        return
+
+    if not api_key:
+        st.error("API_KEY is not configured; cannot upload to a protected backend.")
+        return
+
+    with st.spinner("Converting and uploading document..."):
+        try:
+            uploaded_file.seek(0)
+            text, conv_meta = convert_uploaded_file_to_text(uploaded_file)
+        except Exception as exc:  # noqa: BLE001
+            st.error(f"Error converting file: {exc}")
+            return
+
+        if len(text.strip()) < 200 and not upload_anyway:
+            st.warning(
+                "Extracted text is very short (< 200 characters). "
+                "Check the file or enable the checkbox to upload anyway."
+            )
+            return
+
+        meta: Dict[str, Any] = {
+            **conv_meta,
+            "tags": [t.strip() for t in tags.split(",") if t.strip()],
+            "notes": notes,
+        }
+
+        payload = {
+            "title": title.strip(),
+            "source": source.strip() or "ui-upload",
+            "text": text,
+            "namespace": namespace.strip() or st.session_state.get("namespace", "dev"),
+            "metadata": meta,
+        }
+
+        try:
+            response = post_upload_text(backend_base_url, api_key, payload)
+        except httpx.HTTPStatusError as exc:
+            if exc.response is not None:
+                detail = exc.response.text
+                status_code = exc.response.status_code
+            else:
+                detail = str(exc)
+                status_code = "error"
+            st.error(f"Upload failed ({status_code}): {detail}")
+            return
+        except Exception as exc:  # noqa: BLE001
+            st.error(f"Upload failed: {exc}")
+            return
+
+        # Record recent upload and suggest a follow-up chat action.
+        rec = {
+            "title": title.strip(),
+            "namespace": payload["namespace"],
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "response": response,
+        }
+        recent = st.session_state.get("recent_uploads", [])
+        recent.append(rec)
+        st.session_state.recent_uploads = recent[-5:]
+
+        st.success(f"Uploaded and indexed: {title.strip()}")
+        st.rerun()
+
+
 def main() -> None:
     st.set_page_config(page_title="RAG Agent Workbench", layout="wide")
     st.title("RAG Agent Workbench – Chatbot")
@@ -191,6 +321,10 @@ def main() -> None:
 
     backend_base_url = get_backend_base_url()
     api_key = get_api_key()
+
+    # Upload button near the top-level chat UI.
+    if st.button("📄 Upload Document"):
+        upload_dialog(backend_base_url, api_key)
 
     settings = render_sidebar(backend_base_url, api_key)
     render_chat_history(show_sources=st.session_state.show_sources)
@@ -201,9 +335,19 @@ def main() -> None:
         )
         return
 
-    user_message = st.chat_input("Ask a question about your documents...")
+    # Pre-fill chat input if a suggestion was set (e.g. from recent uploads).
+    prefill = st.session_state.get("chat_prefill")
+    if prefill and "chat_input" not in st.session_state:
+        st.session_state.chat_input = prefill
+
+    user_message = st.chat_input(
+        "Ask a question about your documents...", key="chat_input"
+    )
     if not user_message:
         return
+
+    # Clear any prefill once the user has sent a message.
+    st.session_state.chat_prefill = None
 
     # Record and display user message
     st.session_state.messages.append({"role": "user", "content": user_message})

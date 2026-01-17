@@ -484,8 +484,11 @@ RAG Agent Workbench is a lightweight experimentation backend for retrieval-augme
     - Sidebar ("Backend" + settings):
       - Shows backend URL and API key status.
       - "Ping /health" button that calls the backend and shows the JSON response.
-      - Namespace input, `top_k` slider, `min_score` slider, `use_web_fallback` checkbox.
+      - `top_k` slider, `min_score` slider, `use_web_fallback` checkbox.
       - "Show sources" toggle and "Clear chat" button.
+      - "Recent uploads" section with quick actions:
+        - For each recent upload, displays title, namespace, timestamp.
+        - A "Search this document" button pre-fills the chat input with a prompt such as `Summarize: <title>`.
     - Chatbot UI:
       - Uses `st.chat_message` and `st.chat_input` with conversation stored in `st.session_state.messages`.
       - When the user sends a message:
@@ -497,6 +500,16 @@ RAG Agent Workbench is a lightweight experimentation backend for retrieval-augme
         - Optionally show sources in an expandable "Sources" section with titles, URLs, scores, and truncated snippets.
       - If `API_KEY` is not configured in secrets or environment:
         - The app warns and disables sending messages to the protected backend.
+    - UI document upload:
+      - A top-level “📄 Upload Document” button opens a `@st.dialog` modal.
+      - Inside the dialog:
+        - `st.file_uploader` for `.pdf`, `.md`, `.txt`, `.docx`, `.pptx`, `.xlsx`, `.html`, `.htm`.
+        - Inputs for title (defaulting to filename), namespace, source label, tags, and notes.
+        - A checkbox to allow uploading even when extracted text is very short.
+        - On submit:
+          - The frontend converts the file to text/markdown (using Docling when installed, or raw text for `.md`/`.txt`).
+          - Calls backend `POST /documents/upload-text` with `X-API-Key`.
+          - On success, records the upload in `st.session_state.recent_uploads` and triggers a rerun to close the dialog.
 
 - Root-level `requirements.txt`
   - Added to support Streamlit Community Cloud, where the root requirements file is used:

@@ -279,6 +279,31 @@ python batch_ingest_local_folder.py \
 - Recursively scans the folder for supported extensions and ingests up to `max-files` documents.
 - Each file is converted via `docling_convert_and_upload.py` logic and uploaded to `/documents/upload-text`.
 
+## Upload documents via UI (Streamlit dialog)
+
+The Streamlit chat frontend also supports uploading documents directly from the browser:
+
+- Click the **“📄 Upload Document”** button at the top of the chat page.
+- A modal dialog opens with:
+  - File chooser (`.pdf`, `.md`, `.txt`, `.docx`, `.pptx`, `.xlsx`, `.html`, `.htm`).
+  - Title (defaults to filename without extension).
+  - Namespace (defaults to the backend namespace, e.g. `dev`).
+  - Source label (defaults to `ui-upload`).
+  - Optional metadata: tags (comma-separated) and free-form notes.
+- On upload:
+  - The frontend converts the file to markdown/text and calls `POST /documents/upload-text` with:
+    - `title`, `source`, `text`, `namespace`, and a `metadata` dictionary containing conversion and UI metadata.
+  - On success, the upload is recorded in a “Recent uploads” section in the sidebar and can be quickly queried via “Search this document”.
+
+Notes:
+
+- Conversion happens entirely in the frontend:
+  - `.txt` and `.md` files are read as raw text.
+  - For richer formats (PDF/Office/HTML), the frontend attempts to use **Docling** if installed.
+  - If Docling is not available, an informative error is shown and the user is asked to upload `.md`/`.txt` instead.
+- On Streamlit Cloud, Docling must be added to the app’s Python environment (e.g. `requirements.txt`) for PDF/Office uploads to work.
+- Streamlit’s file uploader has a default maximum size (typically 200 MB); check Streamlit documentation if you need to increase or restrict this limit.
+
 ## Deploy Backend on Hugging Face Spaces (Docker)
 
 1. **Create a new Space**

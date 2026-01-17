@@ -275,38 +275,35 @@ RAG Agent Workbench is a lightweight experimentation backend for retrieval-augme
       - Logs: `Starting on port=<port> hf_spaces_mode=<bool>` using a simple heuristic (`SPACE_ID` / `SPACE_REPO_ID` env vars).
     - Called from `app.main` at import time so the log line is visible in container logs during startup.
 
-### API key middleware and CORS
+### API key protection and CORS
 
 - **API key protection**
-  - New module: `backend/app/core/security.py`
-    - `configure_security(app)`:
-      - Configures CORS.
-      - Installs optional `APIKeyMiddleware` when `API_KEY` env var is set.
-    - `APIKeyMiddleware` rules:
-      - If `API_KEY` is set:
-        - Require header `X-API-Key` on:
-          - `/ingest/*`
-          - `/documents/*`
-          - `/search`
-          - `/chat*` (both `/chat` and `/chat/stream`)
-        - Public endpoints (no key required):
-          - `/health`
-          - `/docs`
-          - `/openapi.json`
-          - `/redoc`
-          - `/metrics`
-        - Requests with missing/invalid key receive:
-          - HTTP `401` with JSON `{"detail": "Missing or invalid API key. ..."}`.
-      - If `API_KEY` is **not** set:
-        - Middleware is not installed.
-        - A warning is logged:
-          - `"API key disabled; protected endpoints are open. Set API_KEY..."`.
-  - Intended use:
-    - For public demos, set a simple API key and configure the frontend to pass it.
-    - For local development, leaving `API_KEY` unset keeps the API open.
+  - New module: `backend/app/core/auth.py`
+    - Defines `require_api_key` FastAPI dependency using `APIKeyHeader` (`X-API-Key`).
+    - `validate_api_key_configuration()` runs at startup and enforces:
+      - In production-like environments (`ENV=production` or on Hugging Face Spaces via `SPACE_ID` / `HF_HOME`):
+        - `API_KEY` **must** be set or the backend fails fast with a clear error.
+      - In local development:
+        - If `API_KEY` is missing, the backend runs open but logs a prominent warning.
+    - `require_api_key` behaviour:
+      - If `API_KEY` is not configured (dev mode), the dependency is a no-op.
+      - If `API_KEY` is configured:
+        - Missing or mismatched `X-API-Key` results in HTTP 403.
+  - Wiring:
+    - All routers except `/health` are registered with `dependencies=[Depends(require_api_key)]`.
+    - Docs and OpenAPI endpoints are explicitly secured:
+      - `GET /openapi.json` – returns `app.openapi()`, protected by `require_api_key`.
+      - `GET /docs` – Swagger UI via `get_swagger_ui_html`, protected by `require_api_key`.
+      - `GET /redoc` – ReDoc UI via `get_redoc_html`, protected by `require_api_key`.
+    - Effect:
+      - In HF Spaces / production:
+        - `/docs`, `/redoc`, `/openapi.json`, `/chat`, `/search`, `/documents/*`, `/ingest/*`, `/metrics` all require `X-API-Key`.
+        - `/health` remains public for simple uptime checks.
+      - In local dev with no `API_KEY`:
+        - All endpoints (including docs) are accessible without a key for convenience.
 
 - **CORS configuration**
-  - Also in `core/security.py`:
+  - `backend/app/core/security.py` now focuses solely on CORS:
     - Reads `ALLOWED_ORIGINS` env var as a comma-separated list.
     - If unset or empty:
       - Defaults to `["*"]` (permissive, useful for local dev and quick demos).
@@ -314,7 +311,7 @@ RAG Agent Workbench is a lightweight experimentation backend for retrieval-augme
       - `allow_origins=origins`
       - `allow_methods=["*"]`
       - `allow_headers=["*"]`
-  - Documented in `.env.example` and README so operators can lock this down for real deployments.
+  - API key enforcement is handled entirely via `core/auth.py` and router/dependency wiring.
 
 ### Rate limiting (SlowAPI)
 
@@ -483,22 +480,23 @@ RAG Agent Workbench is a lightweight experimentation backend for retrieval-augme
       - `httpx`
     - Backend configuration:
       - Reads `BACKEND_BASE_URL` from `st.secrets["BACKEND_BASE_URL"]` or the `BACKEND_BASE_URL` environment variable.
-      - Reads optional `API_KEY` from `st.secrets["API_KEY"]` or the `API_KEY` environment variable.
-    - Connectivity panel (sidebar):
-      - Displays the configured backend URL.
-      - Indicates whether an API key is configured.
-      - Provides a "Ping /health" button that calls the backend and shows the JSON response.
-    - Chat UI:
-      - Text input for namespace (`dev` by default).
-      - Text area for user question.
-      - On "Send":
-        - Calls backend `/chat` with:
-          - `query`, `namespace`, `top_k=5`, `use_web_fallback=true`.
-          - Includes `X-API-Key` header when configured.
-        - Displays:
-          - Answer text.
-          - Timings JSON.
-          - Up to 5 sources with titles, URLs, and snippet text (in expanders).
+      - Reads `API_KEY` from `st.secrets["API_KEY"]` or the `API_KEY` environment variable.
+    - Sidebar ("Backend" + settings):
+      - Shows backend URL and API key status.
+      - "Ping /health" button that calls the backend and shows the JSON response.
+      - Namespace input, `top_k` slider, `min_score` slider, `use_web_fallback` checkbox.
+      - "Show sources" toggle and "Clear chat" button.
+    - Chatbot UI:
+      - Uses `st.chat_message` and `st.chat_input` with conversation stored in `st.session_state.messages`.
+      - When the user sends a message:
+        - Appends it to history and displays it.
+        - Calls `/chat/stream` with `X-API-Key` (if available) and streams tokens into the UI.
+        - If `/chat/stream` is unavailable (e.g. 404), falls back to `/chat`.
+      - Assistant messages:
+        - Display the answer text.
+        - Optionally show sources in an expandable "Sources" section with titles, URLs, scores, and truncated snippets.
+      - If `API_KEY` is not configured in secrets or environment:
+        - The app warns and disables sending messages to the protected backend.
 
 - Root-level `requirements.txt`
   - Added to support Streamlit Community Cloud, where the root requirements file is used:

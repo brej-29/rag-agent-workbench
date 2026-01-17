@@ -1,6 +1,8 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import ORJSONResponse
 
+from app.core.auth import require_api_key, validate_api_key_configuration
 from app.core.config import get_settings
 from app.core.errors import PineconeIndexConfigError, setup_exception_handlers
 from app.core.logging import configure_logging, get_logger
@@ -20,6 +22,9 @@ settings = get_settings()
 configure_logging(settings.LOG_LEVEL)
 logger = get_logger(__name__)
 
+# Validate API key configuration early so hosted deployments fail fast when misconfigured.
+validate_api_key_configuration()
+
 # Log runtime port / environment context at import time for easier diagnostics.
 get_port()
 
@@ -27,9 +32,9 @@ app = FastAPI(
     title="RAG Agent Workbench API",
     version=settings.APP_VERSION,
     default_response_class=ORJSONResponse,
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 # Core app configuration
@@ -37,16 +42,53 @@ configure_security(app)
 setup_rate_limiter(app)
 setup_metrics(app)
 
-# Register routers with tags and ensure they are included in the schema
+# Register routers with tags and ensure they are included in the schema.
+# Health remains public; all other routers are protected by API key dependency when configured.
 app.include_router(health_router, tags=["health"])
-app.include_router(ingest_router, tags=["ingest"])
-app.include_router(search_router, tags=["search"])
-app.include_router(documents_router, tags=["documents"])
-app.include_router(chat_router, tags=["chat"])
-app.include_router(metrics_router, tags=["metrics"])
+app.include_router(ingest_router, tags=["ingest"], dependencies=[Depends(require_api_key)])
+app.include_router(search_router, tags=["search"], dependencies=[Depends(require_api_key)])
+app.include_router(documents_router, tags=["documents"], dependencies=[Depends(require_api_key)])
+app.include_router(chat_router, tags=["chat"], dependencies=[Depends(require_api_key)])
+app.include_router(metrics_router, tags=["metrics"], dependencies=[Depends(require_api_key)])
 
 # Register exception handlers
 setup_exception_handlers(app)
+
+
+@app.get(
+    "/openapi.json",
+    include_in_schema=False,
+    dependencies=[Depends(require_api_key)],
+)
+async def secured_openapi_json() -> dict:
+    """Return the OpenAPI schema, protected by API key when configured."""
+    return app.openapi()
+
+
+@app.get(
+    "/docs",
+    include_in_schema=False,
+    dependencies=[Depends(require_api_key)],
+)
+async def secured_swagger_ui():
+    """Serve Swagger UI, protected by API key when configured."""
+    return get_swagger_ui_html(
+        openapi_url="/openapi.json",
+        title="RAG Agent Workbench API Docs",
+    )
+
+
+@app.get(
+    "/redoc",
+    include_in_schema=False,
+    dependencies=[Depends(require_api_key)],
+)
+async def secured_redoc():
+    """Serve ReDoc UI, protected by API key when configured."""
+    return get_redoc_html(
+        openapi_url="/openapi.json",
+        title="RAG Agent Workbench API ReDoc",
+    )
 
 
 @app.on_event("startup")

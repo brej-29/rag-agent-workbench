@@ -48,7 +48,9 @@ Optional for LangSmith tracing:
 
 Optional for basic API protection:
 
-- `API_KEY` – when set, `/ingest/*`, `/documents/*`, `/search`, and `/chat*` require `X-API-Key` header.
+- `API_KEY` – when set, all routers except `/health` are protected by `X-API-Key` (including `/chat`, `/search`, `/documents/*`, `/ingest/*`, `/metrics`, and the OpenAPI/Swagger docs).
+  - In production-like environments (`ENV=production` or on Hugging Face Spaces), `API_KEY` **must** be set or the backend will fail to start.
+  - In local development (no Spaces and `ENV` not set to `production`), `API_KEY` is optional; when omitted, the API (including docs) is open.
 
 Optional for CORS:
 
@@ -237,20 +239,45 @@ A helper script is provided to seed the index with multiple arXiv and OpenAlex q
 python ../scripts/seed_ingest.py --base-url http://localhost:8000 --namespace dev --mailto you@example.com
 ```
 
-## Docling integration (external script)
+## Docling integration (external scripts)
 
-Docling is used via a separate script so the backend container stays small. To convert a local PDF and upload it as text:
+Docling is used via separate scripts so the backend container stays small and does not depend on Docling. To convert local documents and upload them as text:
+
+### Single file
 
 ```bash
 cd scripts
-pip install docling
+pip install docling  # optional but recommended for rich formats
 python docling_convert_and_upload.py \
-  --pdf-path /path/to/file.pdf \
+  --file /path/to/file.pdf \
   --backend-url http://localhost:8000 \
   --namespace dev \
-  --title "My PDF via Docling" \
-  --source docling
+  --title "My local document" \
+  --source local-file \
+  --api-key "$API_KEY"
 ```
+
+- Supported formats when Docling is installed include: PDF, DOCX, PPT/PPTX, XLS/XLSX, HTML/HTM, MD, AsciiDoc, and TXT.
+- If Docling is **not** installed:
+  - `.txt` and `.md` files are ingested as raw text.
+  - Other formats will fail with a clear message instructing you to install Docling.
+
+### Batch ingest a folder
+
+```bash
+cd scripts
+pip install docling  # optional but recommended
+python batch_ingest_local_folder.py \
+  --folder /path/to/folder \
+  --backend-url http://localhost:8000 \
+  --namespace dev \
+  --source local-folder \
+  --max-files 200 \
+  --api-key "$API_KEY"
+```
+
+- Recursively scans the folder for supported extensions and ingests up to `max-files` documents.
+- Each file is converted via `docling_convert_and_upload.py` logic and uploaded to `/documents/upload-text`.
 
 ## Deploy Backend on Hugging Face Spaces (Docker)
 

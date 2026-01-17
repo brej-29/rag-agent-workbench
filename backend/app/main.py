@@ -8,6 +8,8 @@ from app.routers.documents import router as documents_router
 from app.routers.health import router as health_router
 from app.routers.ingest import router as ingest_router
 from app.routers.search import router as search_router
+from app.routers.documents import router as documents_router
+from app.routers.chat import router as chat_router
 from app.services.pinecone_store import init_pinecone
 
 settings = get_settings()
@@ -28,6 +30,7 @@ app.include_router(health_router, tags=["health"])
 app.include_router(ingest_router, tags=["ingest"])
 app.include_router(search_router, tags=["search"])
 app.include_router(documents_router, tags=["documents"])
+app.include_router(chat_router, tags=["chat"])
 
 # Register exception handlers
 setup_exception_handlers(app)

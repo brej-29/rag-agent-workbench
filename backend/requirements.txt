@@ -11,3 +11,6 @@ pinecone
 langchain-core
 langchain-text-splitters
 langgraph
+langchain-openai
+langchain-community
+tavily-python

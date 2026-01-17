@@ -47,6 +47,46 @@ class Settings(BaseSettings):
         default=3, description="Max retries for outbound HTTP requests"
     )
 
+    # Groq / LLM
+    GROQ_API_KEY: Optional[str] = Field(
+        default=None,
+        description="Groq API key (required for /chat endpoints)",
+    )
+    GROQ_BASE_URL: str = Field(
+        default="https://api.groq.com/openai/v1",
+        description="Groq OpenAI-compatible base URL",
+    )
+    GROQ_MODEL: str = Field(
+        default="llama-3.1-8b-instant",
+        description="Default Groq chat model used for /chat",
+    )
+
+    # Web search / Tavily
+    TAVILY_API_KEY: Optional[str] = Field(
+        default=None,
+        description="Tavily API key for web search fallback (optional)",
+    )
+
+    # RAG defaults
+    RAG_DEFAULT_TOP_K: int = Field(
+        default=5,
+        ge=1,
+        le=100,
+        description="Default number of documents to retrieve for RAG",
+    )
+    RAG_MIN_SCORE: float = Field(
+        default=0.25,
+        ge=0.0,
+        le=1.0,
+        description="Default minimum relevance score to trust retrieval without web fallback",
+    )
+    RAG_MAX_WEB_RESULTS: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Maximum number of web search results to fetch when using Tavily",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

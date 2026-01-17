@@ -44,7 +44,15 @@
 - [Contact](#contact)
 
 ---
+## Screenshot
 
+<img width="1919" height="967" alt="image" src="https://github.com/user-attachments/assets/fe979aa1-b125-415c-9a1d-64a96289af87" />
+
+<img width="1918" height="896" alt="image" src="https://github.com/user-attachments/assets/1d40bb2b-f477-4741-8014-0b2c2a7356bf" />
+
+<img width="1625" height="848" alt="image" src="https://github.com/user-attachments/assets/0967d39d-76ac-4d85-a983-6bf0922f1b9d" />
+
+---
 ## Overview
 
 This repository contains a lightweight RAG backend built with FastAPI, Pinecone (integrated embeddings), and LangGraph/LangChain for agentic RAG flows, plus a Streamlit chatbot frontend.

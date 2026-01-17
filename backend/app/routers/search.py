@@ -17,6 +17,7 @@ router = APIRouter(tags=["search"])
 async def search(payload: SearchRequest) -> SearchResponse:
     settings = get_settings()
     namespace = payload.namespace or settings.PINECONE_NAMESPACE
+    text_field = settings.PINECONE_TEXT_FIELD
 
     logger.info(
         "Received search request namespace='%s' top_k=%d",
@@ -37,7 +38,15 @@ async def search(payload: SearchRequest) -> SearchResponse:
     for hit in hits_raw:
         hit_id = hit.get("_id") or hit.get("id") or ""
         score = float(hit.get("_score") or hit.get("score") or 0.0)
-        fields = hit.get("fields") or {}
+        raw_fields: Dict[str, Any] = hit.get("fields") or {}
+
+        # Map the configured Pinecone text field back to a stable 'chunk_text' key
+        returned_text = raw_fields.get(text_field, "")
+        fields: Dict[str, Any] = dict(raw_fields)
+        if text_field in fields and text_field != "chunk_text":
+            fields.pop(text_field, None)
+        fields["chunk_text"] = returned_text
+
         hits.append(
             SearchHit(
                 id=hit_id,

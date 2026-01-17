@@ -1,7 +1,9 @@
-from typing import Any, Dict, Iterable, List, Sequence
+from typing import Any, Dict, List, Sequence
 
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+from app.core.config import get_settings
 
 
 def chunk_document(
@@ -16,6 +18,9 @@ def chunk_document(
     return chunks
 
 
+MAX_CHARS_PER_CHUNK = 6000
+
+
 def documents_to_records(
     documents: Sequence[Document],
 ) -> List[Dict[str, Any]]:
@@ -28,11 +33,11 @@ def documents_to_records(
       - url (optional)
       - published (optional)
 
-    Output records follow the schema:
+    Output records follow the schema (logical representation):
 
     {
       "_id": "<doc_id>:<chunk_index>",
-      "chunk_text": "<chunk>",
+      "<text_field>": "<chunk>",  # PINECONE_TEXT_FIELD (default: 'chunk_text')
       "title": "...",
       "source": "...",
       "url": "...",
@@ -43,6 +48,8 @@ def documents_to_records(
     }
     """
     records: List[Dict[str, Any]] = []
+    settings = get_settings()
+    text_field = settings.PINECONE_TEXT_FIELD
 
     for document in documents:
         metadata = document.metadata or {}
@@ -64,10 +71,14 @@ def documents_to_records(
 
         chunks = chunk_document(document)
         for idx, chunk in enumerate(chunks):
-            chunk_text = chunk.page_content
+            chunk_text = chunk.page_content or ""
+            # Safety truncation for integrated embedding models like llama-text-embed-v2
+            if len(chunk_text) > MAX_CHARS_PER_CHUNK:
+                chunk_text = chunk_text[:MAX_CHARS_PER_CHUNK]
+
             record: Dict[str, Any] = {
                 "_id": f"{doc_id}:{idx}",
-                "chunk_text": chunk_text,
+                text_field: chunk_text,
                 "title": title,
                 "source": source,
                 "url": url,

@@ -27,7 +27,15 @@ def init_pinecone(settings: Optional[Settings] = None) -> None:
     if settings is None:
         settings = get_settings()
 
-    logger.info("Initialising Pinecone client (host targeting)")
+    text_field = settings.PINECONE_TEXT_FIELD.strip()
+    if not text_field:
+        raise ValueError("PINECONE_TEXT_FIELD must not be empty")
+
+    logger.info(
+        "Initialising Pinecone client (host targeting). host=%s text_field=%s",
+        settings.PINECONE_HOST,
+        text_field,
+    )
 
     pc = Pinecone(api_key=settings.PINECONE_API_KEY)
 
@@ -132,7 +140,17 @@ def search(
     """
     index = get_index()
     if fields is None:
-        fields = ["chunk_text", "title", "source", "url", "published", "doc_id", "chunk_id"]
+        settings = get_settings()
+        text_field = settings.PINECONE_TEXT_FIELD
+        fields = [
+            text_field,
+            "title",
+            "source",
+            "url",
+            "published",
+            "doc_id",
+            "chunk_id",
+        ]
 
     query: Dict[str, Any] = {
         "inputs": {"text": query_text},

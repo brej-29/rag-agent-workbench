@@ -28,6 +28,13 @@ class Settings(BaseSettings):
     PINECONE_NAMESPACE: str = Field(
         default="dev", description="Default Pinecone namespace"
     )
+    PINECONE_TEXT_FIELD: str = Field(
+        default="chunk_text",
+        description=(
+            "Text field name used by the Pinecone integrated embedding index. "
+            "For example, set to 'content' if your index field_map uses that name."
+        ),
+    )
 
     # Logging
     LOG_LEVEL: str = Field(default="INFO", description="Application log level")

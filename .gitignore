@@ -50,6 +50,10 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+*.py[cod]
+eval/reports/
+REPO_AUDIT.md
+PROJECT_DEEP_DIVE_2.md
 
 # Translations
 *.mo

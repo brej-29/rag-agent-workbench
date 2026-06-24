@@ -20,13 +20,9 @@ anyio==4.14.0
 attrs==26.1.0
     # via aiohttp
 beautifulsoup4==4.13.4
-    # via
-    #   -c constraints-current.txt
-    #   -r backend/requirements.in
+    # via -r backend/requirements.in
 cachetools==5.5.1
-    # via
-    #   -c constraints-current.txt
-    #   -r backend/requirements.in
+    # via -r backend/requirements.in
 certifi==2026.6.17
     # via
     #   httpcore
@@ -37,13 +33,6 @@ charset-normalizer==3.4.7
     # via requests
 click==8.4.2
     # via uvicorn
-colorama==0.4.6
-    # via
-    #   click
-    #   tqdm
-    #   uvicorn
-dataclasses-json==0.6.7
-    # via langchain-community
 deprecated==1.3.1
     # via limits
 distro==1.9.0
@@ -51,13 +40,9 @@ distro==1.9.0
     #   langsmith
     #   openai
 fastapi==0.128.0
-    # via
-    #   -c constraints-current.txt
-    #   -r backend/requirements.in
+    # via -r backend/requirements.in
 feedparser==6.0.12
-    # via
-    #   -c constraints-current.txt
-    #   -r backend/requirements.in
+    # via -r backend/requirements.in
 frozenlist==1.8.0
     # via
     #   aiohttp
@@ -74,7 +59,6 @@ httptools==0.8.0
     # via uvicorn
 httpx==0.28.1
     # via
-    #   -c constraints-current.txt
     #   -r backend/requirements.in
     #   langgraph-sdk
     #   langsmith
@@ -94,15 +78,12 @@ jsonpatch==1.33
     # via langchain-core
 jsonpointer==3.1.1
     # via jsonpatch
-langchain-classic==1.0.0
+langchain-classic==1.0.8
     # via langchain-community
-langchain-community==0.4.1
+langchain-community==0.4.2
+    # via -r backend/requirements.in
+langchain-core==1.4.8
     # via
-    #   -c constraints-current.txt
-    #   -r backend/requirements.in
-langchain-core==1.1.0
-    # via
-    #   -c constraints-current.txt
     #   -r backend/requirements.in
     #   langchain-classic
     #   langchain-community
@@ -112,18 +93,15 @@ langchain-core==1.1.0
     #   langgraph-checkpoint
     #   langgraph-prebuilt
 langchain-openai==1.0.3
+    # via -r backend/requirements.in
+langchain-protocol==0.0.18
+    # via langchain-core
+langchain-text-splitters==1.1.2
     # via
-    #   -c constraints-current.txt
-    #   -r backend/requirements.in
-langchain-text-splitters==1.0.0
-    # via
-    #   -c constraints-current.txt
     #   -r backend/requirements.in
     #   langchain-classic
 langgraph==1.0.3
-    # via
-    #   -c constraints-current.txt
-    #   -r backend/requirements.in
+    # via -r backend/requirements.in
 langgraph-checkpoint==3.0.1
     # via
     #   langgraph
@@ -139,21 +117,16 @@ langsmith==0.9.1
     #   langchain-core
 limits==5.8.0
     # via slowapi
-marshmallow==3.26.2
-    # via dataclasses-json
 multidict==6.7.1
     # via
     #   aiohttp
     #   yarl
-mypy-extensions==1.1.0
-    # via typing-inspect
 numpy==2.4.6
     # via langchain-community
 openai==2.43.0
     # via langchain-openai
 orjson==3.11.4
     # via
-    #   -c constraints-current.txt
     #   -r backend/requirements.in
     #   langgraph-sdk
     #   langsmith
@@ -164,12 +137,9 @@ packaging==24.2
     #   langchain-core
     #   langsmith
     #   limits
-    #   marshmallow
     #   pinecone-plugin-assistant
 pinecone==7.3.0
-    # via
-    #   -c constraints-current.txt
-    #   -r backend/requirements.in
+    # via -r backend/requirements.in
 pinecone-plugin-assistant==1.8.0
     # via pinecone
 pinecone-plugin-interface==0.0.7
@@ -191,14 +161,12 @@ pydantic-core==2.46.4
     # via pydantic
 pydantic-settings==2.11.0
     # via
-    #   -c constraints-current.txt
     #   -r backend/requirements.in
     #   langchain-community
 python-dateutil==2.9.0.post0
     # via pinecone
 python-dotenv==1.0.1
     # via
-    #   -c constraints-current.txt
     #   -r backend/requirements.in
     #   pydantic-settings
     #   uvicorn
@@ -226,9 +194,7 @@ sgmllib3k==1.0.0
 six==1.17.0
     # via python-dateutil
 slowapi==0.1.9
-    # via
-    #   -c constraints-current.txt
-    #   -r backend/requirements.in
+    # via -r backend/requirements.in
 sniffio==1.3.1
     # via
     #   langsmith
@@ -242,12 +208,9 @@ sqlalchemy==2.0.51
 starlette==0.50.0
     # via fastapi
 tavily-python==0.7.14
-    # via
-    #   -c constraints-current.txt
-    #   -r backend/requirements.in
+    # via -r backend/requirements.in
 tenacity==8.5.0
     # via
-    #   -c constraints-current.txt
     #   -r backend/requirements.in
     #   langchain-community
     #   langchain-core
@@ -259,12 +222,10 @@ tqdm==4.68.3
     # via openai
 typing-extensions==4.15.0
     # via
-    #   aiohttp
-    #   aiosignal
-    #   anyio
     #   beautifulsoup4
     #   fastapi
     #   langchain-core
+    #   langchain-protocol
     #   langsmith
     #   limits
     #   openai
@@ -272,11 +233,7 @@ typing-extensions==4.15.0
     #   pydantic
     #   pydantic-core
     #   sqlalchemy
-    #   starlette
-    #   typing-inspect
     #   typing-inspection
-typing-inspect==0.9.0
-    # via dataclasses-json
 typing-inspection==0.4.2
     # via
     #   pydantic
@@ -286,11 +243,13 @@ urllib3==2.7.0
     #   pinecone
     #   requests
 uuid-utils==0.16.2
-    # via langsmith
-uvicorn[standard]==0.30.6
     # via
-    #   -c constraints-current.txt
-    #   -r backend/requirements.in
+    #   langchain-core
+    #   langsmith
+uvicorn[standard]==0.30.6
+    # via -r backend/requirements.in
+uvloop==0.22.1
+    # via uvicorn
 watchfiles==1.2.0
     # via uvicorn
 websockets==16.0

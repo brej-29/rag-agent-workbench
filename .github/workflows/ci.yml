@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Install from the pinned lock file — this is the clean-environment
+      # validation of the T1.4 dependency pins.  Deliberate: use the lock,
+      # not the .in file and not a re-resolve.
+      - name: Install pinned dependencies
+        run: pip install --no-cache-dir -r backend/requirements.txt
+
+      # Offline pytest only.  make eval / make eval-corpus are NOT run here:
+      # they require live Pinecone credentials and incur index query cost.
+      - name: Run tests
+        run: pytest tests/ -v

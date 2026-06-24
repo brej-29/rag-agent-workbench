@@ -1,0 +1,28 @@
+version: 2
+updates:
+  # Backend dependencies
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - backend
+    # Dependabot will propose bumps to backend/requirements.in entries.
+    # After merging, regenerate backend/requirements.txt:
+    #   uv pip compile --python-version 3.11 backend/requirements.in \
+    #       -o backend/requirements.txt
+
+  # Frontend / root dependencies
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - frontend
+    # Dependabot will propose bumps to requirements.in entries.
+    # After merging, regenerate requirements.txt:
+    #   uv pip compile requirements.in -o requirements.txt

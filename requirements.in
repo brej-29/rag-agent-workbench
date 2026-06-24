@@ -1,0 +1,10 @@
+# requirements.in — human-edited top-level package intent for the Streamlit frontend.
+# DO NOT edit requirements.txt directly; edit here and regenerate:
+#   uv pip compile requirements.in -o requirements.txt
+#
+# Compiled file: requirements.txt (fully pinned, incl. transitive deps)
+
+streamlit
+httpx
+docling
+pypdf

@@ -1,0 +1,25 @@
+# backend/requirements.in — human-edited top-level package intent.
+# DO NOT edit requirements.txt directly; edit here and regenerate:
+#   uv pip compile --python-version 3.11 backend/requirements.in \
+#       -o backend/requirements.txt
+#
+# Compiled file: backend/requirements.txt (fully pinned, incl. transitive deps)
+
+fastapi
+uvicorn[standard]
+pydantic-settings
+python-dotenv
+httpx
+tenacity
+orjson
+feedparser
+beautifulsoup4
+pinecone
+langchain-core
+langchain-text-splitters
+langgraph
+langchain-openai
+langchain-community
+tavily-python
+slowapi
+cachetools

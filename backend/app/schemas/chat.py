@@ -126,3 +126,13 @@ class ChatResponse(BaseModel):
         ...,
         description="Tracing configuration metadata for observability.",
     )
+    insufficient_context: bool = Field(
+        default=False,
+        description=(
+            "True when no usable context survived retrieval and per-chunk score "
+            "filtering.  The answer is the deterministic abstention message; the "
+            "Groq LLM was NOT called.  Callers can use this flag to distinguish a "
+            "genuine model-generated answer from an abstention without parsing the "
+            "answer text."
+        ),
+    )

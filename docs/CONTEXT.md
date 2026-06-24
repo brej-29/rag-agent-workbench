@@ -603,3 +603,452 @@ RAG Agent Workbench is a lightweight experimentation backend for retrieval-augme
     - Click "Ping /health" and inspect the response or error message.
 
 ---
+
+## Embedding configuration (resolved)
+
+This section records the embedding model and vector dimension used by the Pinecone integrated
+embedding index, the attribute paths used to read them at runtime, whether the dimension is
+pinned in code, and a reconciliation of the chunk-size settings against the model's token limit.
+
+### Model and dimension
+
+- **Embedding model:** `llama-text-embed-v2`  
+  Read at startup from `embed_config.model`, where `embed_config = getattr(index_model, "embed", None)`
+  and `index_model = pc.describe_index(settings.PINECONE_INDEX_NAME)`.  
+  SDK type: `pinecone.core.openapi.db_control.model.model_index_embed.ModelIndexEmbed`
+  (Pinecone SDK v7.3.0, attribute map key `"model"` → `str`).
+
+- **Vector dimension:** `1024` (Pinecone SDK attribute path: `embed_config.dimension`,
+  also mirrored at `index_model.dimension`)  
+  **Not pinned anywhere in application code.** A search for the keyword `dimension` across all
+  backend Python source files returns zero hits in application code — only in audit documentation.
+  The value is whatever the Pinecone index was configured with at creation time.
+  `llama-text-embed-v2` supports configurable output dimensions from 384 to 2048; 1024 is the
+  default when unspecified. This project relies on that default silently.
+
+- **Startup log added** (`backend/app/services/pinecone_store.py`, `init_pinecone`):
+  ```
+  INFO  Pinecone embedding config model='llama-text-embed-v2' dimension=1024 top_k_default=5
+  ```
+  This makes the full stack self-documenting from the first startup log line without any
+  additional module or dependency.
+
+### Token-limit reconciliation
+
+Assumption: ~4 characters per token (standard BPE tokenizer estimate for English prose).
+
+| Setting | Characters | ≈ Tokens | Model limit (tokens) | Truncation risk? |
+|---|---|---|---|---|
+| `chunk_size=900` (RecursiveCharacterTextSplitter) | 900 | ~225 | 2048 | None — well under limit |
+| `MAX_CHARS_PER_CHUNK=6000` (safety cap, `chunking.py:21`) | 6000 | ~1500 | 2048 | None — also under limit |
+
+Both settings are safely within the 2048-token input limit of `llama-text-embed-v2`.
+Because `chunk_size=900 < MAX_CHARS_PER_CHUNK=6000`, the safety cap at 6000 chars never
+activates under normal splitter operation; its role is purely defensive.
+
+**Silent truncation cannot occur with current settings** as long as the embedding model is
+`llama-text-embed-v2` with a 2048-token limit.
+
+### Chunk-size vs. recommended range (observation for a later tuning step)
+
+`llama-text-embed-v2` achieves best retrieval quality with inputs in the 400–500 token range
+(per Pinecone's published guidance). The current primary chunk size of ~225 tokens
+(900 chars ÷ 4 chars/token) is roughly **half** the recommended minimum.
+
+This is flagged here as an observation only. Changing `chunk_size` affects retrieval quality,
+dedup behavior, and the number of chunks per document; it should be tuned with a retrieval
+evaluation harness (recall@k against a golden set) rather than adjusted blindly.
+
+---
+
+## Evaluation
+
+### Retrieval evaluation harness
+
+All files are **additive** (no runtime code modified). The harness exercises only the retrieval
+path — no LLM calls, no graph execution.
+
+#### Directory layout
+
+```
+eval/
+├── __init__.py
+├── corpus.py          — pinned mini-corpus definition (Wikipedia titles + arXiv/OpenAlex queries)
+├── golden.jsonl       — golden query set (human-labeled relevant_doc_ids)
+├── metrics.py         — pure metric functions: recall@k, MRR, nDCG@k
+├── run.py             — retrieval runner (read-only Pinecone queries, writes eval/reports/)
+├── setup_corpus.py    — one-time ingestion script (Pinecone upserts; separate from run.py)
+└── fixtures/
+    └── retrieval_fixture.json  — committed synthetic data for CI tests (zero network calls)
+tests/
+└── test_eval_metrics.py        — unit tests + fixture-based tests (zero network calls)
+Makefile                        — targets: eval-corpus, eval, test
+```
+
+#### Metric function signatures
+
+```python
+# eval/metrics.py — pure functions, no model/embedder/LLM imports, stdlib math only
+
+def recall_at_k(
+    retrieved_ids: Sequence[str],
+    relevant_ids: Set[str],
+    k: int,
+) -> float:
+    """recall@k = |retrieved_top_k ∩ relevant| / |relevant|"""
+
+def mrr(
+    retrieved_ids: Sequence[str],
+    relevant_ids: Set[str],
+) -> float:
+    """RR = 1 / rank_of_first_relevant  (0 if none found)"""
+
+def ndcg_at_k(
+    retrieved_ids: Sequence[str],
+    relevant_ids: Set[str],
+    k: int,
+) -> float:
+    """nDCG@k = DCG@k / IDCG@k  (binary relevance, log2 discount)"""
+```
+
+#### Make targets
+
+| Target | Effect |
+|---|---|
+| `make eval-corpus` | Ingests the fixed mini-corpus into the `eval` Pinecone namespace (upsert — run once). Prints doc_ids for golden-set labeling. |
+| `make eval` | Read-only Pinecone QUERY calls per golden entry. Writes JSON + markdown report to `eval/reports/`. |
+| `make test` | Runs `tests/test_eval_metrics.py` — zero network calls, CI-safe. |
+
+#### Anti-circular-validation rule
+
+`relevant_doc_ids` in `golden.jsonl` **must** be determined by reading document content, not by
+running the retriever and copying its output. Encoding the embedder's own intuition into the
+relevant set makes recall@k tautological — the retriever will appear to have perfect recall
+because the labels were derived from its own output.
+
+The four example entries in `golden.jsonl` use `PLACEHOLDER_*` strings. Replace them with real
+SHA256 doc_ids (printed by `make eval-corpus`) after reading the corresponding documents.
+
+#### Document ID formula (reproducibility anchor)
+
+Doc IDs are deterministic SHA256 hashes computed by `backend/app/services/normalize.py`:
+
+```python
+sha256(f"{source}|{title}|{url or ''}".encode("utf-8")).hexdigest()
+```
+
+Wikipedia titles produce stable doc_ids because the URL is predictable
+(`https://en.wikipedia.org/wiki/{title.replace(" ", "_")}`). arXiv/OpenAlex results vary
+by date — use Wikipedia titles as the anchor for `relevant_doc_ids`.
+
+#### Chunk-level vs. document-level IDs
+
+Pinecone record IDs are `{doc_id}:{chunk_idx}` (chunk level). `eval/run.py` deduplicates at
+the document level before computing metrics: `hit["fields"]["doc_id"]` (preferred) or
+`_id.rsplit(":", 1)[0]` (fallback). Relevance labels in `golden.jsonl` are therefore
+document-level SHA256 IDs, not chunk IDs.
+
+---
+
+## Retrieval gating
+
+### Summary
+
+This step closes the **input-side (front) half** of the audit's primary compounding failure
+chain: *weak retrieval → unfiltered context → unverified generation → hallucinated citations*.
+Before this change, all retrieved Pinecone chunks — including near-zero-score hits — were
+forwarded unconditionally to the LLM.  After this change a per-chunk score floor filters them,
+and if no usable context survives the pipeline short-circuits to a deterministic abstention
+**without calling the LLM**.
+
+The **output-side (back) half** — post-generation grounding / citation verification — is NOT
+addressed here and remains open for a later step (T2.2).
+
+---
+
+### Per-chunk score floor
+
+| Setting | File:line | Purpose | Default | Status |
+|---|---|---|---|---|
+| `RAG_MIN_SCORE` | `config.py:77` | Web-fallback routing threshold: if `top_score < RAG_MIN_SCORE`, invoke Tavily | `0.25` | Routing only |
+| `RAG_MIN_CHUNK_SCORE` | `config.py:83` | Per-chunk cosine floor: Pinecone chunks below this value are excluded from context | `0.25` | **PLACEHOLDER — not tuned** |
+
+These two settings are **distinct** and independently configurable despite sharing the same
+default value.  `RAG_MIN_SCORE` controls *whether* to invoke Tavily web search; `RAG_MIN_CHUNK_SCORE`
+controls *which individual Pinecone chunks* are usable context for generation.
+
+**The `0.25` default for `RAG_MIN_CHUNK_SCORE` is a PLACEHOLDER** chosen to match the routing
+threshold for initial consistency.  It is NOT evidence-backed.  Calibrate it against the T1.2
+retrieval eval set (recall@k / nDCG@k in `eval/`) before treating it as a justified value.
+Setting it too high silences the system unnecessarily; too low lets weak chunks poison context.
+
+#### Where the filter runs
+
+`filter_chunks_by_score()` ([rag_prompt.py](../backend/app/services/prompts/rag_prompt.py)) is a
+pure function — no side effects, independently unit-testable:
+
+```python
+def filter_chunks_by_score(
+    chunks: List[Dict[str, Any]],
+    min_chunk_score: float,
+) -> List[Dict[str, Any]]:
+    return [c for c in chunks if float(c.get("score") or 0.0) >= min_chunk_score]
+```
+
+It is called at the **top of `generate_answer`** in `graph.py`, AFTER `decide_next` has already
+read `top_score` from the full (unfiltered) hit list for routing purposes.  This preserves the
+existing Tavily routing logic exactly.
+
+#### Tavily web results bypass the filter
+
+The filter applies **only to Pinecone vector chunks**.  Tavily web results (source `"web"`) are
+never passed to `filter_chunks_by_score` — they carry no cosine score and are not comparable
+to Pinecone's normalised cosine values.
+
+---
+
+### Empty-context guard
+
+After filtering Pinecone chunks and checking web results, if `usable_sources` is empty
+(filtered Pinecone chunks = 0 AND web results = 0), `generate_answer` returns a fixed
+**deterministic abstention** WITHOUT calling the Groq LLM:
+
+```python
+ABSTENTION_ANSWER = (
+    "I was unable to find sufficient information in the knowledge base to answer "
+    "your question. No retrieved chunks met the minimum relevance score threshold. "
+    "Try enabling the web search fallback, broadening your query, or ingesting "
+    "additional documents."
+)
+```
+
+`generate_ms` is set to `0.0` on this path (no LLM call = no generation time).
+The caller can detect an abstention programmatically via `ChatResponse.insufficient_context`
+(a new `bool` field, default `False` for backward compatibility).
+
+**Calling the LLM with empty context was the failure mode being removed.**  The old advisory
+"say you don't know" instruction in the system prompt was unenforced and relied on the model's
+judgment; the guard replaces it with a hard, unconditional short-circuit.
+
+---
+
+### How new logic composes with existing Tavily routing
+
+```
+retrieve_context          ← unchanged; sets top_score from full hit list
+       │
+decide_next               ← unchanged; routes to web_search if top_score < RAG_MIN_SCORE
+       │
+  ┌────┴───────────────────┐
+  │ (web_fallback_used)     │ (no fallback)
+web_search              [skip]
+  │                        │
+  └────────────┬───────────┘
+               │
+      generate_answer  ← NEW: filter Pinecone chunks by RAG_MIN_CHUNK_SCORE
+                         NEW: if usable_sources empty → ABSTENTION_ANSWER, no LLM
+                         else → build_rag_messages → Groq LLM → answer
+```
+
+The Tavily routing branch fires first (as before).  The empty-context guard fires **after**
+any web fallback, so if Tavily returns results they flow through to the LLM even when all
+Pinecone chunks were filtered out.  The guard only triggers when BOTH Pinecone (filtered) and
+web results are empty simultaneously.
+
+---
+
+### Files changed (additive runtime changes only)
+
+| File | Change |
+|---|---|
+| `backend/app/core/config.py` | Added `RAG_MIN_CHUNK_SCORE` (new setting) |
+| `backend/app/services/prompts/rag_prompt.py` | Added `filter_chunks_by_score()` pure function |
+| `backend/app/services/chat/graph.py` | Added `ABSTENTION_ANSWER` constant; added `insufficient_context` to `ChatState`; rewired `generate_answer` |
+| `backend/app/schemas/chat.py` | Added `insufficient_context: bool` to `ChatResponse` |
+| `backend/app/routers/chat.py` | Propagated `insufficient_context` in `_build_chat_response` |
+| `tests/test_retrieval_gating.py` | 17 new CI-safe unit tests (zero network) |
+
+---
+
+## Dependency management
+
+### Problem
+
+Both requirements files were fully unpinned.  Every `docker build` and `pip install` resolved
+fresh from PyPI, meaning builds were non-reproducible and silently exposed to LangChain / LangGraph
+/ Pinecone SDK breaking changes that ship on minor-version bumps.  This is the primary reason the
+audit flagged the dependency situation as high-priority.
+
+---
+
+### Layout: `.in` (intent) vs `.txt` (lock)
+
+| File | Role | Who edits it |
+|---|---|---|
+| `backend/requirements.in` | Loose top-level packages — human-readable intent | Developer |
+| `backend/requirements.txt` | Fully-pinned lock including ALL transitive deps | Generated (do not edit) |
+| `requirements.in` | Loose top-level packages for the Streamlit frontend | Developer |
+| `requirements.txt` | Fully-pinned lock for the Streamlit frontend | Generated (do not edit) |
+
+The `.in` files are the source of truth for developer intent.  The `.txt` files are machine-generated
+and committed so CI, Docker, and teammates all get bit-for-bit identical installs.
+
+---
+
+### Why pin to tested versions, not floated-to-latest?
+
+The LangChain / LangGraph ecosystem ships breaking API changes on minor version bumps
+(e.g., `langchain-core` 0.x → 1.x removed and renamed public classes; Pinecone SDK 3.x → 7.x
+changed the integrated-embedding API).  Unpinned installs silently pull these changes into
+production.  Deterministic Docker builds also require a stable dependency set — two `docker build`
+calls hours apart should produce identical images.
+
+All direct-dependency versions in the pinned `.txt` files equal the versions **currently installed
+and verified working** in the active development environment (confirmed via `pip show` against all
+22 direct deps; all matched).
+
+---
+
+### Compile tool
+
+**`uv pip compile`** (uv 0.11.21) — available without extra install, faster than pip-tools.
+
+```bash
+# Backend (targets Python 3.11 to match Dockerfile: FROM python:3.11-slim)
+uv pip compile --python-version 3.11 backend/requirements.in \
+    -o backend/requirements.txt
+
+# Frontend / root
+uv pip compile requirements.in -o requirements.txt
+```
+
+The compilation was constrained to the installed direct-dep versions by passing a temporary
+constraint file (`--constraint constraints-current.txt`) during the initial generation.  This file
+is **not committed** — it is a one-time generation aid.  Future regenerations (e.g., after adding
+a new package to `.in`) should use the constraint argument again to preserve currently-working
+versions, or omit it to allow uv to pick the newest compatible set.
+
+#### Transitive dep note (conda env caveat)
+
+The development environment is a **shared conda environment**, not a project-isolated pip venv.
+Conda and pip use different dependency solvers: conda installs packages without strictly enforcing
+pip's `Requires-Dist` metadata.  This means the conda env's installed transitive deps (e.g.,
+`langsmith==0.4.38`) may co-exist with direct deps that PyPI says require a newer version
+(`langchain-core==1.1.0` → `langsmith>=0.9.0`).  The pinned `.txt` files reflect what pip/uv
+would install in a clean pip environment — they are internally consistent and pip-installable,
+which is the correct target for Docker.  **All 22 direct-dep versions match the installed
+versions exactly** (verified); transitive dep versions resolve at the smallest compatible value
+per PyPI metadata and may differ slightly from what conda shows in `pip freeze`.
+
+---
+
+### Hash pinning — deferred next step
+
+Hash pinning (`--generate-hashes`) would verify the integrity of every downloaded wheel, guarding
+against supply-chain attacks (compromised PyPI mirrors, typosquatting).  It was **not included**
+in this step because it significantly lengthens the `.txt` files and requires re-hashing on every
+machine.  Adding it is the recognized next hardening step:
+
+```bash
+uv pip compile --generate-hashes --python-version 3.11 backend/requirements.in \
+    -o backend/requirements.txt
+```
+
+---
+
+### Dockerfile install line (unchanged)
+
+The Dockerfile already installs `backend/requirements.txt`.  No Dockerfile change was required:
+
+```dockerfile
+# line 9-10 of Dockerfile — unchanged
+COPY backend/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+```
+
+The root `requirements.txt` (frontend) is installed separately in the Streamlit environment and
+is not referenced by the Dockerfile.
+
+---
+
+### How to add or upgrade a dependency
+
+```bash
+# 1. Edit the relevant .in file (add/change the package name)
+#    e.g.: echo "httpx>=0.29" >> backend/requirements.in
+
+# 2. Recompile
+uv pip compile --python-version 3.11 backend/requirements.in \
+    -o backend/requirements.txt          # backend
+
+uv pip compile requirements.in -o requirements.txt  # frontend
+
+# 3. Commit BOTH the updated .in and .txt files
+
+# 4. If using Dependabot: it will open PRs updating .in entries;
+#    merge the PR, then recompile .txt and push.
+```
+
+---
+
+### Dependabot
+
+`.github/dependabot.yml` is configured to open weekly PRs for both `backend/requirements.in` and
+`requirements.in`.  After merging a Dependabot PR, recompile the corresponding `.txt` file and
+push the update.
+
+---
+
+## Testing & CI
+
+### What the unit tests cover
+
+| File | Test file | What is tested |
+|---|---|---|
+| `eval/metrics.py` | `tests/test_eval_metrics.py` | recall@k, MRR, nDCG@k pure functions; 4 fixture cases with hand-computed expected values |
+| `backend/app/services/prompts/rag_prompt.py` | `tests/test_retrieval_gating.py` | `filter_chunks_by_score` pure function (9 cases) |
+| `backend/app/services/chat/graph.py` | `tests/test_retrieval_gating.py` | empty-context guard (Groq NOT called), normal path with context (8 cases) |
+| `backend/app/services/normalize.py` | `tests/test_normalize.py` | `normalize_text` whitespace collapsing (10 cases); `is_valid_document` length gate (7 cases); `make_doc_id` SHA-256 determinism + collision-distinctness (10 cases) |
+| `backend/app/services/dedupe.py` | `tests/test_dedupe.py` | `dedupe_records` duplicate removal, order preservation, no-id records, immutability (10 cases) |
+| `backend/app/services/chunking.py` | `tests/test_chunking.py` | `chunk_document` chunk_size / overlap, multi-chunk split, Document output (7 cases); `documents_to_records` record schema, _id format, chunk sequence, text_field, skip-on-missing-metadata, safety truncation (15 cases) |
+| `backend/app/services/prompts/rag_prompt.py` | `tests/test_rag_prompt.py` | `build_context_string` numbering, labels, url/chunk_text inclusion/omission, separator (12 cases); `build_rag_messages` system message, HumanMessage / AIMessage ordering, citation instruction, history handling (13 cases) |
+
+**Total: 134 tests** as of T1.5.  All tests make zero network calls; no Pinecone, Groq, Tavily, or
+LangSmith credentials are required.
+
+---
+
+### CI pipeline — `.github/workflows/ci.yml`
+
+Triggers on every push and pull request.  Runs on `ubuntu-latest` with Python 3.11.
+
+**Key design decisions:**
+
+1. **Installs from `backend/requirements.txt` (the pinned lock), not the `.in` file.**  This is
+   deliberate — it is the clean-environment reproducibility check for the T1.4 dependency pins.
+   Every CI run validates that the pinned set installs cleanly into a fresh pip environment and
+   that the test suite passes under those exact versions.  The dev environment was a shared conda
+   env during T1.4, so this CI job is the authoritative clean-install validation.
+
+2. **Runs `pytest tests/ -v` only.**  `make eval` and `make eval-corpus` are NOT invoked.  Both
+   targets issue live Pinecone queries (reads / upserts); they require secrets (`PINECONE_API_KEY`
+   etc.) and incur index cost.  CI is offline-only by design.
+
+3. **No secrets required.**  The CI job contains no `env:` secrets block and will pass on forks
+   and first-party PRs alike.
+
+---
+
+### Defect discovery policy
+
+Tests assert **intended behavior** as documented in each function's docstring / comments.
+If a new test reveals an actual defect in existing application code:
+
+- The test is **not silently patched** to match the broken behavior.
+- The test is marked `@pytest.mark.xfail(reason="<defect description>")` or
+  `@pytest.mark.skip(reason="...")` with a clear reason string.
+- The defect is **reported in the session chat** for a dedicated fix step.
+- The fix step modifies only the relevant application code; the test is then un-marked.
+
+**T1.5 result: no defects found.**  All 84 new tests passed on first run against the existing
+application code.

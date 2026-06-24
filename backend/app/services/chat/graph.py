@@ -11,11 +11,21 @@ from app.core.errors import UpstreamServiceError
 from app.core.logging import get_logger
 from app.schemas.chat import ChatRequest
 from app.services.llm.groq_llm import get_llm
-from app.services.prompts.rag_prompt import build_rag_messages
+from app.services.prompts.rag_prompt import build_rag_messages, filter_chunks_by_score
 from app.services.pinecone_store import search as pinecone_search
 from app.services.tools.tavily_tool import get_tavily_tool, is_tavily_configured
 
 logger = get_logger(__name__)
+
+# Returned verbatim when no usable context survives retrieval + chunk filtering.
+# Defined once so tests can assert against a known constant rather than a
+# fragile substring match.  The Groq LLM is NOT called on this path.
+ABSTENTION_ANSWER = (
+    "I was unable to find sufficient information in the knowledge base to answer "
+    "your question. No retrieved chunks met the minimum relevance score threshold. "
+    "Try enabling the web search fallback, broadening your query, or ingesting "
+    "additional documents."
+)
 
 
 class ChatState(TypedDict, total=False):
@@ -36,6 +46,7 @@ class ChatState(TypedDict, total=False):
     tavily_available: bool
     web_fallback_used: bool
     top_score: float
+    insufficient_context: bool
 
 
 def _ensure_timings(state: ChatState) -> Dict[str, float]:
@@ -248,12 +259,58 @@ def web_search(state: ChatState, config: RunnableConfig | None = None) -> ChatSt
 
 
 def generate_answer(state: ChatState, config: RunnableConfig | None = None) -> ChatState:
-    """Generate an answer using the Groq-backed chat model."""
+    """Generate an answer using the Groq-backed chat model.
+
+    Two new behaviours added here (routing in decide_next is unchanged):
+
+    1. Per-chunk score floor — Pinecone chunks are filtered by
+       settings.RAG_MIN_CHUNK_SCORE AFTER routing has already read top_score from
+       the unfiltered hit list.  Tavily web results bypass filtering (no comparable
+       cosine score).
+
+    2. Empty-context guard — if no usable context survives filtering + web results,
+       a deterministic abstention (ABSTENTION_ANSWER) is returned WITHOUT calling
+       the Groq LLM.  Calling an LLM with empty context is the failure mode being
+       removed by this step.
+    """
+    settings = get_settings()
     timings = _ensure_timings(state)
+
+    # --- Per-chunk score floor (Pinecone chunks only) ---
+    # Routing in decide_next already read top_score from the full retrieved list;
+    # we are safe to filter state["retrieved"] here without affecting routing.
+    # Web results are NOT filtered — they carry no cosine score.
+    filtered_pinecone = filter_chunks_by_score(
+        state.get("retrieved") or [], settings.RAG_MIN_CHUNK_SCORE
+    )
+    # Update state so the sources list in the API response reflects what was
+    # actually used, not the pre-filter hit list.
+    state["retrieved"] = filtered_pinecone
+
+    web_results = state.get("web_results") or []
+    usable_sources = filtered_pinecone + web_results
+
+    # --- Empty-context guard: deterministic abstention, no LLM call ---
+    if not usable_sources:
+        state["answer"] = ABSTENTION_ANSWER
+        state["insufficient_context"] = True
+        timings.setdefault("generate_ms", 0.0)
+        state["timings"] = timings
+        logger.info(
+            "Empty context after chunk score filtering — returning deterministic "
+            "abstention (Groq NOT called). "
+            "filtered_pinecone=%d web_results=%d min_chunk_score=%.3f",
+            len(filtered_pinecone),
+            len(web_results),
+            settings.RAG_MIN_CHUNK_SCORE,
+        )
+        return state
+
+    # --- Normal path: context exists, call Groq ---
     messages = build_rag_messages(
         chat_history=state.get("chat_history") or [],
         question=state["query"],
-        sources=(state.get("retrieved") or []) + (state.get("web_results") or []),
+        sources=usable_sources,
     )
 
     llm = get_llm()
@@ -281,6 +338,7 @@ def generate_answer(state: ChatState, config: RunnableConfig | None = None) -> C
         answer_text = str(response)
 
     state["answer"] = answer_text
+    state["insufficient_context"] = False
     logger.info("Answer generation completed elapsed_ms=%.2f", elapsed_ms)
     return state
 

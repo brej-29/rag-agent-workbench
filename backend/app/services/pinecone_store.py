@@ -69,6 +69,18 @@ def init_pinecone(settings: Optional[Settings] = None) -> None:
     _index = index
     _default_namespace = settings.PINECONE_NAMESPACE
 
+    # Surface the embedding model and dimension so the stack is self-documenting.
+    # Attribute paths: embed_config.model (str) and embed_config.dimension (int)
+    # from pinecone.core.openapi.db_control.model.model_index_embed.ModelIndexEmbed.
+    # index_model.dimension (top-level) carries the same value once the index is ready.
+    _embed_model = getattr(embed_config, "model", "unknown")
+    _embed_dimension = getattr(embed_config, "dimension", None)
+    logger.info(
+        "Pinecone embedding config model='%s' dimension=%s top_k_default=%d",
+        _embed_model,
+        _embed_dimension,
+        settings.RAG_DEFAULT_TOP_K,
+    )
     logger.info(
         "Pinecone initialised successfully with namespace=%s",
         _default_namespace,

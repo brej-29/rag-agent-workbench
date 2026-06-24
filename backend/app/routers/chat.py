@@ -60,6 +60,7 @@ def _build_chat_response(state: Dict) -> ChatResponse:
         sources=sources,
         timings=timings,
         trace=trace_meta,
+        insufficient_context=bool(state.get("insufficient_context") or False),
     )
 
 

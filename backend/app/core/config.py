@@ -80,6 +80,21 @@ class Settings(BaseSettings):
         le=1.0,
         description="Default minimum relevance score to trust retrieval without web fallback",
     )
+    RAG_MIN_CHUNK_SCORE: float = Field(
+        default=0.25,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Per-chunk cosine score floor for Pinecone vector chunks.  Chunks below "
+            "this threshold are excluded from the context window before generation.  "
+            "Distinct from RAG_MIN_SCORE (the web-fallback routing threshold, line 77): "
+            "RAG_MIN_SCORE decides whether to invoke Tavily web search; "
+            "RAG_MIN_CHUNK_SCORE decides which individual Pinecone chunks are usable "
+            "context.  The 0.25 default is a PLACEHOLDER matching RAG_MIN_SCORE for "
+            "initial consistency — it is NOT a tuned value.  Calibrate against the "
+            "T1.2 retrieval eval set (recall@k / nDCG@k) before treating it as justified."
+        ),
+    )
     RAG_MAX_WEB_RESULTS: int = Field(
         default=5,
         ge=1,

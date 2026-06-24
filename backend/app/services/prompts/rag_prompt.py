@@ -32,6 +32,27 @@ Instructions:
 """
 
 
+def filter_chunks_by_score(
+    chunks: List[Dict[str, Any]],
+    min_chunk_score: float,
+) -> List[Dict[str, Any]]:
+    """Return only Pinecone vector chunks whose cosine score >= min_chunk_score.
+
+    Preserves retrieval rank order.  This function is a pure filter — no side
+    effects, no logging.  Do NOT apply to Tavily web results (source == "web"):
+    web results carry no comparable cosine score.
+
+    Args:
+        chunks: List of chunk dicts (each with at least a "score" key).
+        min_chunk_score: Inclusive lower bound.  Chunks with score strictly
+            below this value are excluded.
+
+    Returns:
+        Filtered list preserving the original order.
+    """
+    return [c for c in chunks if float(c.get("score") or 0.0) >= min_chunk_score]
+
+
 def build_context_string(sources: List[Dict[str, Any]]) -> str:
     """Format retrieved and web results into a numbered context block.
 

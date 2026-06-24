@@ -1,0 +1,5 @@
+[tool.pytest.ini_options]
+# Add both repo root (for `from eval.metrics import ...`) and backend/
+# (for `from app.services... import ...`) to sys.path before collection.
+# This is the committed, CI-safe alternative to PYTHONPATH env-var injection.
+pythonpath = [".", "backend"]

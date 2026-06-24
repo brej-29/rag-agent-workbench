@@ -1,0 +1,10 @@
+# requirements-dev.in — test tooling, NOT installed in the production image.
+# DO NOT edit requirements-dev.txt directly; edit here and regenerate:
+#   uv pip compile --python-version 3.11 \
+#       --constraint backend/requirements.txt \
+#       requirements-dev.in -o requirements-dev.txt
+#
+# The suite uses stdlib unittest.mock (no pytest-mock) and no async tests
+# (no pytest-asyncio).  Only pytest itself is needed beyond the runtime lock.
+
+pytest

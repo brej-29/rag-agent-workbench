@@ -1,6 +1,16 @@
 version: 2
 updates:
-  # Backend dependencies
+  # Keep GitHub Actions versions current
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+
+  # Backend pip dependencies
   - package-ecosystem: pip
     directory: /backend
     schedule:
@@ -9,12 +19,22 @@ updates:
     labels:
       - dependencies
       - backend
-    # Dependabot will propose bumps to backend/requirements.in entries.
-    # After merging, regenerate backend/requirements.txt:
-    #   uv pip compile --python-version 3.11 backend/requirements.in \
-    #       -o backend/requirements.txt
+    groups:
+      # Batch all minor and patch bumps into a single PR instead of one-per-package.
+      # After merging, regenerate backend/requirements.txt:
+      #   uv pip compile --python-version 3.11 backend/requirements.in \
+      #       -o backend/requirements.txt
+      backend-minor-patch:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Do not auto-PR major-version bumps; they require manual review and lock regen.
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
 
-  # Frontend / root dependencies
+  # Frontend / root pip dependencies
   - package-ecosystem: pip
     directory: /
     schedule:
@@ -23,6 +43,14 @@ updates:
     labels:
       - dependencies
       - frontend
-    # Dependabot will propose bumps to requirements.in entries.
-    # After merging, regenerate requirements.txt:
-    #   uv pip compile requirements.in -o requirements.txt
+    groups:
+      # After merging, regenerate requirements.txt:
+      #   uv pip compile requirements.in -o requirements.txt
+      frontend-minor-patch:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major

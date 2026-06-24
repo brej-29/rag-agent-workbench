@@ -1052,3 +1052,100 @@ If a new test reveals an actual defect in existing application code:
 
 **T1.5 result: no defects found.**  All 84 new tests passed on first run against the existing
 application code.
+
+---
+
+### Runtime vs dev dependency separation
+
+Test tooling (`pytest` and its transitives) is **not** installed in the production image.  The
+Dockerfile installs only `backend/requirements.txt`.  Test deps live in a separate lock:
+
+| File | Role | Installed in |
+|---|---|---|
+| `backend/requirements.txt` | Pinned runtime lock | Production Docker image + CI |
+| `requirements-dev.txt` | Pinned test-tooling lock | CI only (and local dev) |
+| `requirements-dev.in` | Loose dev intent (just `pytest`) | Source of truth for dev lock |
+
+**Detected test-only deps beyond stdlib and the runtime lock:** `pytest==8.3.2` (and its
+transitives: colorama 0.4.6, iniconfig 2.3.0, packaging 24.2, pluggy 1.6.0).  The suite uses
+`unittest.mock` (stdlib) for all mocking — `pytest-mock` and `pytest-asyncio` are not needed.
+
+`requirements-dev.txt` was compiled with `backend/requirements.txt` as a `--constraint` so dev
+transitives cannot drift from the runtime pins.
+
+---
+
+### Test import path — committed config
+
+Tests import `app.*` (e.g., `from app.services.normalize import ...`) and `eval.*` (e.g.,
+`from eval.metrics import ...`).  Both require `backend/` and the repo root on `sys.path`.
+
+**Mechanism:** `pyproject.toml` `[tool.pytest.ini_options]` with `pythonpath = [".", "backend"]`.
+pytest adds both directories to `sys.path` before any test module is collected.  This is
+committed to the repo and requires no local `PYTHONPATH` env-var or conda-env manipulation.
+Individual test files also carry their own `sys.path.insert` guards; these are now redundant but
+harmless.
+
+---
+
+### Clean-venv validation of the T1.4 lock (deferred, now complete)
+
+A temporary clean venv was created using Python 3.11.15 (via uv's managed interpreter, matching
+the Dockerfile's `FROM python:3.11-slim`).  Both locks were installed from scratch:
+
+```
+uv venv --python cpython-3.11.15 .venv-ci-check
+uv pip install --python .venv-ci-check -r backend/requirements.txt
+uv pip install --python .venv-ci-check -r requirements-dev.txt
+.venv-ci-check/Scripts/python.exe -m pytest tests/ -v
+```
+
+**Result: 134 passed in 22.70s** on Python 3.11.15.  No import errors, no transitive conflicts,
+no version mismatches.  The backend lock installs cleanly into a vanilla Python 3.11 interpreter.
+This closes the deferred validation from T1.4 (where the conda env could not provide this
+guarantee).
+
+---
+
+### CI pipeline — updated
+
+`.github/workflows/ci.yml` now:
+- **Triggers only on `main` branch** (push and PR targeting main) — prevents double-runs on
+  Dependabot branches and CI noise on every feature branch.
+- **Caches pip** with `cache-dependency-path` covering both `backend/requirements.txt` and
+  `requirements-dev.txt` — cache invalidates when either lock changes.
+- **Installs both locks separately**: runtime first (`backend/requirements.txt`), then dev
+  (`requirements-dev.txt`).  This mirrors the production/test separation exactly.
+- **No secrets** in the workflow file; will pass on forks without any configuration.
+- Does **not** invoke `make eval` or `make eval-corpus`.
+
+---
+
+### Dependabot posture
+
+`.github/dependabot.yml` is configured for three ecosystems: `github-actions`, `pip /backend`,
+and `pip /` (frontend).  For both pip ecosystems:
+
+- **Grouped PRs**: all minor and patch bumps are batched into a single PR per ecosystem
+  (`backend-minor-patch` / `frontend-minor-patch`) instead of one PR per package.
+- **Majors gated**: `version-update:semver-major` is ignored — major bumps require manual
+  review, lock regeneration, and validation.
+- **Limit 5** open PRs per ecosystem.
+
+**Important: accepting a Dependabot bump requires recompiling the lock.**  Dependabot edits
+the `.txt` file directly (it does not run `uv pip compile`), which breaks the uv-generated
+comment header and may silently skip transitive adjustments.  After merging a Dependabot PR,
+always regenerate the affected lock:
+
+```bash
+# Backend bump
+uv pip compile --python-version 3.11 backend/requirements.in -o backend/requirements.txt
+
+# Frontend bump
+uv pip compile requirements.in -o requirements.txt
+
+# Dev tooling bump
+uv pip compile --python-version 3.11 \
+    --constraint backend/requirements.txt \
+    requirements-dev.in -o requirements-dev.txt
+```

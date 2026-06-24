@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
 
 jobs:
   test:
@@ -15,14 +17,21 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            requirements-dev.txt
 
-      # Install from the pinned lock file — this is the clean-environment
-      # validation of the T1.4 dependency pins.  Deliberate: use the lock,
-      # not the .in file and not a re-resolve.
-      - name: Install pinned dependencies
-        run: pip install --no-cache-dir -r backend/requirements.txt
+      # Install the runtime lock first (matches the production image),
+      # then the dev lock (adds pytest and its transitives).
+      # This is the clean-environment validation of the T1.4 dependency pins.
+      - name: Install runtime dependencies
+        run: pip install -r backend/requirements.txt
 
-      # Offline pytest only.  make eval / make eval-corpus are NOT run here:
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      # Offline pytest only.  make eval / make eval-corpus are NOT run:
       # they require live Pinecone credentials and incur index query cost.
       - name: Run tests
         run: pytest tests/ -v

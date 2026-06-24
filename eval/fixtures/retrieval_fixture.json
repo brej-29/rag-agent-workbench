@@ -1,0 +1,56 @@
+{
+  "_comment": "Synthetic fixture for CI unit tests. Contains pre-recorded (fake) ranked doc_ids and human-labeled relevant sets. Zero network calls required. Do NOT use as a real golden set — these doc_ids do not correspond to any indexed document.",
+  "queries": [
+    {
+      "id": "fixture_q1",
+      "description": "Strong retrieval: both relevant docs found, first one at rank 1",
+      "query": "what is retrieval augmented generation",
+      "retrieved_doc_ids": [
+        "doc_rag_001",
+        "doc_vec_002",
+        "doc_rag_003",
+        "doc_llm_004",
+        "doc_ann_005"
+      ],
+      "relevant_doc_ids": ["doc_rag_001", "doc_rag_003"],
+      "k": 5
+    },
+    {
+      "id": "fixture_q2",
+      "description": "Late hit: the single relevant doc is at rank 3",
+      "query": "vector database approximate nearest neighbor",
+      "retrieved_doc_ids": [
+        "doc_llm_010",
+        "doc_tf_011",
+        "doc_ann_012"
+      ],
+      "relevant_doc_ids": ["doc_ann_012"],
+      "k": 3
+    },
+    {
+      "id": "fixture_q3",
+      "description": "Miss: the relevant doc is not in the retrieved list at all",
+      "query": "dense passage retrieval for open domain question answering",
+      "retrieved_doc_ids": [
+        "doc_rag_020",
+        "doc_llm_021",
+        "doc_vec_022"
+      ],
+      "relevant_doc_ids": ["doc_dpr_099"],
+      "k": 5
+    },
+    {
+      "id": "fixture_q4",
+      "description": "Partial hit: one of two relevant docs found at rank 2",
+      "query": "transformer self-attention mechanism",
+      "retrieved_doc_ids": [
+        "doc_ann_030",
+        "doc_tf_031",
+        "doc_vec_032",
+        "doc_tf_033"
+      ],
+      "relevant_doc_ids": ["doc_tf_031", "doc_tf_missing"],
+      "k": 4
+    }
+  ]
+}

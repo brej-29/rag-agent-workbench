@@ -26,7 +26,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from eval.metrics import ndcg_at_k, mrr, recall_at_k  # noqa: E402
+from eval.metrics import ndcg_at_k, mrr, precision_at_k, recall_at_k  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -250,3 +250,43 @@ class TestFixtureMetrics:
         idcg = 1.0 / math.log2(2) + 1.0 / math.log2(3)
         expected = dcg / idcg
         assert result == pytest.approx(expected, rel=1e-9)
+
+
+# ---------------------------------------------------------------------------
+# TestPrecisionAtK — pure function, zero network calls
+# ---------------------------------------------------------------------------
+
+class TestPrecisionAtK:
+    def test_all_top_k_relevant(self):
+        assert precision_at_k(["a", "b", "c"], {"a", "b", "c"}, 3) == pytest.approx(1.0)
+
+    def test_none_top_k_relevant(self):
+        assert precision_at_k(["a", "b", "c"], {"d", "e"}, 3) == pytest.approx(0.0)
+
+    def test_partial_hit(self):
+        # 2 of 4 top-4 are relevant
+        assert precision_at_k(["a", "b", "c", "d"], {"a", "c"}, 4) == pytest.approx(0.5)
+
+    def test_precision_at_1_hit(self):
+        assert precision_at_k(["a", "b", "c"], {"a"}, 1) == pytest.approx(1.0)
+
+    def test_precision_at_1_miss(self):
+        # top-1 is "b", not relevant
+        assert precision_at_k(["b", "a"], {"a"}, 1) == pytest.approx(0.0)
+
+    def test_k_truncation_ignores_beyond_k(self):
+        # relevant doc is at rank 4, which is beyond k=3
+        assert precision_at_k(["a", "b", "c", "d"], {"d"}, 3) == pytest.approx(0.0)
+
+    def test_k_larger_than_retrieved_penalises(self):
+        # only 2 retrieved, k=5; 1 hit → 1/5 = 0.2
+        assert precision_at_k(["a", "b"], {"a"}, 5) == pytest.approx(0.2)
+
+    def test_empty_relevant_returns_zero(self):
+        assert precision_at_k(["a", "b"], set(), 2) == pytest.approx(0.0)
+
+    def test_k_zero_returns_zero(self):
+        assert precision_at_k(["a", "b"], {"a"}, 0) == pytest.approx(0.0)
+
+    def test_empty_retrieved_returns_zero(self):
+        assert precision_at_k([], {"a"}, 3) == pytest.approx(0.0)

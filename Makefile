@@ -14,7 +14,7 @@ MAILTO       ?=
 CANDIDATES   ?= 20
 RERANK_MODEL ?= bge-reranker-v2-m3
 
-.PHONY: eval-corpus eval eval-ab test help
+.PHONY: eval-corpus eval eval-ab eval-ab-topk test help
 
 ## help: Print this help message.
 help:
@@ -50,6 +50,20 @@ eval-ab:
 		--candidates $(CANDIDATES) \
 		--golden $(GOLDEN) \
 		--rerank-model $(RERANK_MODEL)
+
+## eval-ab-topk: Run A/B eval with top-heavy precision/nDCG metrics at multiple k values.
+##   Computes precision@1, recall@3/5, nDCG@3/5 plus the standard @top_k metrics.
+##   Same golden set and corpus as eval-ab — only the reported metrics differ.
+##   ON-DEMAND only — NOT in CI, NOT invoked by make eval.
+eval-ab-topk:
+	@echo ">>> Running top-heavy A/B eval (namespace='$(EVAL_NS)', top_k=$(TOP_K), candidates=$(CANDIDATES))..."
+	$(PYTHON) eval/run_ab.py \
+		--namespace $(EVAL_NS) \
+		--top-k $(TOP_K) \
+		--candidates $(CANDIDATES) \
+		--golden $(GOLDEN) \
+		--rerank-model $(RERANK_MODEL) \
+		--multi-k
 
 ## test: Run CI-safe unit tests (zero network calls).
 test:

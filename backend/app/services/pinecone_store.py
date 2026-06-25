@@ -11,7 +11,7 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 _index: Optional[Any] = None
-_pc: Optional[Pinenecone] = None
+_pc: Optional[Any] = None  # Pinecone client; type erased to avoid import-time SDK coupling
 _default_namespace: str = "dev"
 
 
@@ -92,6 +92,13 @@ def get_index() -> Any:
     if _index is None:
         raise RuntimeError("Pinecone index has not been initialised")
     return _index
+
+
+def get_pinecone_client() -> Any:
+    """Return the initialised Pinecone client (needed for Inference API calls)."""
+    if _pc is None:
+        raise RuntimeError("Pinecone client has not been initialised")
+    return _pc
 
 
 def get_default_namespace() -> str:

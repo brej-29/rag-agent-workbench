@@ -34,6 +34,7 @@ def _build_chat_response(state: Dict) -> ChatResponse:
     timings_raw = state.get("timings") or {}
     timings = ChatTimings(
         retrieve_ms=float(timings_raw.get("retrieve_ms") or 0.0),
+        rerank_ms=float(timings_raw.get("rerank_ms") or 0.0),
         web_ms=float(timings_raw.get("web_ms") or 0.0),
         generate_ms=float(timings_raw.get("generate_ms") or 0.0),
         total_ms=float(timings_raw.get("total_ms") or 0.0),

@@ -1203,3 +1203,98 @@ deployments unnecessarily.  Operators are expected to respond to the warning bef
 |---|---|
 | `backend/app/core/security.py` | Removed `allow_credentials=True`; added prod-wildcard warning; imported `_is_production_like` from auth |
 | `tests/test_cors.py` | 12 new CI-safe unit tests (zero network) |
+
+---
+
+## Two-stage retrieval — Pinecone hosted reranker (T1.6)
+
+### Overview
+
+Two-stage retrieval adds an optional second step to the dense-retrieval path: after a first-stage
+Pinecone cosine search, the surviving chunks are re-ordered by a **Pinecone hosted reranker**
+(`pc.inference.rerank`) before the top-k subset is forwarded to the LLM.  The reranker captures
+semantic nuance that dense retrieval sometimes misses (e.g. keyword-dense but query-irrelevant
+documents).
+
+The feature is **disabled by default** (`RAG_RERANK_ENABLED=false`).  When disabled, every code
+path is byte-for-byte identical to the baseline; the rerank helper is never called.  Enable it only
+after an A/B run (`make eval-ab`) shows a statistically meaningful nDCG@k improvement that justifies
+the added latency.
+
+### Critical scale constraint
+
+Reranker scores and cosine similarity scores are **completely different numerical distributions**.
+The existing thresholds (`RAG_MIN_SCORE`, `RAG_MIN_CHUNK_SCORE`) are calibrated for cosine
+similarity and must **never** be applied to rerank scores.  The cosine floor runs **before**
+reranking (on cosine scores); no threshold is applied to the output of the reranker.
+
+### Configuration knobs
+
+| Setting | File | Default | Purpose |
+|---|---|---|---|
+| `RAG_RERANK_ENABLED` | `config.py` | `False` | Master switch — OFF means baseline behavior |
+| `RAG_RERANK_MODEL` | `config.py` | `bge-reranker-v2-m3` | Pinecone inference reranker model |
+| `RAG_RERANK_CANDIDATES` | `config.py` | `20` | First-stage pool size; clamped to ≥ `RAG_DEFAULT_TOP_K` |
+| `RAG_MIN_CHUNK_SCORE` | `config.py` | `0.25` | Cosine floor applied BEFORE reranking (unchanged) |
+
+`RAG_RERANK_MODEL` must be available on the operator's Pinecone plan.  `pinecone-rerank-v0` is a
+lower-throughput development-tier alternative.  See https://docs.pinecone.io/models/overview.
+
+### Execution path (when enabled)
+
+```
+retrieve_context
+  ├── Dense search: top_k=max(RAG_RERANK_CANDIDATES, top_k) candidates
+  ├── top_score = max cosine score (UNCHANGED — routing reads this)
+  └── state["retrieved"] = all candidates (with cosine scores)
+
+decide_next
+  └── Reads top_score (cosine) for web-fallback threshold (UNCHANGED)
+
+generate_answer
+  ├── Stage 1 — cosine floor: filter_chunks_by_score(retrieved, RAG_MIN_CHUNK_SCORE)
+  │             Cosine-calibrated; floor runs on cosine scores only
+  ├── Stage 2 — hosted rerank: pc.inference.rerank(model, query, survivors, top_n=top_k)
+  │             rerank_ms recorded; rerank scores NOT threshold-compared
+  └── state["retrieved"] = top_k reranked chunks → LLM context
+```
+
+When `RAG_RERANK_ENABLED=False`, Stage 2 is skipped entirely and `rerank_ms=0.0`.
+
+### Graceful degradation
+
+Any Pinecone Inference API error in `rerank_chunks()` is caught, logged, and the function
+returns the pre-rerank cosine order truncated to `top_n`.  The user receives a valid response
+from the baseline retrieval path without any exception propagating.
+
+### Files added / changed
+
+| File | Change |
+|---|---|
+| `backend/app/core/config.py` | Added `RAG_RERANK_ENABLED`, `RAG_RERANK_MODEL`, `RAG_RERANK_CANDIDATES` |
+| `backend/app/services/pinecone_store.py` | Added `get_pinecone_client()` getter; fixed `_pc` type annotation |
+| `backend/app/services/rerank.py` | **New** — `rerank_chunks()` helper using `pc.inference.rerank` |
+| `backend/app/services/chat/graph.py` | `retrieve_context`: wider pool when ON; `generate_answer`: cosine floor → rerank → top_k; added `rerank_ms` timing |
+| `backend/app/schemas/chat.py` | Added `rerank_ms: float` to `ChatTimings` (0.0 when OFF) |
+| `backend/app/routers/chat.py` | Propagated `rerank_ms` in `_build_chat_response` |
+| `eval/run_ab.py` | **New** — on-demand A/B harness (live Pinecone calls, NOT for CI) |
+| `Makefile` | Added `eval-ab` target; added `CANDIDATES` and `RERANK_MODEL` variables |
+| `tests/test_reranking.py` | **New** — 14 CI-safe unit tests; Pinecone Inference API mocked; zero network |
+
+### A/B evaluation — `make eval-ab`
+
+```bash
+# Default: top_k=10, candidates=20, model=bge-reranker-v2-m3
+make eval-ab
+
+# Custom pool and model
+make eval-ab CANDIDATES=30 RERANK_MODEL=pinecone-rerank-v0 TOP_K=5
+```
+
+Runs each golden-set query through both arms (baseline dense + rerank), computes
+recall@k, MRR, nDCG@k, and mean latency per arm, and writes a delta table to
+`eval/reports/ab_{timestamp}.{json,md}`.
+
+**This target issues live Pinecone calls and incurs inference cost.  It is NOT invoked by
+`make eval` and must NOT be added to CI.**  Use it on-demand to empirically justify flipping
+`RAG_RERANK_ENABLED=True`.

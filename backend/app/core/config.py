@@ -102,6 +102,44 @@ class Settings(BaseSettings):
         description="Maximum number of web search results to fetch when using Tavily",
     )
 
+    # Two-stage reranking (disabled by default; enable only after A/B eval justifies it)
+    # Relationship to existing retrieval settings:
+    #   RAG_DEFAULT_TOP_K  — final number of chunks delivered to the LLM (unchanged)
+    #   RAG_MIN_SCORE      — cosine routing threshold for web-fallback (unchanged, cosine-only)
+    #   RAG_MIN_CHUNK_SCORE — cosine per-chunk floor applied BEFORE rerank (unchanged, cosine-only)
+    #   RAG_RERANK_CANDIDATES — wider first-stage pool; must be >= RAG_DEFAULT_TOP_K
+    # Rerank scores are a DIFFERENT scale/distribution from cosine — the cosine thresholds
+    # above are never applied to rerank scores.
+    RAG_RERANK_ENABLED: bool = Field(
+        default=False,
+        description=(
+            "Enable two-stage retrieval: dense-retrieve RAG_RERANK_CANDIDATES candidates "
+            "then rerank with the Pinecone hosted reranker.  Default OFF.  Enable only "
+            "after an A/B run (`make eval-ab`) justifies it."
+        ),
+    )
+    RAG_RERANK_MODEL: str = Field(
+        default="bge-reranker-v2-m3",
+        description=(
+            "Pinecone Inference reranker model.  Eval-tunable. "
+            "Operator must confirm this model is available on their Pinecone plan — "
+            "plan availability varies.  'pinecone-rerank-v0' is a development-tier "
+            "alternative with lower throughput.  See https://docs.pinecone.io/models/overview"
+        ),
+    )
+    RAG_RERANK_CANDIDATES: int = Field(
+        default=20,
+        ge=1,
+        le=200,
+        description=(
+            "Number of candidates to retrieve in the first (dense) stage when reranking "
+            "is enabled.  Eval-tunable: larger pools give the reranker more to work with "
+            "at the cost of higher rerank inference latency.  Must be >= RAG_DEFAULT_TOP_K "
+            "(the final top_k delivered to the LLM); values below top_k are clamped up. "
+            "Ignored when RAG_RERANK_ENABLED is False."
+        ),
+    )
+
     # Operational toggles
     RATE_LIMIT_ENABLED: bool = Field(
         default=True,

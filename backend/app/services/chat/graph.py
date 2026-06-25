@@ -13,6 +13,7 @@ from app.schemas.chat import ChatRequest
 from app.services.llm.groq_llm import get_llm
 from app.services.prompts.rag_prompt import build_rag_messages, filter_chunks_by_score
 from app.services.pinecone_store import search as pinecone_search
+from app.services.rerank import rerank_chunks
 from app.services.tools.tavily_tool import get_tavily_tool, is_tavily_configured
 
 logger = get_logger(__name__)
@@ -103,15 +104,32 @@ def normalize_input(state: ChatState, _config: RunnableConfig | None = None) -> 
 
 
 def retrieve_context(state: ChatState, _config: RunnableConfig | None = None) -> ChatState:
-    """Retrieve relevant document chunks from Pinecone."""
+    """Retrieve relevant document chunks from Pinecone.
+
+    When RAG_RERANK_ENABLED is True, fetches RAG_RERANK_CANDIDATES candidates
+    (clamped to >= top_k) to give the reranker a wider pool.  When False the
+    behavior is identical to the pre-reranking baseline — no extra call, no
+    reordering.
+
+    top_score is always the MAX COSINE score of the retrieved hits so that
+    decide_next's web-fallback routing (which compares against the cosine-
+    calibrated RAG_MIN_SCORE) is unaffected by the reranking flag.
+    """
     settings = get_settings()
     timings = _ensure_timings(state)
+
+    # Stage-1 retrieval: when reranking is enabled, fetch a wider candidate pool.
+    # When disabled, fetch exactly top_k — byte-for-byte identical to baseline.
+    if settings.RAG_RERANK_ENABLED:
+        n_candidates = max(settings.RAG_RERANK_CANDIDATES, state["top_k"])
+    else:
+        n_candidates = state["top_k"]
 
     start = perf_counter()
     raw_hits: List[Dict[str, Any]] = pinecone_search(
         namespace=state["namespace"],
         query_text=state["query"],
-        top_k=state["top_k"],
+        top_k=n_candidates,
         filters=None,
         fields=None,
     )
@@ -276,16 +294,35 @@ def generate_answer(state: ChatState, config: RunnableConfig | None = None) -> C
     settings = get_settings()
     timings = _ensure_timings(state)
 
-    # --- Per-chunk score floor (Pinecone chunks only) ---
+    # --- Stage 1: cosine floor (Pinecone chunks only) ---
     # Routing in decide_next already read top_score from the full retrieved list;
     # we are safe to filter state["retrieved"] here without affecting routing.
     # Web results are NOT filtered — they carry no cosine score.
+    # IMPORTANT: the floor uses RAG_MIN_CHUNK_SCORE which is cosine-calibrated.
+    # It runs BEFORE reranking so only meaningful cosine-scored chunks reach the
+    # reranker.  Rerank scores live on a different scale — never threshold them.
     filtered_pinecone = filter_chunks_by_score(
         state.get("retrieved") or [], settings.RAG_MIN_CHUNK_SCORE
     )
-    # Update state so the sources list in the API response reflects what was
-    # actually used, not the pre-filter hit list.
     state["retrieved"] = filtered_pinecone
+
+    # --- Stage 2: hosted rerank (when enabled) ---
+    # OFF path: byte-for-byte identical to baseline; rerank_chunks is NOT called.
+    # ON path: rerank the cosine-floor survivors and take the top_k result.
+    top_k = state.get("top_k") or settings.RAG_DEFAULT_TOP_K
+    if settings.RAG_RERANK_ENABLED and filtered_pinecone:
+        rerank_start = perf_counter()
+        filtered_pinecone = rerank_chunks(
+            query=state["query"],
+            chunks=filtered_pinecone,
+            top_n=top_k,
+            model=settings.RAG_RERANK_MODEL,
+        )
+        timings["rerank_ms"] = (perf_counter() - rerank_start) * 1000.0
+        state["retrieved"] = filtered_pinecone
+    else:
+        timings["rerank_ms"] = 0.0
+    state["timings"] = timings
 
     web_results = state.get("web_results") or []
     usable_sources = filtered_pinecone + web_results

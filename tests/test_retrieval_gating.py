@@ -38,6 +38,8 @@ def _make_chunk(score: float, text: str = "content", source: str = "wiki") -> Di
 def _make_mock_settings(min_chunk_score: float = 0.25) -> MagicMock:
     s = MagicMock()
     s.RAG_MIN_CHUNK_SCORE = min_chunk_score
+    s.RAG_RERANK_ENABLED = False  # reranking OFF by default in retrieval-gating tests
+    s.RAG_DEFAULT_TOP_K = 5
     return s
 
 

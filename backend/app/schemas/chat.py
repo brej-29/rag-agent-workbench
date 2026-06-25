@@ -87,6 +87,13 @@ class ChatTimings(BaseModel):
         0.0,
         description="Time spent retrieving from Pinecone, in milliseconds.",
     )
+    rerank_ms: float = Field(
+        0.0,
+        description=(
+            "Time spent calling the Pinecone hosted reranker, in milliseconds. "
+            "Zero when RAG_RERANK_ENABLED is False (the default)."
+        ),
+    )
     web_ms: float = Field(
         0.0,
         description="Time spent calling web search tools, in milliseconds.",

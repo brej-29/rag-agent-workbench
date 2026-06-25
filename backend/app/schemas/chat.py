@@ -102,6 +102,13 @@ class ChatTimings(BaseModel):
         0.0,
         description="Time spent generating the answer with the LLM, in milliseconds.",
     )
+    faithfulness_ms: float = Field(
+        0.0,
+        description=(
+            "Time spent on the LLM-judge faithfulness check, in milliseconds. "
+            "Zero when RAG_FAITHFULNESS_ENABLED is False (the default)."
+        ),
+    )
     total_ms: float = Field(
         0.0,
         description="End-to-end time from request receipt to response, in milliseconds.",
@@ -141,5 +148,33 @@ class ChatResponse(BaseModel):
             "Groq LLM was NOT called.  Callers can use this flag to distinguish a "
             "genuine model-generated answer from an abstention without parsing the "
             "answer text."
+        ),
+    )
+    grounded: Optional[bool] = Field(
+        default=None,
+        description=(
+            "Whether the generated answer is grounded in the retrieved context, "
+            "as determined by the LLM judge (RAG_FAITHFULNESS_ENABLED=True). "
+            "None when the judge was not called (flag OFF or abstention path). "
+            "Distinct from insufficient_context: insufficient_context means the "
+            "LLM was never called; grounded=False means the LLM answered but "
+            "the answer is not well-supported by the context."
+        ),
+    )
+    faithfulness_score: Optional[float] = Field(
+        default=None,
+        description=(
+            "Score 0.0-1.0 from the faithfulness judge indicating the proportion "
+            "of answer claims supported by context.  None when the judge was not "
+            "called or JSON parsing of the judge response failed."
+        ),
+    )
+    unverified_citations: List[int] = Field(
+        default_factory=list,
+        description=(
+            "Citation numbers [n] found in the answer that reference chunks "
+            "outside the valid range [1, len(sources)].  Set by the deterministic "
+            "citation check (always runs, even when RAG_FAITHFULNESS_ENABLED=False). "
+            "Empty list means all citations are in range or the answer has none."
         ),
     )

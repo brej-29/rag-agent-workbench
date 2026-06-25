@@ -140,6 +140,30 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Faithfulness / grounding check (T2.2)
+    RAG_FAITHFULNESS_ENABLED: bool = Field(
+        default=False,
+        description=(
+            "Enable the LLM-judge faithfulness check in format_response.  Defaults to "
+            "False to avoid extra LLM call cost on every request.  When False, the "
+            "cheap deterministic citation-marker check still runs (verify_citations); "
+            "only the judge call is skipped.  Set to True to populate grounded and "
+            "faithfulness_score in ChatResponse."
+        ),
+    )
+    RAG_FAITHFULNESS_THRESHOLD: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Minimum faithfulness_score (from the LLM judge) required to set "
+            "grounded=True in ChatResponse.  PLACEHOLDER — this value is NOT "
+            "evidence-backed.  Calibrate against an answer-level eval set (answer + "
+            "context + human grounded label) before treating it as justified.  Setting "
+            "it too high yields false 'ungrounded' flags; too low defeats the check."
+        ),
+    )
+
     # Operational toggles
     RATE_LIMIT_ENABLED: bool = Field(
         default=True,

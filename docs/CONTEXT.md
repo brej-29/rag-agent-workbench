@@ -1152,6 +1152,130 @@ uv pip compile --python-version 3.11 \
 
 ---
 
+## Faithfulness & grounding (T2.2)
+
+### Overview
+
+This step closes the **output-side (back) half** of the audit's primary compounding failure
+chain: *weak retrieval → unfiltered context → unverified generation → hallucinated citations*.
+Before this change, the LLM could generate citations to non-existent chunks or claims that were
+not supported by the retrieved context, with no signal surfaced to the caller.  After this change,
+every response carries grounding metadata: a deterministic citation check always runs, and an
+optional LLM-judge faithfulness check is available behind a flag.
+
+The **input-side (front) half** of the chain — per-chunk score filtering and the empty-context
+abstention guard — was completed in the Retrieval gating section above (T1.3).
+
+---
+
+### Two-layer design
+
+| Layer | When it runs | Model calls | What it checks |
+|---|---|---|---|
+| `verify_citations` | Always (even when `RAG_FAITHFULNESS_ENABLED=False`) | Zero | `[n]` markers in the answer that reference out-of-range chunk indices |
+| `judge_faithfulness` | When `RAG_FAITHFULNESS_ENABLED=True` AND not an abstention | 1 (reuses Groq client) | Whether answer claims are supported by the retrieved context |
+
+Both functions live in `backend/app/services/faithfulness.py` and are importable by
+`eval/faithfulness.py` for offline scoring — no duplicate implementation.
+
+---
+
+### Circular-validation avoidance
+
+The faithfulness check **must not** re-embed the answer with the same retrieval embedder and
+threshold cosine similarity against the retrieved chunks.  That approach reuses the retriever's
+own semantic space to validate the retriever's own output — a circular-validation anti-pattern
+that encodes the embedder's biases into the faithfulness signal.
+
+**Solution:** the judge uses the existing Groq LLM (an independent language model) as a semantic
+reasoner over the already-retrieved text.  The deterministic layer is purely lexical (regex, no
+model).  Neither layer touches the retrieval embedding model.
+
+---
+
+### Flag-default-OFF cost rationale
+
+`RAG_FAITHFULNESS_ENABLED=False` (the default).  Every `/chat` request would otherwise pay for
+a second LLM call (judge) on top of the generation call.  On Groq's free tier the cost is
+latency rather than money, but it is still undesirable for interactive requests.
+
+When the flag is OFF:
+- `verify_citations` runs (free, deterministic).
+- The Groq LLM is **not** called a second time.
+- `grounded` and `faithfulness_score` in `ChatResponse` are `null`.
+
+When the flag is ON:
+- `verify_citations` runs.
+- `judge_faithfulness` calls the Groq LLM with a strict faithfulness prompt.
+- `grounded`, `faithfulness_score`, and `faithfulness_ms` are populated.
+
+---
+
+### Flag-and-report behavior
+
+When a faithfulness problem is detected, the system **flags it in the response and reports it to
+the caller** — it does NOT alter the answer text and does NOT hard-fail the request by default.
+
+Rationale: the judge is an LLM and can itself be wrong.  A false "ungrounded" verdict would
+silently corrupt a correct answer or block a valid response.  Callers who want to suppress
+ungrounded answers can inspect `ChatResponse.grounded` and act accordingly.
+
+`grounded` resolution from the judge verdict:
+- If `faithfulness_score` is not None: `grounded = (faithfulness_score >= RAG_FAITHFULNESS_THRESHOLD)`
+- Else if `grounded` (raw bool from model) is not None: use it as fallback
+- Else (parse failure): `grounded = None` ("unknown") — never raise, never block
+
+---
+
+### Composition with T1.3 (distinct states)
+
+`insufficient_context` (T1.3) and `grounded` (T2.2) are **distinct states** with different
+meanings and different execution paths:
+
+| Field | When True/False | LLM called? |
+|---|---|---|
+| `insufficient_context=True` | No usable context survived retrieval + chunk filtering | No — deterministic abstention |
+| `grounded=False` | LLM answered but answer is not well-supported by context | Yes — generation happened |
+| `grounded=None` | Judge not called (flag OFF, abstention path, or parse failure) | N/A |
+
+**The abstention path (`insufficient_context=True`) bypasses the judge entirely.**  There is no
+model-generated answer to evaluate, and calling the LLM a second time on the abstention path
+would be both wasteful and meaningless.  `format_response` checks `insufficient_context` first
+and skips the judge block unconditionally when it is True.
+
+---
+
+### Grounding threshold — PLACEHOLDER
+
+`RAG_FAITHFULNESS_THRESHOLD=0.5` is **not evidence-backed**.  It is a reasonable midpoint chosen
+as a neutral starting value.  To calibrate it:
+
+1. Collect answer/context pairs from real queries.
+2. Human-label each pair as grounded (1) or ungrounded (0).
+3. Use the faithfulness judge to score each pair.
+4. Choose the threshold that maximises F1 (or precision, depending on operational preference) on
+   the labeled set.
+
+The offline evaluation wrapper (`eval/faithfulness.py`) exposes the same `judge_faithfulness`
+function so this calibration can be done without modifying the runtime.
+
+---
+
+### Files added / changed
+
+| File | Change |
+|---|---|
+| `backend/app/services/faithfulness.py` | **New** — `verify_citations()` (deterministic) + `judge_faithfulness()` (LLM-as-judge) + `FaithfulnessVerdict` dataclass |
+| `backend/app/services/prompts/faithfulness_prompt.py` | **New** — judge prompt builder (separate from `rag_prompt.py`) |
+| `backend/app/core/config.py` | Added `RAG_FAITHFULNESS_ENABLED` (default False) + `RAG_FAITHFULNESS_THRESHOLD` (PLACEHOLDER 0.5) |
+| `backend/app/schemas/chat.py` | Added `faithfulness_ms` to `ChatTimings`; added `grounded`, `faithfulness_score`, `unverified_citations` to `ChatResponse` |
+| `backend/app/services/chat/graph.py` | Added grounding fields to `ChatState`; filled `format_response` node |
+| `backend/app/routers/chat.py` | Propagated grounding fields in `_build_chat_response` |
+| `eval/faithfulness.py` | **New** — thin offline wrapper importing runtime functions for eval use |
+| `tests/test_faithfulness.py` | **New** — 29 CI-safe unit tests (zero network, judge mocked) |
+
+---
+
 ## CORS & origins
 
 ### Problem fixed
@@ -1298,3 +1422,49 @@ recall@k, MRR, nDCG@k, and mean latency per arm, and writes a delta table to
 **This target issues live Pinecone calls and incurs inference cost.  It is NOT invoked by
 `make eval` and must NOT be added to CI.**  Use it on-demand to empirically justify flipping
 `RAG_RERANK_ENABLED=True`.
+
+A second target `make eval-ab-topk` runs the same arm comparison with `--multi-k`, adding
+precision@1, recall@3/5, and nDCG@3/5 to address the ceiling-bound objection at recall@10.
+
+---
+
+### Top-heavy validation (T2.1 follow-up) — `eval/reports/ab_20260625T083719Z.*`
+
+**Motivation:** the initial A/B (T2.1) showed recall@10 falling from 0.9684 to 0.9167 with
+reranking.  Recall@10 on a 34-chunk, 23-document corpus is ceiling-bound (~30 % of the corpus
+retrieved per query), meaning the retriever saturates the metric and any reranker can only
+lose recall without the upside of a larger pool.  Reranking is designed to improve top-of-list
+precision, not recall — so the T2.1 metric had all downside and no upside for the reranker.
+This run (`make eval-ab-topk`, same 29 queries, same golden set, top_k=10, candidates=20)
+computes the metrics reranking is supposed to optimise (precision@1, nDCG@3/5) to check for
+a hidden precision/recall tradeoff.
+
+**Results (n=29, top_k=10, candidates=20, model=bge-reranker-v2-m3):**
+
+| Metric | Baseline (A) | Rerank (B) | D (B-A) | Verdict |
+|--------|-------------|-----------|---------|---------|
+| Mean Precision@1 | 0.9655 | 0.9655 | 0.0000 | Tie |
+| Mean Recall@3 | 0.8534 | 0.7730 | -0.0805 | Baseline wins |
+| Mean nDCG@3 | 0.8750 | 0.8176 | -0.0574 | Baseline wins |
+| Mean Recall@5 | 0.9109 | 0.8822 | -0.0287 | Baseline wins |
+| Mean nDCG@5 | 0.8997 | 0.8687 | -0.0310 | Baseline wins |
+| Mean Recall@10 | 0.9684 | 0.9167 | -0.0517 | Baseline wins |
+| Mean MRR | 0.9828 | 0.9828 | 0.0000 | Tie |
+| Mean nDCG@10 | 0.9255 | 0.8853 | -0.0402 | Baseline wins |
+| Mean latency (ms) | 359.6 | 795.2 | +435.5 | Baseline wins |
+
+**Finding:** there is NO precision/recall tradeoff.  The reranker fails to improve even the
+top-heavy metrics it is designed to target: nDCG@3 falls by 0.057, nDCG@5 by 0.031, and
+Precision@1 ties at 0.9655 (no improvement).  The reranker is flat-or-negative at every
+measured k value.
+
+**Root cause:** `candidates=20` with `RAG_MIN_CHUNK_SCORE=0.25` causes the cosine floor to
+silently drop borderline-relevant chunks from the reranker's input pool before it can
+surface them.  The reranker never sees those documents, so it cannot fix the ordering deficit
+it creates by pushing other documents down.  Two levers exist to revisit this if warranted:
+raise `RAG_RERANK_CANDIDATES` to 40-50, or lower `RAG_MIN_CHUNK_SCORE` specifically for the
+rerank path to give the model more to work with.
+
+**Conclusion: `RAG_RERANK_ENABLED=False` is the correct default.  The decision is now
+empirically validated at both recall-oriented and precision-oriented metrics.**  Report in
+`eval/reports/ab_20260625T083719Z.json` and `.md`.

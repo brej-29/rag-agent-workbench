@@ -10,8 +10,14 @@ from app.core.config import get_settings
 from app.core.errors import UpstreamServiceError
 from app.core.logging import get_logger
 from app.schemas.chat import ChatRequest
+from app.services.faithfulness import FaithfulnessVerdict, judge_faithfulness, verify_citations
 from app.services.llm.groq_llm import get_llm
-from app.services.prompts.rag_prompt import build_rag_messages, filter_chunks_by_score
+from app.services.prompts.faithfulness_prompt import build_faithfulness_judge_messages  # noqa: F401 (imported for test-patchability)
+from app.services.prompts.rag_prompt import (
+    build_context_string,
+    build_rag_messages,
+    filter_chunks_by_score,
+)
 from app.services.pinecone_store import search as pinecone_search
 from app.services.rerank import rerank_chunks
 from app.services.tools.tavily_tool import get_tavily_tool, is_tavily_configured
@@ -48,6 +54,11 @@ class ChatState(TypedDict, total=False):
     web_fallback_used: bool
     top_score: float
     insufficient_context: bool
+
+    # Grounding fields populated by format_response (T2.2)
+    grounded: Optional[bool]
+    faithfulness_score: Optional[float]
+    unverified_citations: List[int]
 
 
 def _ensure_timings(state: ChatState) -> Dict[str, float]:
@@ -381,9 +392,60 @@ def generate_answer(state: ChatState, config: RunnableConfig | None = None) -> C
 
 
 def format_response(state: ChatState, _config: RunnableConfig | None = None) -> ChatState:
-    """No-op node reserved for future formatting; currently returns state."""
-    # This node exists mainly to keep the graph structure explicit and ready
-    # for future formatting steps (e.g. re-ranking or response post-processing).
+    """Grounding checks run after generation.
+
+    Layer 1 (always, free): deterministic citation-marker verification.
+    Layer 2 (gated by RAG_FAITHFULNESS_ENABLED): LLM-judge faithfulness check.
+
+    The abstention path (insufficient_context=True) bypasses the judge entirely —
+    there is no model-generated answer to evaluate and the LLM must not be called
+    a second time.  Does NOT alter the answer text.
+    """
+    settings = get_settings()
+    timings = _ensure_timings(state)
+
+    answer_text: str = state.get("answer") or ""
+    retrieved: List[Dict[str, Any]] = state.get("retrieved") or []
+    web_results: List[Dict[str, Any]] = state.get("web_results") or []
+    is_abstention: bool = bool(state.get("insufficient_context"))
+
+    # Layer 1: deterministic citation-marker check (always runs, zero model calls).
+    all_sources = retrieved + web_results
+    unverified = verify_citations(answer_text, all_sources)
+    state["unverified_citations"] = unverified
+
+    # Defaults — overwritten below when the judge runs successfully.
+    state["grounded"] = None
+    state["faithfulness_score"] = None
+    timings["faithfulness_ms"] = 0.0
+
+    # Layer 2: LLM-judge (gated).  Skip on abstention path — no answer to judge.
+    if settings.RAG_FAITHFULNESS_ENABLED and not is_abstention and answer_text:
+        context_string = build_context_string(all_sources)
+        llm = get_llm()
+        t0 = perf_counter()
+        verdict: FaithfulnessVerdict = judge_faithfulness(answer_text, context_string, llm)
+        timings["faithfulness_ms"] = (perf_counter() - t0) * 1000.0
+
+        # Resolve grounded using the score threshold (more objective than raw bool).
+        if verdict.faithfulness_score is not None:
+            state["grounded"] = (
+                verdict.faithfulness_score >= settings.RAG_FAITHFULNESS_THRESHOLD
+            )
+        elif verdict.grounded is not None:
+            state["grounded"] = verdict.grounded
+        # else: parse failure → grounded stays None ("unknown")
+
+        state["faithfulness_score"] = verdict.faithfulness_score
+        logger.info(
+            "Faithfulness check grounded=%s score=%s unverified_citations=%s ms=%.2f",
+            state["grounded"],
+            state["faithfulness_score"],
+            unverified,
+            timings["faithfulness_ms"],
+        )
+
+    state["timings"] = timings
     return state
 
 

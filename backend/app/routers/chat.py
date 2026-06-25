@@ -37,6 +37,7 @@ def _build_chat_response(state: Dict) -> ChatResponse:
         rerank_ms=float(timings_raw.get("rerank_ms") or 0.0),
         web_ms=float(timings_raw.get("web_ms") or 0.0),
         generate_ms=float(timings_raw.get("generate_ms") or 0.0),
+        faithfulness_ms=float(timings_raw.get("faithfulness_ms") or 0.0),
         total_ms=float(timings_raw.get("total_ms") or 0.0),
     )
 
@@ -62,6 +63,9 @@ def _build_chat_response(state: Dict) -> ChatResponse:
         timings=timings,
         trace=trace_meta,
         insufficient_context=bool(state.get("insufficient_context") or False),
+        grounded=state.get("grounded"),
+        faithfulness_score=state.get("faithfulness_score"),
+        unverified_citations=list(state.get("unverified_citations") or []),
     )
 
 

@@ -6,6 +6,7 @@ from app.core.config import get_settings
 from app.core.errors import PineconeIndexConfigError, setup_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.core.metrics import setup_metrics
+from app.core.prometheus_metrics import setup_prometheus
 from app.core.rate_limit import setup_rate_limiter
 from app.core.runtime import get_port
 from app.core.security import configure_security
@@ -40,6 +41,7 @@ app = FastAPI(
 configure_security(app)
 setup_rate_limiter(app)
 setup_metrics(app)
+setup_prometheus(app)
 
 # Register routers with tags and ensure they are included in the schema.
 # Health and docs remain public; all other routers are protected by API key dependency when configured.

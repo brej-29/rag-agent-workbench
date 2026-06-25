@@ -10,6 +10,7 @@ from app.core.cache import cache_enabled, get_chat_cached, set_chat_cached
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.core.metrics import record_chat_timings
+from app.core.prometheus_metrics import record_chat_timings_prometheus
 from app.core.rate_limit import limiter
 from app.core.tracing import (
     get_tracing_callbacks,
@@ -171,7 +172,10 @@ async def chat(request: Request, payload: ChatRequest) -> ChatResponse:  # noqa:
 
     response_model = _build_chat_response(state)
 
-    # Record metrics based on this response.
+    # Record metrics: legacy in-memory JSON snapshot + Prometheus Histogram.
+    # The Prometheus observation uses the full timings dict (includes rerank_ms,
+    # faithfulness_ms) rather than only the four fields tracked by the JSON snapshot.
+    # Cached-response path is intentionally excluded — no pipeline ran.
     record_chat_timings(
         {
             "retrieve_ms": response_model.timings.retrieve_ms,
@@ -180,6 +184,7 @@ async def chat(request: Request, payload: ChatRequest) -> ChatResponse:  # noqa:
             "total_ms": response_model.timings.total_ms,
         }
     )
+    record_chat_timings_prometheus(timings)
 
     # Cache only when chat_history is empty.
     if use_cache:
@@ -265,7 +270,7 @@ async def chat_stream(request: Request, payload: ChatRequest) -> StreamingRespon
     response_model = _build_chat_response(state)
     answer_text = response_model.answer
 
-    # Record metrics based on this response as well.
+    # Record metrics: legacy in-memory JSON snapshot + Prometheus Histogram.
     record_chat_timings(
         {
             "retrieve_ms": response_model.timings.retrieve_ms,
@@ -274,6 +279,7 @@ async def chat_stream(request: Request, payload: ChatRequest) -> StreamingRespon
             "total_ms": response_model.timings.total_ms,
         }
     )
+    record_chat_timings_prometheus(timings)
 
     async def event_generator() -> AsyncGenerator[str, None]:
         # Stream the answer token-by-token (space-delimited) as simple SSE events.

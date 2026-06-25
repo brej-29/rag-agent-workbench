@@ -1734,3 +1734,163 @@ The correct validation methodology is:
 | `backend/app/schemas/chat.py` | Added `crag_iterations: int` + `corrective_action: Optional[str]` to `ChatResponse` |
 | `backend/app/routers/chat.py` | Propagated CRAG fields in `_build_chat_response` |
 | `tests/test_crag.py` | **New** — 17 CI-safe unit tests (zero network, LLM/search mocked); includes mandatory max-iters guard test |
+
+---
+
+## Metrics & observability (T2.6)
+
+### Overview
+
+T2.6 replaces the unreliable 20-sample deque p95 in the legacy JSON `/metrics` endpoint with a
+Prometheus Histogram as the **authoritative** latency percentile source, and adds a public
+Prometheus text-exposition endpoint at `/metrics/prometheus`.
+
+---
+
+### Path layout and access control
+
+| Path | Format | Auth | Owner |
+|---|---|---|---|
+| `/metrics` | JSON (existing, unchanged) | API-key gated (`X-API-Key`) | `backend/app/routers/metrics.py` |
+| `/metrics/prometheus` | Prometheus text exposition (new) | Public — no API key | `backend/app/core/prometheus_metrics.py` |
+
+The `/metrics/prometheus` endpoint is intentionally public to match the standard Prometheus
+pull model: a Prometheus server polls the endpoint from inside a trusted network, not through
+an authenticated HTTP client.  The endpoint does NOT call Pinecone, Groq, or Tavily — it reads
+only the in-process `prometheus_client` REGISTRY, so no secrets are required.
+
+**Public-endpoint decision (deliberate).** Prometheus endpoints are conventionally
+network-restricted rather than token-gated; on Hugging Face Spaces there is no private network
+in front of the container, so the endpoint is public by necessity.  The data it exposes is
+deliberately low-sensitivity: route-level request counts and latencies only — no query text,
+no document content, no user data.  In a production deployment with network control (e.g. a
+private VPC or Kubernetes cluster), this endpoint would sit behind a network policy or a
+scrape-authentication proxy (e.g. Prometheus `bearer_token` + nginx auth) rather than being
+left publicly reachable.
+
+---
+
+### Why prometheus-client directly (not prometheus-fastapi-instrumentator)
+
+`prometheus-fastapi-instrumentator==8.0.2` requires `starlette>=1.0.0`, which is incompatible
+with `starlette==0.50.0` pinned by `fastapi==0.128.0` in the existing lock.  Upgrading starlette
+to 1.3.1 broke FastAPI internals at test time.
+
+`prometheus-client` has zero framework dependency and provides all needed primitives.
+HTTP instrumentation (count + duration) is implemented as a thin middleware directly in
+`backend/app/core/prometheus_metrics.py`, keeping all Prometheus code in one module.
+
+---
+
+### p95 fix — why the deque is unreliable
+
+The legacy `_timing_samples: deque(maxlen=20)` computes p95 over the last 20 samples only.
+With 20 observations, the 95th-percentile bucket contains exactly one sample (floor(0.95 × 20) = 19th),
+and the result has a very wide confidence interval — approximately ±30 % CI on p95.
+
+The Prometheus Histogram accumulates ALL observations (unbounded sample count, no ring-buffer
+truncation) and computes percentiles from the cumulative bucket distribution.  Percentiles from
+the Histogram converge as more requests are processed and reflect the true long-run distribution.
+
+The deque p95 remains in `/metrics` for backward compatibility but is **documented as legacy /
+indicative only**.  The Prometheus Histogram is the authoritative source.
+
+---
+
+### Metrics registered
+
+**HTTP request metrics** (one series per method × path × status_class):
+- `http_requests_total` (Counter) — total request count
+- `http_request_duration_seconds` (Histogram) — request latency per method + path
+
+**RAG pipeline metrics** (one series per phase):
+- `rag_phase_duration_seconds` (Histogram) — per-phase latency in seconds
+  - Phases: `retrieve`, `web`, `generate`, `rerank`, `faithfulness`, `total`
+  - Only phases with `> 0 ms` measured are observed; zero-ms phases (e.g. `rerank_ms=0` when
+    `RAG_RERANK_ENABLED=False`) are intentionally skipped
+
+---
+
+### Bucket rationale
+
+RAG pipeline Histogram buckets (seconds):
+
+| Bucket | Meaning |
+|---|---|
+| 0.05 | Fast Pinecone retrieval lower bound |
+| 0.10 | Typical Pinecone retrieval |
+| 0.25 | Retrieval ceiling / fast generation floor |
+| 0.50 | Observed Pinecone retrieval peak (~350ms + margin) |
+| 0.75 | Retrieval + CRAG grade, no rewrite |
+| 1.00 | Typical Groq generation (small model, short answer) |
+| 1.50 | Groq generation for longer answers |
+| 2.00 | Groq generation + Tavily single call |
+| 3.00 | One CRAG correction iteration (rewrite + re-retrieve) |
+| 5.00 | Two CRAG iterations or slow Tavily |
+| 10.0 | Timeout safety ceiling |
+
+---
+
+### Label cardinality discipline
+
+Labels MUST be bounded — unbounded labels (raw query text, user input, per-request IDs) cause
+"metric cardinality explosion" where Prometheus TSDB memory grows without bound.
+
+| Metric | Labels | Max series |
+|---|---|---|
+| `http_requests_total` | method, path, status_class | ~6 × 15 × 5 = 450 |
+| `http_request_duration_seconds` | method, path | ~6 × 15 = 90 |
+| `rag_phase_duration_seconds` | phase (6 fixed values) | 6 |
+
+The `path` label uses `request.url.path` (no query string), which is safe for this API because
+all routes are fixed strings with no variable path segments (no `/resource/{id}` patterns).
+
+NEVER add labels for: query text, user input, namespace, document ID, or any other per-request
+unbounded-cardinality field.
+
+---
+
+### Prometheus scrape configuration example
+
+```yaml
+# prometheus.yml snippet
+scrape_configs:
+  - job_name: rag_agent_workbench
+    static_configs:
+      - targets: ['localhost:8000']
+    metrics_path: /metrics/prometheus
+    scrape_interval: 30s
+```
+
+No `Authorization` header required.  The endpoint does not need the `X-API-Key` header.
+
+---
+
+### Dependency change (T2.6)
+
+| Package | Before | After | Reason |
+|---|---|---|---|
+| `prometheus-client` | Not pinned (0.20.0 installed transitively) | `0.25.0` (now a direct dep, pinned in lock) | Direct dependency added to `backend/requirements.in` |
+| `prometheus-fastapi-instrumentator` | — | Not used | starlette compatibility — see above |
+| `fastapi` | `0.128.0` (lock but not pinned in `.in`) | `0.128.0` (now pinned in `.in`) | Prevents uv from resolving newer FastAPI + incompatible starlette |
+| `starlette` | `0.50.0` | `0.50.0` (unchanged) | Held by fastapi==0.128.0 pin |
+
+Recompile command:
+```bash
+uv pip compile --python-version 3.11 --no-strip-extras \
+    --output-file backend/requirements.txt backend/requirements.in
+```
+
+---
+
+### Files added / changed
+
+| File | Change |
+|---|---|
+| `backend/app/core/prometheus_metrics.py` | **New** — all Prometheus code: Histogram definitions, `record_chat_timings_prometheus()`, HTTP middleware, `setup_prometheus()` |
+| `backend/app/main.py` | Added `setup_prometheus(app)` call after `setup_metrics(app)` |
+| `backend/app/routers/chat.py` | Added `record_chat_timings_prometheus(timings)` call after `record_chat_timings(...)` in both `/chat` and `/chat/stream` (NOT in cached-response path) |
+| `backend/requirements.in` | Added `prometheus-client`; pinned `fastapi==0.128.0` (stability guard) |
+| `backend/requirements.txt` | Recompiled — `prometheus-client==0.25.0` now pinned; `starlette==0.50.0` preserved |
+| `tests/test_prometheus_metrics.py` | **New** — 10 CI-safe tests: endpoint 200 + content-type, histogram presence, HTTP metric after request, observation count + sum, zero-phase skip, ms→s conversion, legacy snapshot structure |
+| `docs/CONTEXT.md` | This section |

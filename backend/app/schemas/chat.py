@@ -178,3 +178,20 @@ class ChatResponse(BaseModel):
             "Empty list means all citations are in range or the answer has none."
         ),
     )
+    crag_iterations: int = Field(
+        default=0,
+        description=(
+            "Number of CRAG corrective iterations performed before reaching decide_next.  "
+            "0 when RAG_CRAG_ENABLED is False, or when the initial retrieval was graded "
+            "as good (top cosine score >= RAG_CRAG_GOOD_SCORE).  Maximum value is "
+            "RAG_CRAG_MAX_ITERS (the hard loop bound)."
+        ),
+    )
+    corrective_action: Optional[str] = Field(
+        default=None,
+        description=(
+            "Action taken by the CRAG loop, or None when no correction occurred.  "
+            "Current value: 'rewrite' (query was rewritten via LLM and Pinecone was "
+            "re-queried).  None when RAG_CRAG_ENABLED is False or retrieval was graded good."
+        ),
+    )

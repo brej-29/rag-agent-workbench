@@ -10,6 +10,7 @@ from app.core.config import get_settings
 from app.core.errors import UpstreamServiceError
 from app.core.logging import get_logger
 from app.schemas.chat import ChatRequest
+from app.services.crag import grade_retrieval, rewrite_query
 from app.services.faithfulness import FaithfulnessVerdict, judge_faithfulness, verify_citations
 from app.services.llm.groq_llm import get_llm
 from app.services.prompts.faithfulness_prompt import build_faithfulness_judge_messages  # noqa: F401 (imported for test-patchability)
@@ -59,6 +60,10 @@ class ChatState(TypedDict, total=False):
     grounded: Optional[bool]
     faithfulness_score: Optional[float]
     unverified_citations: List[int]
+
+    # CRAG observability fields (T2.4) — set by corrective_retrieve when CRAG is ON
+    crag_iterations: int
+    corrective_action: Optional[str]
 
 
 def _ensure_timings(state: ChatState) -> Dict[str, float]:
@@ -184,6 +189,99 @@ def retrieve_context(state: ChatState, _config: RunnableConfig | None = None) ->
         len(retrieved),
         top_score,
     )
+    return state
+
+
+def corrective_retrieve(state: ChatState, config: RunnableConfig | None = None) -> ChatState:  # noqa: ARG001
+    """CRAG corrective retrieval loop (gated by RAG_CRAG_ENABLED).
+
+    When OFF (the default): exact pass-through — state is returned unchanged,
+    byte-for-byte identical to the node never being wired.
+
+    When ON: grades the initial retrieval using the top cosine score already in state
+    (no re-embedding — avoids circular validation).  If graded 'weak', rewrites the
+    query via the Groq LLM and re-retrieves from Pinecone, up to RAG_CRAG_MAX_ITERS
+    times.  The loop ALWAYS terminates after max_iters regardless of the grade outcome.
+
+    Composes with existing nodes unchanged: the cosine floor (generate_answer), the
+    Tavily web fallback (decide_next -> web_search), the empty-context abstention
+    (generate_answer), and the faithfulness check (format_response) all run after this
+    node and are unmodified.
+    """
+    settings = get_settings()
+    if not settings.RAG_CRAG_ENABLED:
+        return state
+
+    _ensure_timings(state)
+    state["crag_iterations"] = 0
+    state["corrective_action"] = None
+
+    current_query: str = state["query"]
+    max_iters: int = settings.RAG_CRAG_MAX_ITERS
+
+    for iteration in range(max_iters):
+        top_score = float(state.get("top_score") or 0.0)
+        grade = grade_retrieval(top_score, settings.RAG_CRAG_GOOD_SCORE)
+
+        if grade == "good":
+            logger.info(
+                "CRAG grade=good top_score=%.4f >= threshold=%.4f (iteration %d) -- no correction",
+                top_score,
+                settings.RAG_CRAG_GOOD_SCORE,
+                iteration,
+            )
+            break
+
+        state["crag_iterations"] = iteration + 1
+        logger.info(
+            "CRAG iteration=%d grade=weak top_score=%.4f threshold=%.4f -- rewriting query",
+            iteration + 1,
+            top_score,
+            settings.RAG_CRAG_GOOD_SCORE,
+        )
+
+        # Rewrite query using existing Groq client — no new LLM, no new dependency
+        llm = get_llm()
+        rewritten = rewrite_query(current_query, llm)
+        if rewritten != current_query:
+            current_query = rewritten
+            state["corrective_action"] = "rewrite"
+
+        # Re-retrieve from Pinecone with the (possibly rewritten) query
+        n_candidates = int(state.get("top_k") or settings.RAG_DEFAULT_TOP_K)
+        raw_hits: List[Dict[str, Any]] = pinecone_search(
+            namespace=state["namespace"],
+            query_text=current_query,
+            top_k=n_candidates,
+            filters=None,
+            fields=None,
+        )
+
+        text_field = settings.PINECONE_TEXT_FIELD
+        retrieved: List[Dict[str, Any]] = []
+        new_top_score = 0.0
+        for hit in raw_hits:
+            hit_score = float(hit.get("_score") or hit.get("score") or 0.0)
+            fields: Dict[str, Any] = hit.get("fields") or {}
+            chunk_text = str(fields.get(text_field, "") or "")
+            retrieved.append({
+                "source": str(fields.get("source") or "unknown"),
+                "title": str(fields.get("title") or ""),
+                "url": str(fields.get("url") or ""),
+                "score": hit_score,
+                "chunk_text": chunk_text,
+            })
+            new_top_score = max(new_top_score, hit_score)
+
+        state["retrieved"] = retrieved
+        state["top_score"] = new_top_score
+        logger.info(
+            "CRAG re-retrieval iteration=%d hits=%d top_score=%.4f",
+            iteration + 1,
+            len(retrieved),
+            new_top_score,
+        )
+
     return state
 
 
@@ -462,6 +560,7 @@ def get_chat_graph() -> Any:
 
     workflow.add_node("normalize_input", normalize_input)
     workflow.add_node("retrieve_context", retrieve_context)
+    workflow.add_node("corrective_retrieve", corrective_retrieve)
     workflow.add_node("decide_next", decide_next)
     workflow.add_node("web_search", web_search)
     workflow.add_node("generate_answer", generate_answer)
@@ -469,7 +568,8 @@ def get_chat_graph() -> Any:
 
     workflow.set_entry_point("normalize_input")
     workflow.add_edge("normalize_input", "retrieve_context")
-    workflow.add_edge("retrieve_context", "decide_next")
+    workflow.add_edge("retrieve_context", "corrective_retrieve")
+    workflow.add_edge("corrective_retrieve", "decide_next")
     workflow.add_conditional_edges(
         "decide_next",
         _route_after_decide_next,

@@ -81,7 +81,7 @@ class Settings(BaseSettings):
         description="Default minimum relevance score to trust retrieval without web fallback",
     )
     RAG_MIN_CHUNK_SCORE: float = Field(
-        default=0.25,
+        default=0.20,
         ge=0.0,
         le=1.0,
         description=(
@@ -90,9 +90,13 @@ class Settings(BaseSettings):
             "Distinct from RAG_MIN_SCORE (the web-fallback routing threshold, line 77): "
             "RAG_MIN_SCORE decides whether to invoke Tavily web search; "
             "RAG_MIN_CHUNK_SCORE decides which individual Pinecone chunks are usable "
-            "context.  The 0.25 default is a PLACEHOLDER matching RAG_MIN_SCORE for "
-            "initial consistency — it is NOT a tuned value.  Calibrate against the "
-            "T1.2 retrieval eval set (recall@k / nDCG@k) before treating it as justified."
+            "context.  Set to 0.20 as a SAFETY BOUND derived from the T2.2 top-k sweep "
+            "(eval/run_sweep.py, n=30 queries): the minimum cosine score of any retrieved "
+            "chunk belonging to a golden-relevant doc was 0.2368 across all queries.  "
+            "Setting the floor below 0.2368 guarantees no known-relevant chunk is dropped "
+            "from the eval set.  0.20 is NOT an empirically-tuned optimum; sharp floor "
+            "tuning requires a precision-oriented eval, graded relevance labels at chunk "
+            "level, or a larger corpus where low-quality noise chunks are retrievable."
         ),
     )
     RAG_MAX_WEB_RESULTS: int = Field(
@@ -161,6 +165,42 @@ class Settings(BaseSettings):
             "evidence-backed.  Calibrate against an answer-level eval set (answer + "
             "context + human grounded label) before treating it as justified.  Setting "
             "it too high yields false 'ungrounded' flags; too low defeats the check."
+        ),
+    )
+
+    # Corrective RAG (CRAG) — disabled by default; OFF path byte-for-byte identical to baseline
+    RAG_CRAG_ENABLED: bool = Field(
+        default=False,
+        description=(
+            "Enable the CRAG corrective retrieval loop.  When ON, initial retrieval is "
+            "graded by top cosine score; if weak, the query is rewritten by the Groq LLM "
+            "and Pinecone is re-queried up to RAG_CRAG_MAX_ITERS times.  "
+            "Default OFF — the retrieve->decide_next path is byte-for-byte identical to "
+            "the baseline when this flag is False.  Composed with the existing cosine "
+            "floor, web fallback, abstention, and faithfulness checks."
+        ),
+    )
+    RAG_CRAG_MAX_ITERS: int = Field(
+        default=2,
+        ge=1,
+        le=10,
+        description=(
+            "Hard maximum number of corrective iterations for the CRAG loop.  The loop "
+            "ALWAYS terminates after this many iterations regardless of the grade outcome.  "
+            "Non-negotiable safety guard — prevents runaway loops.  Ignored when "
+            "RAG_CRAG_ENABLED is False."
+        ),
+    )
+    RAG_CRAG_GOOD_SCORE: float = Field(
+        default=0.45,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Cosine score threshold for grading retrieval in the CRAG loop.  If the top "
+            "retrieved chunk's cosine score is >= this value, retrieval is graded 'good' "
+            "and no corrective action is taken.  PLACEHOLDER — not empirically tuned.  "
+            "Calibrate against an answer-quality eval before treating it as justified.  "
+            "Ignored when RAG_CRAG_ENABLED is False."
         ),
     )
 

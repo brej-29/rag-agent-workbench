@@ -14,7 +14,7 @@ MAILTO       ?=
 CANDIDATES   ?= 20
 RERANK_MODEL ?= bge-reranker-v2-m3
 
-.PHONY: eval-corpus eval eval-ab eval-ab-topk test help
+.PHONY: eval-corpus eval eval-ab eval-ab-topk eval-sweep test help
 
 ## help: Print this help message.
 help:
@@ -64,6 +64,18 @@ eval-ab-topk:
 		--golden $(GOLDEN) \
 		--rerank-model $(RERANK_MODEL) \
 		--multi-k
+
+## eval-sweep: Run top-k sweep to find the minimum context-preserving k value.
+##   Retrieves at chunk_fetch_k=20 ONCE per query (dense-only, rerank OFF),
+##   then computes recall@k, nDCG@k, precision@k at k = 1, 2, 3, 5, 8, 10.
+##   Reports the knee (smallest k within 0.02 of the k=10 quality ceiling)
+##   and a cosine-floor safety bound.
+##   ON-DEMAND only -- NOT in CI, NOT invoked by make eval.
+eval-sweep:
+	@echo ">>> Running top-k sweep eval (namespace='$(EVAL_NS)', golden=$(GOLDEN))..."
+	$(PYTHON) eval/run_sweep.py \
+		--namespace $(EVAL_NS) \
+		--golden $(GOLDEN)
 
 ## test: Run CI-safe unit tests (zero network calls).
 test:

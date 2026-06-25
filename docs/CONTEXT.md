@@ -79,10 +79,11 @@ RAG Agent Workbench is a lightweight experimentation backend for retrieval-augme
   - Chat pipeline is modelled as a state graph:
     1. `normalize_input` – set defaults, normalise chat history.
     2. `retrieve_context` – Pinecone retrieval.
-    3. `decide_next` – route to web search or generation.
-    4. `web_search` – Tavily search (optional).
-    5. `generate_answer` – Groq LLM with RAG prompts.
-    6. `format_response` – reserved for post-processing.
+    3. `corrective_retrieve` – CRAG loop (pass-through when `RAG_CRAG_ENABLED=False`).
+    4. `decide_next` – route to web search or generation.
+    5. `web_search` – Tavily search (optional).
+    6. `generate_answer` – Groq LLM with RAG prompts.
+    7. `format_response` – post-generation grounding checks.
   - This makes the flow explicit and easy to extend.
 
 - **Web search as a conditional fallback**
@@ -1468,3 +1469,268 @@ rerank path to give the model more to work with.
 **Conclusion: `RAG_RERANK_ENABLED=False` is the correct default.  The decision is now
 empirically validated at both recall-oriented and precision-oriented metrics.**  Report in
 `eval/reports/ab_20260625T083719Z.json` and `.md`.
+
+---
+
+## Retrieval calibration
+
+### Why "maximize retrieval quality" is the wrong framing here
+
+Baseline dense retrieval on this corpus (34 chunks / 23 docs, `eval` Pinecone namespace)
+is already saturated at the production setting: recall@10=0.97, MRR=0.98, nDCG@10=0.93.
+Running a parameter sweep to "maximize" these metrics is uninformative when they barely
+move — any apparent optimum is noise, not signal.
+
+The framing is therefore recast from "maximize quality" to two distinct objectives:
+
+1. **Context-cost floor (top_k):** find the SMALLEST `top_k` at which retrieval quality
+   is near the ceiling.  Fewer chunks in the LLM prompt = lower token cost + less
+   mid-context dilution (the "lost-in-the-middle" effect).  The deliverable is a
+   quality-vs-k curve with a readable knee.
+
+2. **Cosine floor (RAG_MIN_CHUNK_SCORE) — honest documentation only:** the floor's job
+   is precision/noise-reduction, which recall@k does NOT measure.  A saturated recall
+   eval cannot validate a precision floor sharply, so this calibration step documents
+   purpose, limitations, and a data-derived safety bound — it does NOT claim an optimum.
+
+---
+
+### Top-k sweep — `eval/reports/sweep_20260625T100233Z.*`
+
+**Setup:** `make eval-sweep` runs `eval/run_sweep.py`.  Retrieves `chunk_fetch_k=20`
+chunks ONCE per query (dense-only, rerank OFF, matching shipped production defaults),
+deduplicates to a doc-ranked list (~13 unique docs), then slices to compute metrics at
+doc-level k = 1, 2, 3, 5, 8, 10 — no extra Pinecone calls per k value.
+
+Note on chunk vs doc level: `RAG_DEFAULT_TOP_K` is a chunk-level budget in the production
+pipeline.  For this corpus (avg 1.48 chunks/doc) the chunk:doc ratio is close to 1:1 at the
+k values swept, so the curve directly informs the `RAG_DEFAULT_TOP_K` setting.
+
+**Quality-vs-k table (n=30 queries):**
+
+| k  | Recall@k | nDCG@k  | P@k    | D-Recall | D-nDCG  |
+|----|----------|---------|--------|----------|---------|
+|  1 | 0.5806   | 0.9667  | 0.9667 | -0.4000  | +0.0341 |
+|  2 | 0.7389   | 0.8635  | 0.6833 | -0.2417  | -0.0690 |
+|  3 | 0.8583   | 0.8791  | 0.5556 | -0.1222  | -0.0534 |
+|  5 | 0.9139   | 0.9030  | 0.3600 | -0.0667  | -0.0295 |
+|  8 | 0.9694   | 0.9280  | 0.2417 | -0.0111  | -0.0045 | **<- knee** |
+| 10 | 0.9806   | 0.9326  | 0.1967 | +0.0000  | +0.0000 | <- ceiling |
+
+Margin used: +/-0.02 on both recall AND nDCG (must satisfy both simultaneously).
+
+**Knee: k=8.**  Recall@8=0.9694 (delta 0.011 below ceiling) and nDCG@8=0.9280
+(delta 0.005 below ceiling) — both inside the 0.02 margin.  k=5 does NOT qualify:
+recall@5=0.9139 (delta 0.067) and nDCG@5=0.9030 (delta 0.030), nDCG delta exceeds the
+margin.
+
+**Cost rationale:** moving from k=8 to k=10 retrieves two more chunks per query.  On this
+corpus that costs ~15% more LLM-context tokens for less than 1% quality gain (delta-recall
+0.011, delta-nDCG 0.005).  Moving from k=5 to k=8 recovers 6.7 recall points and 3
+nDCG points for 60% more chunks.
+
+**Precision@1 curiosity:** P@1=0.9667 at k=1 (96.7% of queries have the top-ranked doc
+relevant) but recall@1=0.5806 — because many golden entries have 2-3 relevant docs, so
+one retrieved doc is often only partial coverage.  This confirms the dense retriever is
+excellent at ranking precision but needs k >= 8 to achieve full recall for multi-relevant
+queries.
+
+---
+
+### RAG_DEFAULT_TOP_K recommendation
+
+**Current default: `RAG_DEFAULT_TOP_K = 5`.**
+
+The curve shows k=5 is meaningfully below the quality knee (recall delta 0.067, nDCG
+delta 0.030 from ceiling).  The minimum k that holds quality within 0.02 of the ceiling
+is **k=8**.
+
+**k=8 is the recall-margin knee** — the smallest k where both recall AND nDCG are within
+0.02 of the k=10 ceiling (recall@8=0.9694, D=0.011; nDCG@8=0.9280, D=0.005).
+
+**However, precision@8=0.2417** — approximately 76% of the retrieved context at k=8 is
+irrelevant.  Moving from k=5 to k=8 costs 60% more LLM-context chunks per query while
+picking up 6.7 recall points and 3 nDCG points.
+
+**recall@k cannot adjudicate this tradeoff.**  Recall measures whether relevant doc_ids
+appear in the top-k list; it does NOT measure whether the LLM produces better answers
+from a larger-but-noisier context.  The precision/recall tradeoff at this corpus size
+is not resolvable from retrieval metrics alone.
+
+**Decision: `RAG_DEFAULT_TOP_K` kept at 5** (T2.2 lock).  This is a precision-first
+choice: k=5 delivers higher-signal context (P@5=0.36 vs P@8=0.24) at the accepted cost
+of lower recall coverage (recall@5=0.91 vs recall@8=0.97).  The tiebreaker for
+revisiting this decision is an **answer-quality eval** — a head-to-head comparison of
+answers generated at k=5 vs k=8 against human relevance judgments.  Until that eval
+exists, context signal quality is preferred over recall coverage.
+
+---
+
+### Cosine floor (RAG_MIN_CHUNK_SCORE) — honest documentation
+
+**Current default: `RAG_MIN_CHUNK_SCORE = 0.25`.**
+
+**Purpose:** drop low-cosine-similarity chunks before they enter the LLM context window.
+The floor reduces noise (irrelevant chunks that passed the top-k retrieval budget) and
+keeps the prompt tightly relevant.  It runs BEFORE any reranking step.
+
+**Why this eval cannot tune the floor sharply:** recall@k measures whether relevant
+doc_ids appear in the top-k ranked list — it does NOT measure whether those docs'
+individual chunks are present in the filtered context.  On a corpus saturated at
+recall@10=0.97, every floor value from 0.0 to 0.96 produces the same recall score
+(because the relevant docs still rank within top-k even when their chunks are
+hypothetically dropped).  A precision-oriented eval (where false positives reduce the
+score) or a graded-relevance eval (where chunk quality matters, not just doc presence)
+would be needed to tune the floor sharply.
+
+**Data-derived safety bound:** the sweep at `chunk_fetch_k=20` recorded the minimum
+cosine score of any retrieved chunk whose `doc_id` was in the relevant set, across all 30
+golden queries.  That minimum was **0.2368**.
+
+> A `RAG_MIN_CHUNK_SCORE` at or below **0.2368** is safe for this eval set: no
+> golden-relevant chunk scored below that threshold in the top-20 results.
+
+**Current floor vs safety bound:** `RAG_MIN_CHUNK_SCORE=0.25 > 0.2368`.  The one chunk
+that scored 0.2368 would be dropped by the current floor.  Whether this matters in
+practice depends on whether that chunk carries information not duplicated by the same
+doc's other chunks (if any) or by other relevant docs retrieved for the same query.
+Since the production recall is 0.97, the dropped chunk is evidently not the only path
+to a correct answer — but this cannot be confirmed without a faithfulness or answer-
+quality eval.
+
+**What would tune it sharply:** (a) a per-answer quality eval comparing answers produced
+with and without the low-scoring chunk; (b) graded relevance labels at the chunk level
+(not just doc level) so a precision@k metric is meaningful; (c) a larger or noisier
+corpus with more retrievable low-quality noise where the floor discriminates signal
+from noise.
+
+**Change (T2.2 lock): `RAG_MIN_CHUNK_SCORE` lowered from 0.25 to 0.20.**  The prior floor
+of 0.25 was above the 0.2368 safety bound — meaning the one chunk that scored 0.2368
+could be silently dropped.  Setting the floor at 0.20 places it explicitly below the
+0.2368 bound so that no known-relevant chunk from the eval set is excluded.
+
+0.20 is **not a tuned optimum** — it is the safety-bound floor.  It encodes only the
+constraint "never drop a known-relevant chunk from the eval set" and nothing more.  Sharp
+floor tuning (trading precision against recall at the chunk level) requires a
+precision-oriented eval, graded relevance labels at chunk level, or a larger corpus where
+low-quality noise chunks are routinely retrievable.
+
+---
+
+## Corrective retrieval (CRAG) (T2.4)
+
+### Overview
+
+CRAG (Corrective RAG) adds a self-correcting loop between initial Pinecone retrieval and
+the `decide_next` routing node.  After the first retrieval attempt, the retrieved chunks
+are **graded** using the cosine scores already in state (no re-embedding).  If retrieval
+is graded weak, the query is **rewritten** by the Groq LLM and Pinecone is **re-queried**
+with the new query.  This repeats up to `RAG_CRAG_MAX_ITERS` times.
+
+The feature is **disabled by default** (`RAG_CRAG_ENABLED=False`).  When disabled, the
+`corrective_retrieve` node is a byte-for-byte pass-through — the existing pipeline is
+unchanged.
+
+---
+
+### Mandatory max-iterations guard
+
+`RAG_CRAG_MAX_ITERS=2` (default) is a **hard, non-negotiable loop bound**.  The
+corrective loop ALWAYS terminates after this many iterations regardless of whether the
+grade improves.  This is not a soft "try up to N times" — the bound is enforced
+unconditionally by a `for iteration in range(max_iters)` loop without any early-exit
+other than a `break` on a "good" grade.
+
+**Why this guard is mandatory:** an unbounded corrective loop on a query that always
+produces weak retrieval (e.g. a topic not in the knowledge base) would spin indefinitely,
+exhausting API rate limits and blocking the response.  The guard closes this audit
+finding.  `test_max_iters_guard_always_terminates` in `tests/test_crag.py` uses a
+threshold of 0.99 (unreachably high) to ensure the loop terminates after exactly
+`max_iters` iterations even when retrieval is perpetually graded weak.
+
+---
+
+### Circular-validation avoidance
+
+The CRAG grader uses the **top cosine score already returned by `retrieve_context`**
+(stored in `state["top_score"]`).  It does NOT re-embed the query or the retrieved
+chunks with the retrieval model.  Re-embedding would be circular validation: using the
+retriever's own semantic space to assess the retriever's own output encodes the
+embedder's biases into the grading signal.
+
+This mirrors the same avoidance principle as T2.3 (faithfulness judge uses the Groq LLM,
+not the retrieval embedder).
+
+---
+
+### Composition with existing components
+
+CRAG is composed with the existing pipeline without duplicating any component:
+
+| Existing component | How CRAG composes |
+|---|---|
+| `retrieve_context` | CRAG grades its output; re-retrieval reuses `pinecone_search` |
+| Groq LLM (`get_llm`) | Query rewriter reuses the same client; no new LLM |
+| Tavily web fallback | Unchanged — `decide_next` still routes to web_search if top_score < RAG_MIN_SCORE after CRAG |
+| Cosine floor (`RAG_MIN_CHUNK_SCORE`) | Unchanged — runs in `generate_answer` after CRAG |
+| Empty-context abstention | Unchanged — if CRAG exhausts its iterations with empty results, `generate_answer` still detects the empty context and returns the deterministic abstention |
+| Faithfulness check | Unchanged — `format_response` runs after the full pipeline |
+
+When `RAG_CRAG_ENABLED=False`, the `corrective_retrieve` node returns state unchanged
+at the top of the function — no branches, no side effects, no calls to any dependency.
+The OFF path is verified by `test_flag_off_is_exact_passthrough`.
+
+---
+
+### Flag-OFF posture
+
+`RAG_CRAG_ENABLED=False` is the permanent default for new deployments.  The corrective
+loop adds latency (one extra LLM call + one extra Pinecone query per iteration) and the
+grading threshold (`RAG_CRAG_GOOD_SCORE=0.45`) is a PLACEHOLDER not backed by an
+answer-quality eval.  Enable it only after:
+
+1. Observing real out-of-corpus queries where initial retrieval fails.
+2. Confirming that the rewritten query + re-retrieval actually improves answer quality
+   (not just recall@k — recall@k is saturated at 0.97 on the golden set, meaning CRAG
+   will rarely fire on in-corpus queries and metric lift is not the right signal here).
+
+---
+
+### Validation methodology
+
+On this saturated corpus (MRR=0.98, recall@10=0.97), CRAG will rarely fire — initial
+retrieval almost always returns a good result.  **Metric lift on the golden set is not
+the right signal**: if CRAG almost never triggers, its contribution to eval metrics is
+near zero by construction, not because it is broken.
+
+The correct validation methodology is:
+1. **Triggering mechanism**: design out-of-corpus or low-signal test queries that
+   reliably produce top_score < `RAG_CRAG_GOOD_SCORE`.  Confirm the loop fires.
+2. **Answer quality**: compare answers before/after CRAG correction on those queries.
+   The tiebreaker is human judgment on answer quality, not recall@k.
+3. **Guard test**: `test_max_iters_guard_always_terminates` is the CI-safe proxy for
+   the termination invariant.
+
+---
+
+### Configuration
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `RAG_CRAG_ENABLED` | `False` | Master switch; OFF = byte-for-byte baseline behavior |
+| `RAG_CRAG_MAX_ITERS` | `2` | Hard loop bound; mandatory, non-negotiable |
+| `RAG_CRAG_GOOD_SCORE` | `0.45` | Cosine threshold for "good" grade; PLACEHOLDER, not tuned |
+
+---
+
+### Files added / changed
+
+| File | Change |
+|---|---|
+| `backend/app/core/config.py` | Added `RAG_CRAG_ENABLED`, `RAG_CRAG_MAX_ITERS`, `RAG_CRAG_GOOD_SCORE` |
+| `backend/app/services/crag.py` | **New** — `grade_retrieval()` + `rewrite_query()` (no circular validation, reuses existing LLM) |
+| `backend/app/services/prompts/query_rewrite_prompt.py` | **New** — query rewrite prompt builder (separate from rag_prompt.py and faithfulness_prompt.py) |
+| `backend/app/services/chat/graph.py` | Added `crag_iterations`/`corrective_action` to `ChatState`; added `corrective_retrieve` node; wired between `retrieve_context` and `decide_next`; added CRAG import |
+| `backend/app/schemas/chat.py` | Added `crag_iterations: int` + `corrective_action: Optional[str]` to `ChatResponse` |
+| `backend/app/routers/chat.py` | Propagated CRAG fields in `_build_chat_response` |
+| `tests/test_crag.py` | **New** — 17 CI-safe unit tests (zero network, LLM/search mocked); includes mandatory max-iters guard test |

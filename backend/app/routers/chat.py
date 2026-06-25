@@ -66,6 +66,8 @@ def _build_chat_response(state: Dict) -> ChatResponse:
         grounded=state.get("grounded"),
         faithfulness_score=state.get("faithfulness_score"),
         unverified_citations=list(state.get("unverified_citations") or []),
+        crag_iterations=int(state.get("crag_iterations") or 0),
+        corrective_action=state.get("corrective_action"),
     )
 
 

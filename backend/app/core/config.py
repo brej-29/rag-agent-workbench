@@ -204,6 +204,23 @@ class Settings(BaseSettings):
         ),
     )
 
+    # History-aware query contextualization (T2.5)
+    # Distinct from CRAG rewrite (T2.4): this triggers BEFORE retrieval using
+    # conversation history; CRAG triggers AFTER weak retrieval on the current query.
+    RAG_CONTEXTUALIZE_ENABLED: bool = Field(
+        default=False,
+        description=(
+            "Enable history-aware query contextualization before retrieval.  When ON "
+            "and the request includes prior chat_history, the follow-up query is rewritten "
+            "into a standalone question by the Groq LLM before Pinecone retrieval runs.  "
+            "When OFF (the default), retrieval runs on the raw current message — identical "
+            "to the baseline behavior.  When ON but no history is present (first turn), "
+            "the LLM is NOT called and retrieval runs on the raw message unchanged.  "
+            "Distinct from RAG_CRAG_ENABLED (T2.4): CRAG corrects weak retrieval on a "
+            "single turn; this corrects context-free fragments across turns."
+        ),
+    )
+
     # Operational toggles
     RATE_LIMIT_ENABLED: bool = Field(
         default=True,

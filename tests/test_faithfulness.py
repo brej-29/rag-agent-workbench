@@ -208,7 +208,7 @@ class TestFormatResponse:
         with patch("app.services.chat.graph.get_settings") as mock_settings:
             mock_settings.return_value.RAG_FAITHFULNESS_ENABLED = False
             mock_settings.return_value.RAG_FAITHFULNESS_THRESHOLD = 0.5
-            with patch("app.services.chat.graph.judge_faithfulness") as mock_judge:
+            with patch("app.services.chat.graph.judge_faithfulness_with_usage") as mock_judge:
                 result = format_response(state)
         mock_judge.assert_not_called()
         assert result["grounded"] is None
@@ -232,7 +232,7 @@ class TestFormatResponse:
         with patch("app.services.chat.graph.get_settings") as mock_settings:
             mock_settings.return_value.RAG_FAITHFULNESS_ENABLED = True
             mock_settings.return_value.RAG_FAITHFULNESS_THRESHOLD = 0.5
-            with patch("app.services.chat.graph.judge_faithfulness", return_value=mock_verdict) as mock_judge:
+            with patch("app.services.chat.graph.judge_faithfulness_with_usage", return_value=(mock_verdict, {})) as mock_judge:
                 with patch("app.services.chat.graph.get_llm", return_value=MagicMock()):
                     result = format_response(state)
         mock_judge.assert_called_once()
@@ -245,7 +245,7 @@ class TestFormatResponse:
         with patch("app.services.chat.graph.get_settings") as mock_settings:
             mock_settings.return_value.RAG_FAITHFULNESS_ENABLED = True
             mock_settings.return_value.RAG_FAITHFULNESS_THRESHOLD = 0.5
-            with patch("app.services.chat.graph.judge_faithfulness", return_value=mock_verdict):
+            with patch("app.services.chat.graph.judge_faithfulness_with_usage", return_value=(mock_verdict, {})):
                 with patch("app.services.chat.graph.get_llm", return_value=MagicMock()):
                     result = format_response(state)
         assert result["grounded"] is False  # score 0.3 < threshold 0.5
@@ -259,7 +259,7 @@ class TestFormatResponse:
         with patch("app.services.chat.graph.get_settings") as mock_settings:
             mock_settings.return_value.RAG_FAITHFULNESS_ENABLED = True
             mock_settings.return_value.RAG_FAITHFULNESS_THRESHOLD = 0.5
-            with patch("app.services.chat.graph.judge_faithfulness") as mock_judge:
+            with patch("app.services.chat.graph.judge_faithfulness_with_usage") as mock_judge:
                 with patch("app.services.chat.graph.get_llm") as mock_get_llm:
                     result = format_response(state)
         mock_judge.assert_not_called()
@@ -284,7 +284,7 @@ class TestFormatResponse:
         with patch("app.services.chat.graph.get_settings") as mock_settings:
             mock_settings.return_value.RAG_FAITHFULNESS_ENABLED = True
             mock_settings.return_value.RAG_FAITHFULNESS_THRESHOLD = 0.5
-            with patch("app.services.chat.graph.judge_faithfulness", return_value=parse_fail_verdict):
+            with patch("app.services.chat.graph.judge_faithfulness_with_usage", return_value=(parse_fail_verdict, {})):
                 with patch("app.services.chat.graph.get_llm", return_value=MagicMock()):
                     result = format_response(state)
         assert result["grounded"] is None  # graceful degradation
@@ -304,7 +304,7 @@ class TestFormatResponse:
         with patch("app.services.chat.graph.get_settings") as mock_settings:
             mock_settings.return_value.RAG_FAITHFULNESS_ENABLED = True
             mock_settings.return_value.RAG_FAITHFULNESS_THRESHOLD = 0.5
-            with patch("app.services.chat.graph.judge_faithfulness", return_value=mock_verdict):
+            with patch("app.services.chat.graph.judge_faithfulness_with_usage", return_value=(mock_verdict, {})):
                 with patch("app.services.chat.graph.get_llm", return_value=MagicMock()):
                     result = format_response(state)
         # perf_counter-based; just assert it's a non-negative float

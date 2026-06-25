@@ -35,7 +35,7 @@ unbounded-cardinality field — those cause Prometheus metric explosion.
 from __future__ import annotations
 
 from time import perf_counter
-from typing import TYPE_CHECKING, Mapping
+from typing import TYPE_CHECKING, Dict, Mapping
 
 from fastapi import Request
 from fastapi.responses import Response
@@ -108,6 +108,24 @@ RAG_PHASE_DURATION = Histogram(
     buckets=_CHAT_DURATION_BUCKETS,
 )
 
+# ---------------------------------------------------------------------------
+# LLM token counter (T2.7)
+# ---------------------------------------------------------------------------
+#
+# call_type is a BOUNDED enumeration with exactly 4 values:
+#   generation  — main answer LLM call
+#   judge       — faithfulness judge call (when RAG_FAITHFULNESS_ENABLED=True)
+#   crag_rewrite — CRAG corrective query rewrite (when RAG_CRAG_ENABLED=True)
+#   contextualize — history-aware query rewrite (when RAG_CONTEXTUALIZE_ENABLED=True)
+#
+# 4 call_type values × 1 counter = 4 max time series.  Strictly bounded.
+# NEVER label by model name, user, namespace, or any unbounded field.
+LLM_TOKENS_TOTAL = Counter(
+    "llm_tokens_total",
+    "Total LLM tokens consumed per request, by call type.",
+    ["call_type"],
+)
+
 # Maps timing-dict keys (milliseconds) to Histogram phase label values.
 _PHASE_MAP: dict[str, str] = {
     "retrieve_ms": "retrieve",
@@ -140,6 +158,21 @@ def record_chat_timings_prometheus(timings: Mapping[str, float]) -> None:
         value_ms = float(timings.get(ms_key) or 0.0)
         if value_ms > 0.0:
             RAG_PHASE_DURATION.labels(phase=phase_label).observe(value_ms / 1000.0)
+
+
+def record_token_usage(by_call_type: Dict[str, Dict[str, int]]) -> None:
+    """Increment LLM_TOKENS_TOTAL counter for each LLM call type in the request.
+
+    by_call_type: the token_usage_by_call dict from graph state.  Keys are
+    bounded call_type labels (generation / judge / crag_rewrite / contextualize).
+    Call types with zero total tokens are silently ignored.
+
+    Called from routers/chat.py after the pipeline completes.
+    """
+    for call_type, counts in (by_call_type or {}).items():
+        total = int((counts or {}).get("total_tokens") or 0)
+        if total > 0:
+            LLM_TOKENS_TOTAL.labels(call_type=call_type).inc(total)
 
 
 def setup_prometheus(app: "FastAPI") -> None:

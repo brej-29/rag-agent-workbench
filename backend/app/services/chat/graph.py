@@ -7,11 +7,18 @@ from langchain_core.runnables.config import RunnableConfig
 from langgraph.graph import END, StateGraph
 
 from app.core.config import get_settings
+from app.core.cost_accounting import estimate_cost_usd, extract_token_usage
 from app.core.errors import UpstreamServiceError
 from app.core.logging import get_logger
 from app.schemas.chat import ChatRequest
-from app.services.crag import grade_retrieval, rewrite_query
-from app.services.faithfulness import FaithfulnessVerdict, judge_faithfulness, verify_citations
+from app.services.contextualize import contextualize_followup
+from app.services.crag import grade_retrieval, rewrite_query, rewrite_query_with_usage
+from app.services.faithfulness import (
+    FaithfulnessVerdict,
+    judge_faithfulness,
+    judge_faithfulness_with_usage,
+    verify_citations,
+)
 from app.services.llm.groq_llm import get_llm
 from app.services.prompts.faithfulness_prompt import build_faithfulness_judge_messages  # noqa: F401 (imported for test-patchability)
 from app.services.prompts.rag_prompt import (
@@ -65,6 +72,12 @@ class ChatState(TypedDict, total=False):
     crag_iterations: int
     corrective_action: Optional[str]
 
+    # T2.5 contextualization — set by contextualize_query
+    contextualized_query: Optional[str]
+
+    # T2.7 token accounting — accumulated across ALL LLM calls in the request
+    token_usage_by_call: Dict[str, Dict[str, int]]
+
 
 def _ensure_timings(state: ChatState) -> Dict[str, float]:
     timings = state.get("timings") or {}
@@ -72,6 +85,27 @@ def _ensure_timings(state: ChatState) -> Dict[str, float]:
         timings = {}
     state["timings"] = timings
     return timings  # type: ignore[return-value]
+
+
+def _accumulate_token_usage(
+    state: ChatState,
+    call_type: str,
+    usage: Dict[str, int],
+) -> None:
+    """Sum token counts from an LLM call into state["token_usage_by_call"].
+
+    call_type values: "generation", "judge", "crag_rewrite", "contextualize".
+    These are the bounded labels also used as Prometheus counter labels (T2.7).
+    Accumulates across multiple iterations (e.g. CRAG loops).
+    """
+    by_call: Dict[str, Dict[str, int]] = state.get("token_usage_by_call") or {}
+    prev = by_call.get(call_type, {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})
+    by_call[call_type] = {
+        "prompt_tokens": prev["prompt_tokens"] + int(usage.get("prompt_tokens") or 0),
+        "completion_tokens": prev["completion_tokens"] + int(usage.get("completion_tokens") or 0),
+        "total_tokens": prev["total_tokens"] + int(usage.get("total_tokens") or 0),
+    }
+    state["token_usage_by_call"] = by_call
 
 
 def normalize_input(state: ChatState, _config: RunnableConfig | None = None) -> ChatState:
@@ -117,6 +151,50 @@ def normalize_input(state: ChatState, _config: RunnableConfig | None = None) -> 
         new_state["tavily_available"],
     )
     return new_state
+
+
+def contextualize_query(state: ChatState, config: RunnableConfig | None = None) -> ChatState:  # noqa: ARG001
+    """Rewrite a follow-up question into a standalone question (T2.5).
+
+    When OFF (RAG_CONTEXTUALIZE_ENABLED=False, the default): exact pass-through —
+    state is returned unchanged, byte-for-byte identical to the node not existing.
+
+    When ON + no chat_history: pass-through — no LLM call (nothing to contextualize).
+
+    When ON + history present: calls the Groq LLM via contextualize_followup().
+    If the rewrite succeeds, state["query"] is replaced with the standalone form
+    and state["contextualized_query"] is set to the rewritten query for observability.
+    If the rewrite fails (exception, empty response), falls back to the original query;
+    state["contextualized_query"] is set to None.
+
+    DISTINCT from corrective_retrieve (CRAG / T2.4):
+      - This node runs BEFORE retrieval and uses conversation history as input.
+      - CRAG runs AFTER retrieval and corrects for low retrieval quality.
+    """
+    settings = get_settings()
+    if not settings.RAG_CONTEXTUALIZE_ENABLED:
+        return state  # exact pass-through — no keys added
+
+    history = state.get("chat_history") or []
+    if not history:
+        return state  # first-turn request — nothing to contextualize, no LLM call
+
+    original_query: str = state["query"]
+    llm = get_llm()
+    rewritten, usage = contextualize_followup(
+        original_query=original_query,
+        chat_history=history,
+        llm=llm,
+    )
+
+    if rewritten and rewritten != original_query:
+        state["query"] = rewritten
+        state["contextualized_query"] = rewritten
+    else:
+        state["contextualized_query"] = None
+
+    _accumulate_token_usage(state, "contextualize", usage)
+    return state
 
 
 def retrieve_context(state: ChatState, _config: RunnableConfig | None = None) -> ChatState:
@@ -242,7 +320,8 @@ def corrective_retrieve(state: ChatState, config: RunnableConfig | None = None) 
 
         # Rewrite query using existing Groq client — no new LLM, no new dependency
         llm = get_llm()
-        rewritten = rewrite_query(current_query, llm)
+        rewritten, rewrite_usage = rewrite_query_with_usage(current_query, llm)
+        _accumulate_token_usage(state, "crag_rewrite", rewrite_usage)
         if rewritten != current_query:
             current_query = rewritten
             state["corrective_action"] = "rewrite"
@@ -485,6 +564,7 @@ def generate_answer(state: ChatState, config: RunnableConfig | None = None) -> C
 
     state["answer"] = answer_text
     state["insufficient_context"] = False
+    _accumulate_token_usage(state, "generation", extract_token_usage(response))
     logger.info("Answer generation completed elapsed_ms=%.2f", elapsed_ms)
     return state
 
@@ -522,8 +602,9 @@ def format_response(state: ChatState, _config: RunnableConfig | None = None) -> 
         context_string = build_context_string(all_sources)
         llm = get_llm()
         t0 = perf_counter()
-        verdict: FaithfulnessVerdict = judge_faithfulness(answer_text, context_string, llm)
+        verdict, judge_usage = judge_faithfulness_with_usage(answer_text, context_string, llm)
         timings["faithfulness_ms"] = (perf_counter() - t0) * 1000.0
+        _accumulate_token_usage(state, "judge", judge_usage)
 
         # Resolve grounded using the score threshold (more objective than raw bool).
         if verdict.faithfulness_score is not None:
@@ -559,6 +640,7 @@ def get_chat_graph() -> Any:
     workflow: StateGraph = StateGraph(ChatState)
 
     workflow.add_node("normalize_input", normalize_input)
+    workflow.add_node("contextualize_query", contextualize_query)
     workflow.add_node("retrieve_context", retrieve_context)
     workflow.add_node("corrective_retrieve", corrective_retrieve)
     workflow.add_node("decide_next", decide_next)
@@ -567,7 +649,8 @@ def get_chat_graph() -> Any:
     workflow.add_node("format_response", format_response)
 
     workflow.set_entry_point("normalize_input")
-    workflow.add_edge("normalize_input", "retrieve_context")
+    workflow.add_edge("normalize_input", "contextualize_query")
+    workflow.add_edge("contextualize_query", "retrieve_context")
     workflow.add_edge("retrieve_context", "corrective_retrieve")
     workflow.add_edge("corrective_retrieve", "decide_next")
     workflow.add_conditional_edges(

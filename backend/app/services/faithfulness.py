@@ -29,6 +29,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from app.core.cost_accounting import extract_token_usage
 from app.core.logging import get_logger
 from app.services.prompts.faithfulness_prompt import build_faithfulness_judge_messages
 
@@ -114,6 +115,40 @@ def judge_faithfulness(
         )
 
     return _parse_verdict(raw)
+
+
+def judge_faithfulness_with_usage(
+    answer_text: str,
+    retrieved_context: str,
+    llm: Any,
+) -> tuple[FaithfulnessVerdict, dict]:
+    """Like judge_faithfulness but also returns actual token usage from the response.
+
+    Returns (FaithfulnessVerdict, usage_dict) where usage_dict has keys
+    prompt_tokens / completion_tokens / total_tokens from the ACTUAL Groq API
+    response.  Returns zeros on LLM error — never estimated.
+
+    Called from graph.py format_response so the token cost of the faithfulness
+    judge is captured in the per-request token accounting (T2.7).  The original
+    judge_faithfulness() remains available for eval/offline use.
+    """
+    messages = build_faithfulness_judge_messages(answer_text, retrieved_context)
+    _empty_usage: dict = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    try:
+        response = llm.invoke(messages)
+        raw: str = str(getattr(response, "content", "") or response)
+        usage = extract_token_usage(response)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Faithfulness judge LLM call failed: %s", exc)
+        return (
+            FaithfulnessVerdict(
+                grounded=None,
+                faithfulness_score=None,
+                rationale=f"judge_call_error: {exc}",
+            ),
+            _empty_usage,
+        )
+    return _parse_verdict(raw), usage
 
 
 def _parse_verdict(raw: str) -> FaithfulnessVerdict:

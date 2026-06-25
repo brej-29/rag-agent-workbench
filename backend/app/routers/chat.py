@@ -8,9 +8,10 @@ from fastapi.responses import StreamingResponse
 
 from app.core.cache import cache_enabled, get_chat_cached, set_chat_cached
 from app.core.config import get_settings
+from app.core.cost_accounting import estimate_cost_usd
 from app.core.logging import get_logger
 from app.core.metrics import record_chat_timings
-from app.core.prometheus_metrics import record_chat_timings_prometheus
+from app.core.prometheus_metrics import record_chat_timings_prometheus, record_token_usage
 from app.core.rate_limit import limiter
 from app.core.tracing import (
     get_tracing_callbacks,
@@ -20,6 +21,7 @@ from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
     ChatTimings,
+    ChatTokenUsage,
     ChatTraceMetadata,
     SourceHit,
 )
@@ -58,6 +60,26 @@ def _build_chat_response(state: Dict) -> ChatResponse:
 
     trace_meta = ChatTraceMetadata(**get_tracing_response_metadata())
 
+    # Build token usage summary across all LLM call types (T2.7).
+    by_call: Dict = dict(state.get("token_usage_by_call") or {})
+    # Filter out call types with zero total tokens (don't pollute the response).
+    by_call = {k: v for k, v in by_call.items() if int((v or {}).get("total_tokens") or 0) > 0}
+    total_prompt = sum(int((v or {}).get("prompt_tokens") or 0) for v in by_call.values())
+    total_completion = sum(int((v or {}).get("completion_tokens") or 0) for v in by_call.values())
+    total_tokens = total_prompt + total_completion
+
+    settings = get_settings()
+    usage: Optional[ChatTokenUsage] = None
+    if total_tokens > 0 or by_call:
+        cost = estimate_cost_usd(total_prompt, total_completion, settings.GROQ_MODEL)
+        usage = ChatTokenUsage(
+            prompt_tokens=total_prompt,
+            completion_tokens=total_completion,
+            total_tokens=total_tokens,
+            estimated_cost_usd=cost,
+            by_call_type=by_call,
+        )
+
     return ChatResponse(
         answer=str(state.get("answer") or ""),
         sources=sources,
@@ -69,6 +91,8 @@ def _build_chat_response(state: Dict) -> ChatResponse:
         unverified_citations=list(state.get("unverified_citations") or []),
         crag_iterations=int(state.get("crag_iterations") or 0),
         corrective_action=state.get("corrective_action"),
+        contextualized_query=state.get("contextualized_query"),
+        usage=usage,
     )
 
 
@@ -185,6 +209,7 @@ async def chat(request: Request, payload: ChatRequest) -> ChatResponse:  # noqa:
         }
     )
     record_chat_timings_prometheus(timings)
+    record_token_usage(state.get("token_usage_by_call") or {})
 
     # Cache only when chat_history is empty.
     if use_cache:
@@ -280,6 +305,7 @@ async def chat_stream(request: Request, payload: ChatRequest) -> StreamingRespon
         }
     )
     record_chat_timings_prometheus(timings)
+    record_token_usage(state.get("token_usage_by_call") or {})
 
     async def event_generator() -> AsyncGenerator[str, None]:
         # Stream the answer token-by-token (space-delimited) as simple SSE events.

@@ -1894,3 +1894,166 @@ uv pip compile --python-version 3.11 --no-strip-extras \
 | `backend/requirements.txt` | Recompiled — `prometheus-client==0.25.0` now pinned; `starlette==0.50.0` preserved |
 | `tests/test_prometheus_metrics.py` | **New** — 10 CI-safe tests: endpoint 200 + content-type, histogram presence, HTTP metric after request, observation count + sum, zero-phase skip, ms→s conversion, legacy snapshot structure |
 | `docs/CONTEXT.md` | This section |
+
+---
+
+## Multi-turn contextualization (T2.5)
+
+### Problem addressed
+
+In a multi-turn chat session, the user's follow-up messages frequently contain pronouns or
+fragments that are meaningless without the conversation history — e.g. *"What about the second
+one?"* or *"How does it compare?"*.  Before T2.5, `retrieve_context` ran on `state["query"]`
+(the raw current message), so Pinecone retrieval was history-blind: it saw only the fragment,
+not the referenced entity, and returned irrelevant chunks.
+
+### Solution: pre-retrieval standalone-query rewrite
+
+T2.5 inserts a new `contextualize_query` LangGraph node **before** `retrieve_context`.  When
+enabled and when the request includes prior `chat_history`, the node calls the Groq LLM with a
+"standalone-query rewrite" prompt: given the conversation history and the follow-up fragment,
+output a self-contained standalone question.  The rewritten query replaces `state["query"]` so
+that `retrieve_context` and all subsequent nodes see the fully-contextualized question.
+
+### Distinction from CRAG rewrite (T2.4)
+
+| Property | T2.5 contextualize | T2.4 CRAG rewrite |
+|---|---|---|
+| Trigger | History present + follow-up | Low retrieval quality (top cosine score < threshold) |
+| Fires | **Before** retrieval | **After** weak retrieval |
+| Input | Current message + conversation history | Current query alone |
+| Purpose | Resolve pronouns/fragments for multi-turn retrieval | Improve query specificity to get better chunks |
+| Prompt file | `prompts/contextualize_prompt.py` | `prompts/query_rewrite_prompt.py` |
+| Function | `contextualize.contextualize_followup()` | `crag.rewrite_query()` |
+
+### Flag behaviour
+
+`RAG_CONTEXTUALIZE_ENABLED` (default `False`):
+
+- **OFF (default)**: `contextualize_query` node is an exact pass-through.  `state["query"]`
+  is not touched.  No LLM call.  No new keys added to state.  Byte-for-byte identical to the
+  node not existing.
+- **ON + no history**: No LLM call.  State unchanged.  (First-turn requests have nothing to
+  contextualize.)
+- **ON + history present**: LLM called once via `contextualize_followup()`.  Rewritten query
+  replaces `state["query"]`.  `state["contextualized_query"]` is set to the rewritten text.
+- **ON + LLM error or empty response**: Falls back to original query.  No exception propagated.
+  `state["contextualized_query"]` is set to `None`.
+
+### Observability
+
+`ChatResponse.contextualized_query` (new optional field, `None` when not rewritten):
+- The rewritten standalone query used for retrieval.
+- `None` when: flag is OFF, no history, or fallback to original (error or identical text).
+- Distinct from `corrective_action` (CRAG): contextualized_query reflects a pre-retrieval
+  history-aware rewrite; CRAG's `corrective_action` reflects a post-retrieval quality fix.
+
+### Files added / changed
+
+| File | Change |
+|---|---|
+| `backend/app/services/prompts/contextualize_prompt.py` | **New** — standalone-query rewrite prompt; `build_contextualize_messages()` |
+| `backend/app/services/contextualize.py` | **New** — `contextualize_followup(original_query, chat_history, llm) -> (str, dict)` |
+| `backend/app/services/chat/graph.py` | Added `contextualize_query` node (between `normalize_input` and `retrieve_context`); added `contextualized_query` to `ChatState` |
+| `backend/app/schemas/chat.py` | Added `contextualized_query: Optional[str]` to `ChatResponse` |
+| `backend/app/core/config.py` | Added `RAG_CONTEXTUALIZE_ENABLED: bool = False` |
+| `backend/app/routers/chat.py` | Propagated `contextualized_query` in `_build_chat_response` |
+| `tests/test_contextualize.py` | **New** — 20 CI-safe tests: flag OFF pass-through, no-history no-LLM-call, rewrite replaces query, token usage accumulation, error fallback, unit tests of `contextualize_followup` |
+
+---
+
+## Token & cost accounting (T2.7)
+
+### Design goal
+
+Count ACTUAL token usage for every LLM call made during a request (generation, faithfulness
+judge, CRAG rewrite, history contextualize rewrite) and aggregate them into a per-request
+`usage` field on `ChatResponse`.  Emit a Prometheus counter by `call_type` for operational
+monitoring.  Provide an estimated dollar cost derived from an as-of-date pricing table.
+
+### Token counts — ACTUAL, not estimated
+
+Token counts come from the Groq API response object, not from a local tokenizer estimate.
+`extract_token_usage(response)` in `backend/app/core/cost_accounting.py` tries two standard
+LangChain attribute paths:
+
+1. `response.usage_metadata` (langchain-core 0.2+ `AIMessage` attribute):
+   keys `input_tokens` / `output_tokens` / `total_tokens`.
+2. `response.response_metadata["token_usage"]` (OpenAI-compatible fallback):
+   keys `prompt_tokens` / `completion_tokens` / `total_tokens`.
+
+Returns zeros when neither path yields a valid dict — safe in tests where the LLM is mocked.
+`isinstance(x, dict)` guards prevent `int(MagicMock())` errors under mock responses.
+
+### Dollar cost — ESTIMATED, as-of-date pricing table
+
+Cost is computed by `estimate_cost_usd(prompt_tokens, completion_tokens, model)` in
+`backend/app/core/cost_accounting.py`.  The pricing constants live in ONE place — a
+`_GROQ_PRICING_USD_PER_1M` dict keyed by model ID.  The table is clearly labeled with an
+as-of date (`2026-06-25`) and a "MUST update" comment.
+
+**This is an ESTIMATE** — it does not account for free-tier credits, discounts, batch pricing,
+or promotional rates.  `ChatResponse.usage.estimated_cost_usd` is `None` for unknown models.
+
+### Call types and accumulation
+
+Tokens are accumulated per call type in `state["token_usage_by_call"]` (a `dict` keyed by
+`call_type`).  The four bounded call type values are:
+
+| `call_type` | When it fires |
+|---|---|
+| `generation` | Always (main RAG answer generation) — if usable context exists |
+| `judge` | When `RAG_FAITHFULNESS_ENABLED=True` and not on abstention path |
+| `crag_rewrite` | When `RAG_CRAG_ENABLED=True` and retrieval is graded weak; sums across CRAG iterations |
+| `contextualize` | When `RAG_CONTEXTUALIZE_ENABLED=True` and prior `chat_history` is present |
+
+Accumulation is additive across iterations (CRAG can iterate multiple times).
+
+### Embedding tokens
+
+Pinecone integrated-embedding inference tokens are **not reported** in `usage.by_call_type`.
+The Pinecone Python SDK's `index.search(...)` response object does not expose embedding token
+counts — the response is a list of matches without a usage field comparable to the OpenAI
+`usage` object.  This is a Pinecone API limitation, not a code limitation.
+
+### ChatResponse.usage fields
+
+```
+ChatTokenUsage:
+  prompt_tokens     — total prompt (input) tokens across all LLM calls
+  completion_tokens — total completion (output) tokens across all LLM calls
+  total_tokens      — prompt + completion
+  estimated_cost_usd — ESTIMATE in USD; None when model not in pricing table
+  by_call_type      — dict of per-call-type breakdown (zero-token types omitted)
+```
+
+`usage` is `None` on cached responses (no pipeline ran).
+
+### Prometheus counter
+
+`llm_tokens_total` (Counter) with label `call_type` (4 bounded values):
+
+```
+# HELP llm_tokens_total Total LLM tokens consumed per request, by call type.
+# TYPE llm_tokens_total counter
+llm_tokens_total{call_type="generation"} 15024
+llm_tokens_total{call_type="judge"} 3501
+```
+
+`record_token_usage(by_call_type)` is called from `routers/chat.py` after the pipeline
+completes (same location as `record_chat_timings_prometheus`).  Call types with zero tokens
+are not incremented.
+
+### Files added / changed
+
+| File | Change |
+|---|---|
+| `backend/app/core/cost_accounting.py` | **New** — pricing table (as-of-date), `extract_token_usage()`, `estimate_cost_usd()` |
+| `backend/app/services/faithfulness.py` | Added `judge_faithfulness_with_usage()` returning `(FaithfulnessVerdict, dict)`; `judge_faithfulness()` delegates to it |
+| `backend/app/services/crag.py` | Added `rewrite_query_with_usage()` returning `(str, dict)`; `rewrite_query()` delegates to it |
+| `backend/app/services/chat/graph.py` | Added `_accumulate_token_usage()` helper; token capture in `contextualize_query`, `corrective_retrieve`, `generate_answer`, `format_response`; `token_usage_by_call` added to `ChatState` |
+| `backend/app/schemas/chat.py` | Added `ChatTokenUsage` model; added `usage: Optional[ChatTokenUsage]` to `ChatResponse` |
+| `backend/app/core/prometheus_metrics.py` | Added `LLM_TOKENS_TOTAL` counter; added `record_token_usage()` |
+| `backend/app/routers/chat.py` | Build `ChatTokenUsage` from state in `_build_chat_response`; call `record_token_usage()` after pipeline |
+| `tests/test_faithfulness.py` | Updated `TestFormatResponse` mocks: `judge_faithfulness` → `judge_faithfulness_with_usage` (return value changed to `(verdict, {})` tuple) |
+| `tests/test_cost_accounting.py` | **New** — 19 CI-safe tests: token extraction from response paths, mock zeros safety, accumulation across iterations and call types, cost arithmetic, Prometheus counter increments |

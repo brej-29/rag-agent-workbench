@@ -1149,3 +1149,57 @@ uv pip compile --python-version 3.11 \
     --constraint backend/requirements.txt \
     requirements-dev.in -o requirements-dev.txt
 ```
+
+---
+
+## CORS & origins
+
+### Problem fixed
+
+`security.py` previously set `allow_credentials=True` alongside a default `allow_origins=["*"]`.
+The **WHATWG Fetch Standard** (not RFC 7234, which covers HTTP caching) forbids this combination:
+a wildcard origin paired with `credentials: include` is rejected by every major browser.  The
+bug was latent because the API is consumed by a Streamlit frontend that does not send cookies,
+but it would have silently broken any browser client that enabled credentials mode.
+
+### Bearer-token auth — why credentials mode is never needed
+
+The API authenticates with a bearer API key in the `X-API-Key` header.  `allow_credentials=True`
+in CORS enables the `Access-Control-Allow-Credentials` response header, which signals to browsers
+that the request may carry cookies, HTTP authentication, or TLS client certificates.  None of
+those are used here.  `allow_credentials` is now permanently `False`.
+
+### Origins resolution
+
+`_get_allowed_origins()` in `security.py`:
+
+| `ALLOWED_ORIGINS` env var | Result |
+|---|---|
+| Unset or empty string | `["*"]` — permissive dev default (safe: credentials=False) |
+| `"https://a.com,https://b.com"` | `["https://a.com", "https://b.com"]` |
+| Entries that are all whitespace | Falls back to `["*"]` |
+
+Set `ALLOWED_ORIGINS` to a comma-separated list before deploying:
+
+```
+ALLOWED_ORIGINS=https://my-app.hf.space,https://my-frontend.com
+```
+
+### Prod-wildcard warning
+
+On startup, `configure_security` checks whether origins resolved to `["*"]` **and** whether the
+environment is production-like.  The prod-detection reuses `_is_production_like()` from
+`app.core.auth` (same `ENV=production` / `SPACE_ID` / `HF_HOME` heuristic used by the API-key
+startup check), so the two startup guards are consistent.
+
+**Behaviour:** a `WARNING` is logged — not a `RuntimeError`.  The rationale for not hard-failing:
+the API is still protected by bearer-token auth even with wildcard CORS, so the operational risk
+of a misconfigured `ALLOWED_ORIGINS` is lower than a missing `API_KEY`; a hard-fail would block
+deployments unnecessarily.  Operators are expected to respond to the warning before going live.
+
+### Files changed
+
+| File | Change |
+|---|---|
+| `backend/app/core/security.py` | Removed `allow_credentials=True`; added prod-wildcard warning; imported `_is_production_like` from auth |
+| `tests/test_cors.py` | 12 new CI-safe unit tests (zero network) |

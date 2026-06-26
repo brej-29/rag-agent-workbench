@@ -20,9 +20,9 @@ anyio==4.14.0
 attrs==26.1.0
     # via aiohttp
 beautifulsoup4==4.15.0
-    # via -r backend/requirements.in
+    # via -r requirements.in
 cachetools==5.5.2
-    # via -r backend/requirements.in
+    # via -r requirements.in
 certifi==2026.6.17
     # via
     #   httpcore
@@ -39,10 +39,10 @@ distro==1.9.0
     # via
     #   langsmith
     #   openai
-fastapi==0.138.0
-    # via -r backend/requirements.in
+fastapi==0.138.1
+    # via -r requirements.in
 feedparser==6.0.12
-    # via -r backend/requirements.in
+    # via -r requirements.in
 frozenlist==1.8.0
     # via
     #   aiohttp
@@ -59,7 +59,7 @@ httptools==0.8.0
     # via uvicorn
 httpx==0.28.1
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   langgraph-sdk
     #   langsmith
     #   openai
@@ -81,10 +81,10 @@ jsonpointer==3.1.1
 langchain-classic==1.0.8
     # via langchain-community
 langchain-community==0.4.2
-    # via -r backend/requirements.in
+    # via -r requirements.in
 langchain-core==1.4.8
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   langchain-classic
     #   langchain-community
     #   langchain-openai
@@ -94,17 +94,17 @@ langchain-core==1.4.8
     #   langgraph-prebuilt
     #   langgraph-sdk
 langchain-openai==1.3.3
-    # via -r backend/requirements.in
+    # via -r requirements.in
 langchain-protocol==0.0.18
     # via
     #   langchain-core
     #   langgraph-sdk
 langchain-text-splitters==1.1.2
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   langchain-classic
 langgraph==1.2.6
-    # via -r backend/requirements.in
+    # via -r requirements.in
 langgraph-checkpoint==4.1.1
     # via
     #   langgraph
@@ -130,7 +130,7 @@ openai==2.43.0
     # via langchain-openai
 orjson==3.11.9
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   langgraph-sdk
     #   langsmith
 ormsgpack==1.12.2
@@ -142,7 +142,7 @@ packaging==24.2
     #   limits
     #   pinecone-plugin-assistant
 pinecone==7.3.0
-    # via -r backend/requirements.in
+    # via -r requirements.in
 pinecone-plugin-assistant==1.8.0
     # via pinecone
 pinecone-plugin-interface==0.0.7
@@ -164,13 +164,13 @@ pydantic-core==2.46.4
     # via pydantic
 pydantic-settings==2.14.2
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   langchain-community
 python-dateutil==2.9.0.post0
     # via pinecone
 python-dotenv==1.2.2
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   pydantic-settings
     #   uvicorn
 pyyaml==6.0.3
@@ -197,7 +197,7 @@ sgmllib3k==1.0.0
 six==1.17.0
     # via python-dateutil
 slowapi==0.1.10
-    # via -r backend/requirements.in
+    # via -r requirements.in
 sniffio==1.3.1
     # via
     #   langsmith
@@ -211,10 +211,10 @@ sqlalchemy==2.0.51
 starlette==0.50.0
     # via fastapi
 tavily-python==0.7.26
-    # via -r backend/requirements.in
+    # via -r requirements.in
 tenacity==8.5.0
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   langchain-community
     #   langchain-core
 tiktoken==0.13.0
@@ -251,7 +251,7 @@ uuid-utils==0.16.2
     #   langchain-core
     #   langsmith
 uvicorn[standard]==0.49.0
-    # via -r backend/requirements.in
+    # via -r requirements.in
 uvloop==0.22.1
     # via uvicorn
 watchfiles==1.2.0

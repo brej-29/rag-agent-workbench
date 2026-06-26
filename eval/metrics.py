@@ -102,3 +102,35 @@ def ndcg_at_k(
     if idcg == 0.0:
         return 0.0
     return dcg / idcg
+
+
+def precision_at_k(
+    retrieved_ids: Sequence[str],
+    relevant_ids: Set[str],
+    k: int,
+) -> float:
+    """Fraction of the top-k retrieved results that are relevant.
+
+    Formula:
+        precision@k = |retrieved_top_k ∩ relevant| / k
+
+    Unlike recall@k this normalises by k (the retrieval budget), not by the
+    number of relevant documents, so it directly measures top-of-list density.
+    When k > len(retrieved_ids) the missing positions count as non-relevant
+    (i.e. precision is penalised for returning fewer than k items).
+
+    Returns 0.0 when k <= 0.
+
+    Args:
+        retrieved_ids: Ranked list of document IDs returned by the retriever,
+            ordered from most to least relevant.
+        relevant_ids: Set of document IDs judged relevant by a human annotator.
+        k: Cutoff rank (must be >= 1).
+
+    Returns:
+        Float in [0.0, 1.0].
+    """
+    if k <= 0:
+        return 0.0
+    top_k = retrieved_ids[:k]
+    return len(set(top_k) & relevant_ids) / k

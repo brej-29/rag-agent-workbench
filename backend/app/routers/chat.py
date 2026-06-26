@@ -1,4 +1,3 @@
-import json
 from time import perf_counter
 from typing import AsyncGenerator, Dict, List, Optional
 
@@ -8,8 +7,10 @@ from fastapi.responses import StreamingResponse
 
 from app.core.cache import cache_enabled, get_chat_cached, set_chat_cached
 from app.core.config import get_settings
+from app.core.cost_accounting import estimate_cost_usd
 from app.core.logging import get_logger
 from app.core.metrics import record_chat_timings
+from app.core.prometheus_metrics import record_chat_timings_prometheus, record_token_usage
 from app.core.rate_limit import limiter
 from app.core.tracing import (
     get_tracing_callbacks,
@@ -19,10 +20,12 @@ from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
     ChatTimings,
+    ChatTokenUsage,
     ChatTraceMetadata,
     SourceHit,
 )
 from app.services.chat.graph import get_chat_graph
+from app.services.chat.streaming import stream_chat_response
 
 logger = get_logger(__name__)
 
@@ -34,8 +37,10 @@ def _build_chat_response(state: Dict) -> ChatResponse:
     timings_raw = state.get("timings") or {}
     timings = ChatTimings(
         retrieve_ms=float(timings_raw.get("retrieve_ms") or 0.0),
+        rerank_ms=float(timings_raw.get("rerank_ms") or 0.0),
         web_ms=float(timings_raw.get("web_ms") or 0.0),
         generate_ms=float(timings_raw.get("generate_ms") or 0.0),
+        faithfulness_ms=float(timings_raw.get("faithfulness_ms") or 0.0),
         total_ms=float(timings_raw.get("total_ms") or 0.0),
     )
 
@@ -55,12 +60,39 @@ def _build_chat_response(state: Dict) -> ChatResponse:
 
     trace_meta = ChatTraceMetadata(**get_tracing_response_metadata())
 
+    # Build token usage summary across all LLM call types (T2.7).
+    by_call: Dict = dict(state.get("token_usage_by_call") or {})
+    # Filter out call types with zero total tokens (don't pollute the response).
+    by_call = {k: v for k, v in by_call.items() if int((v or {}).get("total_tokens") or 0) > 0}
+    total_prompt = sum(int((v or {}).get("prompt_tokens") or 0) for v in by_call.values())
+    total_completion = sum(int((v or {}).get("completion_tokens") or 0) for v in by_call.values())
+    total_tokens = total_prompt + total_completion
+
+    settings = get_settings()
+    usage: Optional[ChatTokenUsage] = None
+    if total_tokens > 0 or by_call:
+        cost = estimate_cost_usd(total_prompt, total_completion, settings.GROQ_MODEL)
+        usage = ChatTokenUsage(
+            prompt_tokens=total_prompt,
+            completion_tokens=total_completion,
+            total_tokens=total_tokens,
+            estimated_cost_usd=cost,
+            by_call_type=by_call,
+        )
+
     return ChatResponse(
         answer=str(state.get("answer") or ""),
         sources=sources,
         timings=timings,
         trace=trace_meta,
         insufficient_context=bool(state.get("insufficient_context") or False),
+        grounded=state.get("grounded"),
+        faithfulness_score=state.get("faithfulness_score"),
+        unverified_citations=list(state.get("unverified_citations") or []),
+        crag_iterations=int(state.get("crag_iterations") or 0),
+        corrective_action=state.get("corrective_action"),
+        contextualized_query=state.get("contextualized_query"),
+        usage=usage,
     )
 
 
@@ -164,7 +196,10 @@ async def chat(request: Request, payload: ChatRequest) -> ChatResponse:  # noqa:
 
     response_model = _build_chat_response(state)
 
-    # Record metrics based on this response.
+    # Record metrics: legacy in-memory JSON snapshot + Prometheus Histogram.
+    # The Prometheus observation uses the full timings dict (includes rerank_ms,
+    # faithfulness_ms) rather than only the four fields tracked by the JSON snapshot.
+    # Cached-response path is intentionally excluded — no pipeline ran.
     record_chat_timings(
         {
             "retrieve_ms": response_model.timings.retrieve_ms,
@@ -173,6 +208,8 @@ async def chat(request: Request, payload: ChatRequest) -> ChatResponse:  # noqa:
             "total_ms": response_model.timings.total_ms,
         }
     )
+    record_chat_timings_prometheus(timings)
+    record_token_usage(state.get("token_usage_by_call") or {})
 
     # Cache only when chat_history is empty.
     if use_cache:
@@ -190,11 +227,17 @@ async def chat(request: Request, payload: ChatRequest) -> ChatResponse:  # noqa:
 
 @router.post(
     "/chat/stream",
-    summary="Streaming RAG chat endpoint (SSE)",
+    summary="Streaming RAG chat endpoint (SSE) — true token streaming (T2.9)",
     description=(
-        "Same behaviour as /chat but streams the answer over Server-Sent Events "
-        "(SSE). The final event includes the full JSON payload with answer, sources, "
-        "timings, and trace metadata."
+        "Runs the full RAG pipeline and streams the LLM's generation tokens as "
+        "they are produced (real TTFT), then emits a final metadata event carrying "
+        "grounding, citations, token usage, and timings.\n\n"
+        "SSE event protocol:\n"
+        "  event: token  data: {\"text\": \"<token>\"}\n"
+        "  event: done   data: {<full observability payload>}\n"
+        "  event: error  data: {\"message\": \"<error>\"}\n\n"
+        "Non-streamable paths (cache hit, empty-context abstention) emit a single "
+        "'token' event followed immediately by 'done' — the LLM is not called."
     ),
 )
 @limiter.limit("30/minute")
@@ -209,7 +252,25 @@ async def chat_stream(request: Request, payload: ChatRequest) -> StreamingRespon
         payload.use_web_fallback,
     )
 
-    graph = get_chat_graph()
+    # Cache check — same rule as /chat: only for requests without history.
+    use_cache = cache_enabled() and not payload.chat_history
+    cached_response: Optional[ChatResponse] = None
+    if use_cache:
+        cached = get_chat_cached(
+            namespace=namespace,
+            query=payload.query,
+            top_k=payload.top_k,
+            min_score=payload.min_score,
+            use_web_fallback=payload.use_web_fallback,
+        )
+        if cached is not None:
+            logger.info(
+                "Serving /chat/stream response from cache namespace='%s' query='%s'",
+                namespace,
+                payload.query,
+            )
+            cached_response = cached
+
     callbacks = get_tracing_callbacks()
     config: Dict = {}
     if callbacks:
@@ -228,54 +289,13 @@ async def chat_stream(request: Request, payload: ChatRequest) -> StreamingRespon
         ],
     }
 
-    start_total = perf_counter()
-
-    def _invoke_graph() -> Dict:
-        return graph.invoke(initial_state, config=config)
-
-    # Exceptions (including UpstreamServiceError) are handled by global handlers.
-    state = await run_in_threadpool(_invoke_graph)
-
-    total_ms = (perf_counter() - start_total) * 1000.0
-    timings = state.get("timings") or {}
-    timings["total_ms"] = total_ms
-    state["timings"] = timings
-
-    web_used = bool(state.get("web_fallback_used"))
-    top_score = float(state.get("top_score") or 0.0)
-    logger.info(
-        "Streaming chat completed namespace='%s' web_fallback_used=%s "
-        "retrieve_ms=%.2f web_ms=%.2f generate_ms=%.2f total_ms=%.2f top_score=%.4f",
-        namespace,
-        web_used,
-        float(timings.get("retrieve_ms") or 0.0),
-        float(timings.get("web_ms") or 0.0),
-        float(timings.get("generate_ms") or 0.0),
-        float(timings.get("total_ms") or 0.0),
-        top_score,
-    )
-
-    response_model = _build_chat_response(state)
-    answer_text = response_model.answer
-
-    # Record metrics based on this response as well.
-    record_chat_timings(
-        {
-            "retrieve_ms": response_model.timings.retrieve_ms,
-            "web_ms": response_model.timings.web_ms,
-            "generate_ms": response_model.timings.generate_ms,
-            "total_ms": response_model.timings.total_ms,
-        }
-    )
-
     async def event_generator() -> AsyncGenerator[str, None]:
-        # Stream the answer token-by-token (space-delimited) as simple SSE events.
-        for token in answer_text.split():
-            yield f"data: {token}\n\n"
-
-        # Send a final event containing the full JSON payload for clients that
-        # want metadata and sources.
-        final_payload = response_model.model_dump()
-        yield f"event: end\ndata: {json.dumps(final_payload)}\n\n"
+        async for frame in stream_chat_response(
+            initial_state=initial_state,
+            config=config,
+            use_cache=use_cache,
+            cached_response=cached_response,
+        ):
+            yield frame
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

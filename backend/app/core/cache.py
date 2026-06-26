@@ -9,8 +9,13 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-_settings = get_settings()
-_CACHE_ENABLED: bool = getattr(_settings, "CACHE_ENABLED", True)
+# get_settings() requires PINECONE_* env vars; wrap so the module can be
+# imported in test environments without secrets. Defaults to enabled (safe —
+# the in-process cache starts empty, so all lookups will miss).
+try:
+    _CACHE_ENABLED: bool = get_settings().CACHE_ENABLED
+except Exception:
+    _CACHE_ENABLED = True
 
 # TTLs are intentionally short and in-code defaults; no env required.
 _SEARCH_TTL_SECONDS = 60

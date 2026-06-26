@@ -35,6 +35,13 @@ from typing import Any, Dict, List
 from app.core.logging import get_logger
 from app.services.pinecone_store import get_pinecone_client
 
+# Hard upper limit on candidates passed to the Pinecone hosted reranker.
+# bge-reranker-v2-m3 (and pinecone-rerank-v0) cap at 100 documents per call;
+# exceeding this returns an API error.  Operators setting RAG_RERANK_CANDIDATES
+# above this value would otherwise waste the call (graceful degradation catches
+# it, but the latency is already paid).
+RERANK_CANDIDATES_MAX = 100
+
 logger = get_logger(__name__)
 
 

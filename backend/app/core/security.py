@@ -22,6 +22,11 @@ def _get_allowed_origins() -> List[str]:
       the WHATWG Fetch Standard forbids wildcard origins + credentials together,
       and browsers reject that combination.
     """
+    # Read via os.getenv rather than get_settings() because get_settings() is
+    # an lru_cache singleton — test-time env-var overrides (used by
+    # TestGetAllowedOrigins) would not be reflected in an already-cached
+    # instance.  ALLOWED_ORIGINS is read once at startup (configure_security is
+    # called during app init), so the behaviour is identical to a Settings field.
     raw = os.getenv("ALLOWED_ORIGINS")
     if not raw:
         return ["*"]

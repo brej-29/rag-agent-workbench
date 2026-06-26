@@ -27,7 +27,7 @@ from app.services.prompts.rag_prompt import (
     filter_chunks_by_score,
 )
 from app.services.pinecone_store import search as pinecone_search
-from app.services.rerank import rerank_chunks
+from app.services.rerank import RERANK_CANDIDATES_MAX, rerank_chunks
 from app.services.tools.tavily_tool import get_tavily_tool, is_tavily_configured
 
 logger = get_logger(__name__)
@@ -215,7 +215,11 @@ def retrieve_context(state: ChatState, _config: RunnableConfig | None = None) ->
     # Stage-1 retrieval: when reranking is enabled, fetch a wider candidate pool.
     # When disabled, fetch exactly top_k — byte-for-byte identical to baseline.
     if settings.RAG_RERANK_ENABLED:
-        n_candidates = max(settings.RAG_RERANK_CANDIDATES, state["top_k"])
+        # Lower clamp: candidates must cover at least top_k.
+        # Upper clamp: bge-reranker-v2-m3 caps at RERANK_CANDIDATES_MAX docs
+        # per call; exceeding it triggers an API error (even if caught by
+        # graceful degradation, the call latency is already wasted).
+        n_candidates = min(max(settings.RAG_RERANK_CANDIDATES, state["top_k"]), RERANK_CANDIDATES_MAX)
     else:
         n_candidates = state["top_k"]
 

@@ -50,8 +50,6 @@ from fastapi.concurrency import run_in_threadpool
 from app.core.config import get_settings
 from app.core.cost_accounting import estimate_cost_usd, extract_token_usage
 from app.core.logging import get_logger
-from app.core.metrics import record_chat_timings
-from app.core.prometheus_metrics import record_chat_timings_prometheus, record_token_usage
 from app.core.tracing import get_tracing_response_metadata
 from app.services.chat.graph import (
     ABSTENTION_ANSWER,
@@ -181,6 +179,12 @@ def _run_post_generation(state: Dict) -> Dict:
 
 def _record_metrics(state: Dict, total_ms: float) -> None:
     """Emit legacy + Prometheus timing metrics and per-call token counters."""
+    # Lazy imports: metrics.py → cache.py calls get_settings() at module level,
+    # which fails in CI without Pinecone secrets. Importing here avoids that
+    # chain at collection time.
+    from app.core.metrics import record_chat_timings
+    from app.core.prometheus_metrics import record_chat_timings_prometheus, record_token_usage
+
     timings = dict(state.get("timings") or {})
     timings["total_ms"] = total_ms
     record_chat_timings(

@@ -2600,3 +2600,83 @@ from measurement noise.
 3. Update `pinecone_store.search()` to pass `sparse_vector` when `alpha < 1.0`.
 4. Add `RAG_HYBRID_ALPHA` to `Settings` (default 1.0 = pure dense, backward compatible).
 5. Extend the golden set with â‰¥ 10 proper-noun queries before measuring impact.
+
+
+---
+
+## Integration Tests (T3-C)
+
+### What they are
+
+The 22 tests in `tests/integration/` drive the **real FastAPI app** via
+`TestClient` — not individual functions with mocked collaborators.  Each test
+sends an HTTP request and asserts on the HTTP response.  This catches wiring
+bugs, middleware ordering issues, and schema mismatches that unit tests cannot
+detect by construction.
+
+### What runs for real
+
+| Component | Real? |
+|---|---|
+| HTTP routing, middleware stack (CORS, metrics, auth) | Yes |
+| `require_api_key` auth dependency | Yes |
+| LangGraph `graph.invoke()` (all 7 nodes) | Yes |
+| `filter_chunks_by_score`, prompt builders, `verify_citations` | Yes |
+| `ChatResponse` Pydantic schema validation | Yes |
+| SSE frame encoder (`/chat/stream`) | Yes |
+| Faithfulness judge call path (`judge_faithfulness_with_usage`) | Yes |
+
+### What is mocked (external network only)
+
+| Boundary | Patch target |
+|---|---|
+| Pinecone vector search | `app.services.chat.graph.pinecone_search` |
+| Groq LLM (`graph.generate_answer`) | `app.services.chat.graph.get_llm` |
+| Groq LLM (`streaming.py`) | `app.services.chat.streaming.get_llm` |
+| Tavily web search availability | `app.services.chat.graph.is_tavily_configured` |
+| Pinecone SDK init (startup event) | `app.main.init_pinecone` |
+| Response cache (cross-test isolation) | `app.routers.chat.cache_enabled` |
+
+### Why these patch targets
+
+LangGraph imports are bound at module load time:
+
+```python
+# graph.py
+from app.services.pinecone_store import search as pinecone_search
+from app.services.llm.groq_llm import get_llm
+```
+
+Patching `app.services.pinecone_store.search` AFTER the import would have no
+effect.  The correct targets are the names in the **consuming** module's namespace:
+`app.services.chat.graph.pinecone_search` and `app.services.chat.graph.get_llm`.
+
+### LRU cache management
+
+`get_settings()`, `_get_configured_api_key()`, and `get_llm()` are all
+`@lru_cache(maxsize=1)`.  The session fixture calls `cache_clear()` on each
+before constructing the `TestClient` so the integration API key and test
+settings are visible to the first request.
+
+### Test organisation
+
+| Class | What it covers |
+|---|---|
+| `TestHealthAndMetrics` | `/health` public; `/metrics` auth-gated |
+| `TestAuth` | Missing key ? 403; wrong key ? 403; correct key passes |
+| `TestChatHappyPath` | 200 status, all schema fields present, answer content, sources, timings, token usage |
+| `TestAbstention` | Low/empty retrieval ? `insufficient_context=True`, LLM never called |
+| `TestChatStream` | SSE 200, token* then done, token has `text`, done has all observability fields |
+| `TestFaithfulnessFlag` | `RAG_FAITHFULNESS_ENABLED=True` ? `grounded` and `faithfulness_score` populated, 2 LLM calls |
+
+### CI instructions
+
+```bash
+# Zero network, zero credentials needed
+pytest tests/integration/ -v
+```
+
+The session fixture sets `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`, and
+`PINECONE_HOST` as defaults; if the CI environment already exports these from
+a secrets manager, those values are used (but never called, since the
+`init_pinecone` startup event is patched).

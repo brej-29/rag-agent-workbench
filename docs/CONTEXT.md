@@ -2392,3 +2392,211 @@ if `chunk_size` is ever raised above 6000 chars in the future, the safety trunca
 activates automatically without a separate code change, preventing silent context-window
 overruns for `llama-text-embed-v2` (2048-token input limit).  The comment explains this
 so a future reader does not mistake it for unintentional dead code and remove it.
+
+
+---
+
+## Corpus reproducibility manifest (T3-B / P1)
+
+### Problem
+
+The eval corpus ingests from three sources — Wikipedia, arXiv, and OpenAlex.
+Wikipedia titles are stable (the same title always produces the same SHA256 doc_id
+via `normalize.make_doc_id("wiki", title, url)`).  arXiv and OpenAlex are live
+APIs: the set of papers returned by a given query changes as new papers are published.
+This means the exact set of documents in the `eval` Pinecone namespace is
+non-deterministic across runs of `make eval-corpus`.
+
+Without a committed provenance snapshot, it is impossible to tell whether a
+recall-metric regression is caused by a model/config change or by a different
+corpus having been ingested.
+
+### Solution: eval/corpus_manifest.json
+
+A JSON manifest file pinning the set of ingested documents is committed to the
+repository.  Each entry records:
+
+| Field | Description |
+|---|---|
+| `doc_id` | SHA256 document identifier (from `normalize.make_doc_id`) |
+| `first_chunk_id` | The `<doc_id>:0` Pinecone vector ID for the first chunk |
+| `source_type` | `wiki`, `arxiv`, or `openalex` |
+| `source_id` | Stable identifier (Wikipedia title or URL) |
+| `title` | Document title |
+| `url` | Source URL (if available from metadata) |
+| `published` | Publication date (if available) |
+
+### Generator: `eval/corpus_manifest.py generate`
+
+Reads the live Pinecone index (read-only: `index.list()` + `index.fetch()`) and
+writes `eval/corpus_manifest.json`.  Algorithm:
+
+1. `index.list(namespace=eval_ns)` — paginated enumeration of all vector IDs.
+2. `parse_doc_id(vid)` — strip the `:<chunk_idx>` suffix to get unique doc_ids.
+3. `index.fetch(ids=representative_chunks)` (batched at 100) — retrieve metadata
+   for one chunk per doc_id.
+4. Build manifest records and write sorted JSON.
+
+### Validator: `eval/corpus_manifest.py validate`
+
+Reads the committed manifest and the live index, then calls `compute_drift()`:
+
+```
+missing: doc_ids in manifest but absent from live index (re-ingestion needed)
+extra:   doc_ids in live index but absent from manifest (manifest is stale)
+```
+
+Exit code 0 = no drift.  Exit code 1 = drift detected.
+
+### Makefile targets
+
+```makefile
+make corpus-manifest   # generate/refresh eval/corpus_manifest.json
+make corpus-verify     # validate committed manifest vs. live index
+```
+
+Both targets are **ON-DEMAND only** — they require live Pinecone credentials and
+are NOT included in CI (`make test`).
+
+### When to regenerate
+
+Re-run `make corpus-manifest` whenever:
+- `make eval-corpus` is run (new corpus ingestion)
+- Wikipedia article content changes and titles are re-ingested
+- arXiv/OpenAlex query sets in `eval/corpus.py` change
+
+The committed manifest is a **provenance snapshot**, not a validation gate.
+Eval metric regressions can be correlated against manifest diffs to distinguish
+corpus-change from model-change as the root cause.
+
+### Initial seed
+
+The committed `eval/corpus_manifest.json` is seeded with the 8 stable Wikipedia
+doc_ids already known from `eval/golden.jsonl`.  arXiv and OpenAlex entries
+require a live `make corpus-manifest` run to populate.
+
+---
+
+## Index provisioning (T3-B / P2)
+
+### Problem
+
+The original index was created interactively via the Pinecone console.  The
+specific embedding model (`llama-text-embed-v2`) and vector dimension (`1024`)
+were implicit — not committed to code.  Any future recreate or clone of the index
+would require consulting runbook notes rather than the codebase.
+
+### Solution: `scripts/create_index.py`
+
+An idempotent index-creation script that pins model and dimension **explicitly**
+in code.  The single source of truth for both values is `Settings`
+(`app.core.config`), which the script imports at runtime — the same config used by
+the running application.
+
+```python
+# Settings fields (backend/app/core/config.py)
+PINECONE_EMBED_MODEL: str      = "llama-text-embed-v2"
+PINECONE_EMBED_DIMENSION: int  = 1024
+```
+
+The `create_index_for_model` call reads both from `settings`:
+
+```python
+pc.create_index_for_model(
+    name=index_name,
+    cloud=cloud,
+    region=region,
+    embed={
+        "model": settings.PINECONE_EMBED_MODEL,       # "llama-text-embed-v2"
+        "field_map": {"text": settings.PINECONE_TEXT_FIELD},  # "chunk_text"
+        "metric": "cosine",
+        "dimension": settings.PINECONE_EMBED_DIMENSION,  # 1024
+    },
+)
+```
+
+### Safety contract
+
+| Mode | Behaviour |
+|---|---|
+| Normal (no flags) | Skip if index exists; create if absent |
+| `--recreate` alone | Error — second opt-in required |
+| `--recreate --confirm-recreate` | Delete + recreate (with 5-second loud warning) |
+
+When the index already exists, the script prints the live model and dimension from
+`pc.describe_index()` alongside the expected values from Settings, making
+configuration drift immediately visible.
+
+### Why dimension matters
+
+`llama-text-embed-v2` supports multiple output dimensions (384–2048).  Without an
+explicit `dimension=1024` in the creation call, a future `create_index` using a
+different API default would produce an incompatible index that silently accepts
+ingest but returns meaningless cosine scores for queries built against 1024-dim
+vectors.  Pinning the dimension in code makes this class of mismatch a build-time
+error rather than a runtime mystery.
+
+### Usage
+
+```bash
+# First-time bootstrap (idempotent — safe to re-run)
+python scripts/create_index.py
+
+# Recreate (DESTRUCTIVE)
+python scripts/create_index.py --recreate --confirm-recreate
+```
+
+---
+
+## Hybrid sparse-dense retrieval (evaluated, deferred) (T3-B / P3)
+
+### What hybrid retrieval is
+
+Dense retrieval (used in this project) represents queries and documents as
+continuous embedding vectors and ranks by cosine similarity.  It captures semantic
+relationships but can miss exact-match terms.
+
+Hybrid retrieval combines dense scores with sparse BM25 scores using a linear
+interpolation parameter α:
+
+```
+score_hybrid = α * score_dense + (1 - α) * score_sparse
+```
+
+Pinecone's integrated embedding API supports hybrid queries via a `sparse_vector`
+field alongside the dense query vector, making the plumbing straightforward.
+
+### Why it was evaluated and deferred
+
+Hybrid retrieval was evaluated as a candidate tier-3 enhancement.  The decision
+to defer (not implement) is based on the following analysis:
+
+**Arguments for hybrid:**
+- Precision improvement on queries with rare proper nouns (author names, arXiv IDs,
+  model names like "Gemma-3") that embeddings generalize away.
+- Free to experiment with via Pinecone's `sparse_vector` parameter — no new
+  infrastructure required.
+- α is tunable: α=1.0 degrades to pure dense, so the risk of regression is bounded.
+
+**Arguments for deferral:**
+- The eval corpus (`WIKI_TITLES` + arXiv/OpenAlex abstracts) is dominated by
+  well-known concepts that the dense embedder (`llama-text-embed-v2`) handles well.
+  Measured recall@10 on the current golden set is ≥ 0.80 without hybrid.
+- BM25 index population adds a separate ingestion step (or requires Pinecone's
+  built-in sparse encoder, which requires a distinct index type in some SDK versions).
+- Tuning α without a larger held-out set risks overfitting the golden test set.
+- The most impactful open retrieval gap is query expansion / HyDE, not sparse
+  term matching.
+
+**Decision:** defer hybrid until the golden set is large enough (≥ 50 queries with
+diverse recall failure modes) to reliably distinguish a 5–10 pp recall improvement
+from measurement noise.
+
+### If hybrid is implemented later
+
+1. Decide index type: Pinecone dotproduct-metric index (required for hybrid) vs.
+   current cosine-metric index.  cosine + hybrid is not supported in all SDK versions.
+2. Add BM25 encoding step in `setup_corpus.py` / ingestors to populate `sparse_values`.
+3. Update `pinecone_store.search()` to pass `sparse_vector` when `alpha < 1.0`.
+4. Add `RAG_HYBRID_ALPHA` to `Settings` (default 1.0 = pure dense, backward compatible).
+5. Extend the golden set with ≥ 10 proper-noun queries before measuring impact.

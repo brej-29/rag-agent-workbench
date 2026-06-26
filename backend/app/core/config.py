@@ -35,6 +35,25 @@ class Settings(BaseSettings):
             "For example, set to 'content' if your index field_map uses that name."
         ),
     )
+    # Embedding model and dimension used to CREATE the index (scripts/create_index.py)
+    # and VERIFIED at startup (pinecone_store.init_pinecone logs the live values from
+    # pc.describe_index — T1.1).  Changing either requires recreating the index.
+    PINECONE_EMBED_MODEL: str = Field(
+        default="llama-text-embed-v2",
+        description=(
+            "Pinecone integrated embedding model.  Must match the model the index "
+            "was created with.  Used by scripts/create_index.py and logged at "
+            "startup for drift detection."
+        ),
+    )
+    PINECONE_EMBED_DIMENSION: int = Field(
+        default=1024,
+        description=(
+            "Vector dimension of the Pinecone integrated embedding index.  "
+            "llama-text-embed-v2 supports 384–2048; 1024 is the default and "
+            "the value in use.  Changing this requires full index recreation."
+        ),
+    )
 
     # Logging
     LOG_LEVEL: str = Field(default="INFO", description="Application log level")

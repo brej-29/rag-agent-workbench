@@ -14,7 +14,7 @@ MAILTO       ?=
 CANDIDATES   ?= 20
 RERANK_MODEL ?= bge-reranker-v2-m3
 
-.PHONY: eval-corpus eval eval-ab eval-ab-topk eval-sweep test help
+.PHONY: eval-corpus eval eval-ab eval-ab-topk eval-sweep corpus-manifest corpus-verify test help
 
 ## help: Print this help message.
 help:
@@ -76,6 +76,22 @@ eval-sweep:
 	$(PYTHON) eval/run_sweep.py \
 		--namespace $(EVAL_NS) \
 		--golden $(GOLDEN)
+
+## corpus-manifest: Snapshot the live eval-namespace index into eval/corpus_manifest.json.
+##   READ-ONLY — no upserts or deletes.  ON-DEMAND only (not in CI).
+##   Run this once after `make eval-corpus` and re-run whenever the corpus changes.
+##   Override namespace:  make corpus-manifest EVAL_NS=staging
+corpus-manifest:
+	@echo ">>> Snapshotting eval corpus manifest (namespace='$(EVAL_NS)')..."
+	$(PYTHON) eval/corpus_manifest.py generate --namespace $(EVAL_NS)
+
+## corpus-verify: Compare the committed manifest to the live index and report drift.
+##   READ-ONLY — no upserts or deletes.  ON-DEMAND only (not in CI).
+##   Exit code 0 means no drift; exit code 1 means missing/extra doc_ids found.
+##   Override namespace:  make corpus-verify EVAL_NS=staging
+corpus-verify:
+	@echo ">>> Verifying eval corpus manifest (namespace='$(EVAL_NS)')..."
+	$(PYTHON) eval/corpus_manifest.py validate --namespace $(EVAL_NS)
 
 ## test: Run CI-safe unit tests (zero network calls).
 test:

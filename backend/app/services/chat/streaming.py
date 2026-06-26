@@ -105,10 +105,13 @@ def _build_done_payload(state: Dict, total_ms: float, *, cached: bool = False) -
     total_completion = sum(int((v or {}).get("completion_tokens") or 0) for v in by_call.values())
     total_tokens = total_prompt + total_completion
 
-    settings = get_settings()
+    try:
+        groq_model = get_settings().GROQ_MODEL
+    except Exception:
+        groq_model = ""
     usage: Optional[Dict] = None
     if total_tokens > 0 or by_call:
-        cost = estimate_cost_usd(total_prompt, total_completion, settings.GROQ_MODEL)
+        cost = estimate_cost_usd(total_prompt, total_completion, groq_model)
         usage = {
             "prompt_tokens": total_prompt,
             "completion_tokens": total_completion,

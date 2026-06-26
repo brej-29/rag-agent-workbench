@@ -1,3 +1,10 @@
+[project]
+name = "rag-agent-workbench"
+version = "0.1.0"
+description = "Production-style RAG backend with LangGraph, Pinecone, and Groq"
+requires-python = ">=3.11"
+dependencies = []
+
 [tool.pytest.ini_options]
 # Add both repo root (for `from eval.metrics import ...`) and backend/
 # (for `from app.services... import ...`) to sys.path before collection.

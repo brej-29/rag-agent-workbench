@@ -154,10 +154,6 @@ def _render_quality_indicator(response: Dict[str, Any]) -> None:
         return
 
     if grounded is None:
-        st.info(
-            "Faithfulness: **not evaluated** (RAG_FAITHFULNESS_ENABLED is OFF).",
-            icon="ℹ️",
-        )
         return
 
     score_str = f"  Score: {faithfulness_score:.2f}" if faithfulness_score is not None else ""
@@ -351,6 +347,17 @@ def render_sidebar(backend_base_url: str, api_key: Optional[str]) -> Dict[str, A
 
         if st.button("Clear chat"):
             st.session_state.messages = []
+
+        # Faithfulness mode indicator — derived from the last assistant response.
+        # grounded=None means the faithfulness judge did not run this session.
+        assistant_msgs = [
+            m for m in st.session_state.get("messages", []) if m.get("role") == "assistant"
+        ]
+        if assistant_msgs:
+            last_grounded = assistant_msgs[-1].get("grounded")
+            if last_grounded is None:
+                st.markdown("---")
+                st.caption("Grounding verification: off — answers are not grounding-checked.")
 
         st.markdown("---")
         st.subheader("Recent uploads")

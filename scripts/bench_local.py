@@ -2,7 +2,7 @@ import argparse
 import asyncio
 import statistics
 import time
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 
@@ -77,7 +77,13 @@ async def _run_load_test(
     concurrency: int,
     total_requests: int,
     api_key: str | None,
+    transport: Optional[Any] = None,
 ) -> Dict[str, Any]:
+    """Run a load test against /chat.
+
+    transport: optional httpx transport (e.g. httpx.ASGITransport) for in-process
+               testing without a real HTTP server.  When None, uses real TCP.
+    """
     url = f"{base_url.rstrip('/')}/chat"
     payload: Dict[str, Any] = {
         "query": "Briefly explain retrieval-augmented generation.",
@@ -94,7 +100,11 @@ async def _run_load_test(
     latencies: List[float] = []
     errors = 0
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    client_kwargs: Dict[str, Any] = {"timeout": 30.0}
+    if transport is not None:
+        client_kwargs["transport"] = transport
+
+    async with httpx.AsyncClient(**client_kwargs) as client:
         tasks = [
             _run_one_request(client, "POST", url, payload, headers, semaphore)
             for _ in range(total_requests)

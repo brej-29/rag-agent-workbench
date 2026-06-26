@@ -18,6 +18,11 @@ def chunk_document(
     return chunks
 
 
+# Belt-and-suspenders safety cap: the primary splitter (chunk_size=900) means
+# no chunk normally reaches 6000 chars, so this branch is dead under current
+# settings.  Kept intentionally — if chunk_size is ever raised above 6000 the
+# truncation guard activates automatically without a code change, preventing
+# silent context-window overruns for llama-text-embed-v2 (2048-token limit).
 MAX_CHARS_PER_CHUNK = 6000
 
 

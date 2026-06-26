@@ -1,6 +1,7 @@
 <div align="center">
   <h1>🧠 rag-agent-workbench</h1>
-  <p><i>Lightweight, production-style RAG backend with a Streamlit chatbot frontend — built for Pinecone, Groq, and LangGraph/LangChain.</i></p>
+  <p><i>Production-style RAG backend with a 7-node LangGraph pipeline, cosine-gated abstention,
+  corrective retrieval, two-layer faithfulness checking, and honest token streaming.</i></p>
 </div>
 
 <br>
@@ -11,81 +12,95 @@
   <img alt="Vector Store" src="https://img.shields.io/badge/Vector%20Store-Pinecone-3776AB">
   <img alt="Frameworks" src="https://img.shields.io/badge/Frameworks-LangChain%20%7C%20LangGraph-ff9800">
   <img alt="Frontend" src="https://img.shields.io/badge/Frontend-Streamlit-ff4b4b">
+  <img alt="Tests" src="https://img.shields.io/badge/Tests-343%20passing-brightgreen">
   <img alt="License" src="https://img.shields.io/badge/License-MIT-black">
 </div>
 
-<div align="center">
-  <br>
-  <b>Built with the tools and technologies:</b>
-  <br><br>
-  <code>Python</code> |
-  <code>FastAPI</code> |
-  <code>Pinecone</code> |
-  <code>LangChain</code> |
-  <code>LangGraph</code> |
-  <code>Groq</code> |
-  <code>Streamlit</code> |
-  <code>Docling</code> |
-  <code>httpx</code>
-</div>
+---
+
+## What this is
+
+An agentic RAG system built as a deliberate engineering exercise: every design decision is
+measurement-driven, every limitation is documented, and every feature ships with a test.
+
+**Stack:** FastAPI · LangGraph/LangChain · Pinecone (`llama-text-embed-v2`, 1024-dim) · Groq
+(LLaMA 3.1 8B) · Tavily · Streamlit · Prometheus · Docker
+
+**Standout decisions** (details in [`docs/DESIGN.md`](docs/DESIGN.md)):
+- **Eval-first:** retrieval evaluation harness built before any parameter was tuned; labels
+  set by reading documents, not by running the retriever (anti-circular-validation).
+- **Reranking measured and disabled:** `bge-reranker-v2-m3` A/B tested — nDCG@3 fell 0.057,
+  +435 ms latency, no tradeoff found. `RAG_RERANK_ENABLED=False` is empirically validated.
+- **top_k=5, precision-first:** the recall-margin knee is k=8 (recall@8=0.97), but k=5
+  (P@5=0.36 vs P@8=0.24) delivers higher-signal context. Tiebreaker: an answer-quality eval
+  that doesn't yet exist.
+- **Cosine floor = 0.20, data-derived:** set below the 0.2368 minimum cosine score of any
+  golden-relevant chunk — a safety bound, not a tuned optimum.
+- **Bounded CRAG:** hard `max_iters=2` loop guard, disabled by default on a saturated corpus.
+- **Honest streaming:** `llm.astream` for real TTFT; cache hits and abstentions are served
+  honestly with explicit `done.cached` / `insufficient_context` flags — never fake word-splits.
 
 ---
 
-## Table of Contents
+## Architecture
 
-- [Overview](#overview)
-- [Features](#features)
-- [Getting Started](#getting-started)
-  - [Backend](#backend)
-  - [Frontend](#frontend)
-- [Project Structure](#project-structure)
-- [Documentation](#documentation)
-- [License](#license)
-- [Contact](#contact)
+```mermaid
+flowchart TD
+    Client(["Client\n(HTTP / Streamlit)"])
+
+    subgraph FastAPI["FastAPI (backend/app)"]
+        MW["Middleware\nCORS · Auth · Rate limit · Prometheus · Cache"]
+        ROUTER["/chat · /chat/stream\n/search · /ingest · /metrics"]
+    end
+
+    subgraph LangGraph["LangGraph Pipeline"]
+        N1["normalize_input\n(defaults, history)"]
+        N2["contextualize_query\n(multi-turn rewrite — flag)"]
+        N3["retrieve_context\n(Pinecone top-k)"]
+        N4["corrective_retrieve\n(CRAG grade → rewrite — flag)"]
+        N5{"decide_next\n(top_score < RAG_MIN_SCORE?)"}
+        N6["web_search\n(Tavily — optional)"]
+        N7["generate_answer\nCosine floor RAG_MIN_CHUNK_SCORE=0.20\nUsable context? No → ABSTAIN"]
+        N8["format_response\nverify_citations (always)\njudge_faithfulness (flag)"]
+    end
+
+    subgraph External["External Services"]
+        PC[("Pinecone\nllama-text-embed-v2\n1024-dim cosine")]
+        GR[("Groq\nLLaMA 3.1 8B")]
+        TV[("Tavily\nWeb Search")]
+        LS[("LangSmith\nTracing — optional")]
+    end
+
+    ABSTAIN(["Abstention\ninsufficient_context=True\nno LLM call"])
+    RESP(["ChatResponse\nanswer · sources · timings\ngrounded · faithfulness_score\nusage · crag_iterations"])
+
+    Client --> MW --> ROUTER
+    ROUTER --> N1 --> N2 --> N3 --> N4 --> N5
+    N5 -- "yes (web fallback)" --> N6 --> N7
+    N5 -- "no" --> N7
+    N7 -- "no usable context" --> ABSTAIN
+    N7 -- "context OK" --> GR
+    GR --> N8 --> RESP
+    RESP --> Client
+
+    N3 <--> PC
+    N6 <--> TV
+    N8 -.->|faithfulness judge| GR
+    N8 -.->|traces| LS
+```
+
+> **Node-to-code mapping:**
+> `normalize_input` · `contextualize_query` · `retrieve_context` · `corrective_retrieve` ·
+> `decide_next` · `generate_answer` · `format_response` — all in
+> [`backend/app/services/chat/graph.py`](backend/app/services/chat/graph.py)
 
 ---
+
 ## Screenshot
 
 <img width="1919" height="967" alt="image" src="https://github.com/user-attachments/assets/fe979aa1-b125-415c-9a1d-64a96289af87" />
 
 <img width="1918" height="896" alt="image" src="https://github.com/user-attachments/assets/1d40bb2b-f477-4741-8014-0b2c2a7356bf" />
-
-<img width="1625" height="848" alt="image" src="https://github.com/user-attachments/assets/0967d39d-76ac-4d85-a983-6bf0922f1b9d" />
-
----
-## Overview
-
-This repository contains a lightweight RAG backend built with FastAPI, Pinecone (integrated embeddings), and LangGraph/LangChain for agentic RAG flows, plus a Streamlit chatbot frontend.
-
-At a high level:
-
-- The **backend** exposes ingestion, semantic search, and production-style RAG chat endpoints (with optional web-search fallback, rate limiting, caching, metrics, and API key protection).
-- The **frontend** is a Streamlit chatbot UI that talks to the backend `/chat` endpoint, supports streaming responses, and offers a modal-based document upload workflow that ingests local files via `/documents/upload-text`.
-
----
-
-## Features
-
-- **Backend API**
-  - FastAPI-based RAG backend with Pinecone integrated embeddings.
-  - Agentic RAG chat powered by LangGraph and LangChain.
-  - Groq LLM integration via OpenAI-compatible API.
-  - Optional Tavily web-search fallback.
-  - Ingestion endpoints for arXiv, OpenAlex, Wikipedia, and manual text uploads.
-  - Caching, rate limiting, metrics endpoint, and API key protection for secured deployments.
-  - Dockerized backend suitable for Hugging Face Spaces.
-
-- **Frontend (Streamlit)**
-  - Chatbot UI using `st.chat_message` and `st.chat_input`.
-  - Streaming support via `/chat/stream` when available, with automatic fallback to `/chat`.
-  - Sidebar controls for query behaviour (top_k, min_score, web fallback, show sources).
-  - Modal **Upload Document** dialog to convert and upload local PDFs/MD/TXT/Office/HTML files to the backend.
-  - Recent uploads panel with quick “Search this document” actions.
-
-- **Developer Experience**
-  - Simple configuration via `.env` and Streamlit secrets.
-  - Utility scripts for seeding, smoke tests, benchmarking, and Docling-based local ingestion.
-  - Clear work package history and operational runbook under `docs/`.
 
 ---
 
@@ -93,112 +108,68 @@ At a high level:
 
 ### Backend
 
-- Backend API: see [`backend/README.md`](backend/README.md) for setup, environment variables, API key protection, endpoint examples, and deployment instructions (including `/chat`, `/chat/stream`, `/metrics`, and Hugging Face Spaces notes).
+```bash
+cd backend
+pip install -r requirements.txt
+cp .env.example .env      # set PINECONE_*, GROQ_API_KEY; API_KEY optional
+uvicorn app.main:app --port 8000
+```
 
-Typical flow:
-
-1. Create a Python 3.11+ virtual environment.
-2. Install backend dependencies:
-
-   ```bash
-   cd backend
-   pip install -r requirements.txt
-   ```
-
-3. Copy `.env.example` → `.env` and configure:
-   - Pinecone (integrated embeddings).
-   - Groq LLM parameters.
-   - Optional Tavily, LangSmith, rate limiting, caching, and API key (`API_KEY`) for protected deployments.
-4. Run the backend locally:
-
-   ```bash
-   uvicorn app.main:app --reload --port 8000
-   ```
-
-5. Browse:
-   - `http://localhost:8000/health`
-   - `http://localhost:8000/docs`
+Browse: `http://localhost:8000/health` · `http://localhost:8000/docs`
 
 ### Frontend
 
-- Frontend: Streamlit chat app under [`frontend/app.py`](frontend/app.py) intended for Streamlit Community Cloud or local runs.
-
-For local usage:
-
 ```bash
-pip install -r requirements.txt  # root requirements (Streamlit + frontend deps)
+pip install -r requirements.txt   # root (Streamlit)
 streamlit run frontend/app.py
 ```
 
-Configure:
+Set `BACKEND_BASE_URL` and (if the backend is protected) `API_KEY` in
+`.streamlit/secrets.toml` or environment variables.
 
-- `BACKEND_BASE_URL` (e.g. `http://localhost:8000` or your HF Space URL).
-- `API_KEY` (if the backend is protected) via:
-  - `st.secrets` in `.streamlit/secrets.toml`, or
-  - environment variables.
+### Tests
+
+```bash
+pytest tests/ -v        # 343 tests, zero network, zero credentials
+```
 
 ---
 
 ## Project Structure
 
-- Backend API: see [`backend/README.md`](backend/README.md) for setup, environment variables, API key protection, endpoint examples, and deployment instructions (including `/chat`, `/chat/stream`, `/metrics`, and Hugging Face Spaces notes).
-- Architecture and design context: see [`docs/CONTEXT.md`](docs/CONTEXT.md) for work package history, security hardening notes, and operational runbook.
-- Frontend: Streamlit chat app under [`frontend/app.py`](frontend/app.py) intended for Streamlit Community Cloud or local runs.
-- Utility scripts: see the `scripts/` directory for ingestion, smoke-test helpers, Docling-based local ingestion, and benchmarking (including `scripts/bench_local.py`).
-
-A high-level layout:
-
 ```text
 rag-agent-workbench/
-├─ backend/            # FastAPI app, core logic, routers, services, config
-├─ frontend/           # Streamlit chatbot UI
-├─ docs/               # Context, worklog, and design documentation
-├─ scripts/            # Ingestion, smoke tests, benchmark, and docling helpers
-├─ requirements.txt    # Frontend / root-level dependencies
-├─ backend/requirements.txt  # Backend dependencies
-├─ LICENSE
-└─ README.md
+├─ backend/
+│  ├─ app/
+│  │  ├─ routers/        # chat, search, ingest, metrics, health
+│  │  ├─ services/       # chat/graph.py (LangGraph), pinecone_store, llm, rerank, crag, …
+│  │  ├─ core/           # config, auth, cache, rate_limit, prometheus_metrics, …
+│  │  └─ schemas/        # Pydantic models (ChatResponse, SourceHit, …)
+│  ├─ requirements.in    # loose intent
+│  └─ requirements.txt   # pinned lock (uv pip compile)
+├─ frontend/app.py       # Streamlit chatbot UI
+├─ eval/                 # retrieval harness, golden.jsonl, corpus manifest
+├─ tests/                # 343 tests — unit + integration
+├─ scripts/              # bench_local.py, bench_mocked.py, smoke tests
+└─ docs/
+   ├─ DESIGN.md          # ← design decisions + limitations (start here)
+   ├─ CONTEXT.md         # full decision log, work package history, runbook
+   └─ LOAD_TEST.md       # in-process benchmark report
 ```
 
 ---
 
 ## Documentation
 
-- **Backend API & operations**  
-  See [`backend/README.md`](backend/README.md) for:
-  - Environment variables and configuration.
-  - Endpoint catalogue (ingest, search, chat, metrics).
-  - Hugging Face Spaces deployment notes.
-  - LangSmith, Tavily, Groq, and Pinecone configuration.
-
-- **Architecture & work packages**  
-  See [`docs/CONTEXT.md`](docs/CONTEXT.md) for:
-  - Overall architecture and design decisions.
-  - Work package history (A/B/C, security + UI + ingestion).
-  - Operational runbook (key rotation, toggling rate limiting/caching, diagnosing issues).
-
-- **Worklog**  
-  See [`docs/WORKLOG.md`](docs/WORKLOG.md) for a chronological summary of changes and key files per work package.
+| Document | What it covers |
+|---|---|
+| **[`docs/DESIGN.md`](docs/DESIGN.md)** | Design decisions, tradeoffs, limitations — the engineering story |
+| [`docs/CONTEXT.md`](docs/CONTEXT.md) | Full decision log, eval results, dependency management, runbook |
+| [`docs/LOAD_TEST.md`](docs/LOAD_TEST.md) | In-process benchmark report (framework overhead, GIL analysis) |
+| [`backend/README.md`](backend/README.md) | API catalogue, env vars, HF Spaces deployment |
 
 ---
 
 ## License
 
-This project is licensed under the **MIT License**.  
-See the [`LICENSE`](LICENSE) file for details.
-
----
-
-## Contact
-
-For questions, suggestions, or collaboration:
-
-- Open an issue or discussion in this repository.
-- Refer to the maintainers listed in project documentation or commit history. rag-agent-workbench
-
-This repository contains a lightweight RAG backend built with FastAPI, Pinecone (integrated embeddings), and LangGraph/LangChain for agentic RAG flows, plus a minimal Streamlit frontend.
-
-- Backend API: see [`backend/README.md`](backend/README.md) for setup, environment variables, endpoint examples, and deployment instructions (including `/chat`, `/chat/stream`, `/metrics`, and Hugging Face Spaces notes).
-- Architecture and design context: see [`docs/CONTEXT.md`](docs/CONTEXT.md) for work package history and operational runbook.
-- Frontend: minimal Streamlit app under [`frontend/app.py`](frontend/app.py) intended for Streamlit Community Cloud or local runs.
-- Utility scripts: see the `scripts/` directory for ingestion, smoke tests, and benchmarking helpers (including `scripts/bench_local.py`).
+MIT — see [`LICENSE`](LICENSE).

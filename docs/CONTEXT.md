@@ -2057,3 +2057,171 @@ are not incremented.
 | `backend/app/routers/chat.py` | Build `ChatTokenUsage` from state in `_build_chat_response`; call `record_token_usage()` after pipeline |
 | `tests/test_faithfulness.py` | Updated `TestFormatResponse` mocks: `judge_faithfulness` → `judge_faithfulness_with_usage` (return value changed to `(verdict, {})` tuple) |
 | `tests/test_cost_accounting.py` | **New** — 19 CI-safe tests: token extraction from response paths, mock zeros safety, accumulation across iterations and call types, cost arithmetic, Prometheus counter increments |
+---
+
+## Streaming (T2.9)
+
+### Problem
+
+The previous `/chat/stream` ran the full LangGraph pipeline synchronously (blocking, TTFT ==
+request latency), then split the completed answer string on whitespace and yielded each word as
+a bare `data: word\n\n` SSE event.  TTFT was not improved â€” the endpoint misrepresented itself
+as a streaming endpoint.
+
+### Solution: generation-scoped true token streaming
+
+Streaming is scoped to **the generation LLM call only**.  Earlier pipeline nodes (retrieval,
+CRAG, contextualize, web search) are I/O-bound and complete before the first token is useful;
+making the full graph async-native would add complexity for no meaningful TTFT benefit.
+
+Architecture (three phases, all via the new `backend/app/services/chat/streaming.py`):
+
+**Phase 1 â€” Pre-generation (synchronous, in threadpool):**
+  `normalize_input â†’ contextualize_query â†’ retrieve_context â†’ corrective_retrieve â†’
+  decide_next â†’ [web_search]`
+  All T2.x pipeline logic (CRAG, T2.5 contextualize, cosine floor, web fallback) runs
+  unchanged via direct node function calls â€” identical logic to the compiled LangGraph.
+
+**Phase 2 â€” Token streaming (async):**
+  `llm.astream(messages)` â€” each generated token is forwarded to the client as it arrives,
+  giving real TTFT improvement.
+
+**Phase 3 â€” Post-generation (synchronous, in threadpool):**
+  `format_response` (deterministic citation check + optional faithfulness judge), token
+  accounting, Prometheus recording.  The final `done` event is emitted AFTER these steps so
+  grounding and cost data are accurate.
+
+### SSE event protocol
+
+Three event types (stable interface for frontend and API consumers):
+
+```
+# Token event â€” one per LLM-generated text fragment; zero or more
+event: token
+data: {"text": "<token text>"}
+
+# Done/metadata event â€” exactly one, after the stream completes
+event: done
+data: {
+    "answer": "<full assembled answer>",
+    "sources": [...],
+    "timings": {"retrieve_ms": â€¦, "rerank_ms": â€¦, "web_ms": â€¦,
+                "generate_ms": â€¦, "faithfulness_ms": â€¦, "total_ms": â€¦},
+    "trace": {"trace_enabled": â€¦, "langsmith_project": â€¦},
+    "insufficient_context": false,
+    "grounded": true | false | null,
+    "faithfulness_score": 0.92 | null,
+    "unverified_citations": [],
+    "crag_iterations": 0,
+    "corrective_action": null,
+    "contextualized_query": null,
+    "usage": {"prompt_tokens": â€¦, "completion_tokens": â€¦, "total_tokens": â€¦,
+              "estimated_cost_usd": â€¦, "by_call_type": {â€¦}} | null,
+    "cached": false,
+    "top_score": 0.85,
+    "web_fallback_used": false
+}
+
+# Error event â€” exactly one on failure; no done event follows
+event: error
+data: {"message": "<human-readable error>"}
+```
+
+### Explicit non-streamable paths
+
+These paths are HONEST â€” they do NOT fake token streaming:
+
+| Path | Token events | LLM called? | done.cached |
+|---|---|---|---|
+| Cache hit | One token event with the full cached answer | No | `true` |
+| Empty-context abstention (T1.3) | One token event with ABSTENTION_ANSWER | No | `false` |
+| Generation error | Zero â€” `error` event instead | Failed | N/A |
+
+### Relationship to existing features
+
+- **`/chat` (non-streaming)**: unchanged; still uses the compiled LangGraph via `graph.invoke`.
+- **Caching**: `/chat/stream` now checks the cache (same rule as `/chat`: only when no
+  `chat_history`). Cache hits are served honestly without an LLM call.
+- **T2.7 token accounting**: generation tokens are captured from the final streaming chunk via
+  `extract_token_usage`; faithfulness/CRAG/contextualize tokens accumulate via the same
+  `_accumulate_token_usage` mechanism as in the non-streaming path.
+- **T2.3 faithfulness**: runs AFTER the token stream, BEFORE the `done` event â€” so
+  `grounded` and `faithfulness_score` in the done payload are accurate, not deferred.
+
+### `_prepare_generation_inputs` refactor
+
+`generate_answer` in `graph.py` had its pre-LLM work extracted into a new module-level
+function `_prepare_generation_inputs(state)` (returns `(should_abstain, usable_sources,
+messages)`).  `generate_answer` delegates to it and then calls `llm.invoke`; the streaming
+path calls the same function and then calls `llm.astream`.  Behavior of `generate_answer`
+is unchanged; existing tests pass without modification.
+
+### Files changed
+
+| File | Change |
+|---|---|
+| `backend/app/services/chat/streaming.py` | **New** â€” streaming pipeline and SSE protocol |
+| `backend/app/services/chat/graph.py` | Extracted `_prepare_generation_inputs`; refactored `generate_answer` to call it |
+| `backend/app/routers/chat.py` | Replaced fake-streaming endpoint with real streaming via `stream_chat_response`; added cache check to streaming path |
+| `tests/test_streaming.py` | **New** â€” 19 CI-safe tests: multiple token events, cached/abstention no-LLM, done-event fields, error handling |
+
+---
+
+## Frontend / UI (T2.8)
+
+### What the UI now surfaces
+
+The Streamlit frontend (`frontend/app.py`) was updated to consume the T2.9 SSE protocol and
+render the observability data the backend has produced across Tier 2.
+
+#### T8.1 â€” Live token streaming
+`iter_chat_stream` now parses `event: token` / `event: done` / `event: error` frames
+(with legacy bare-data fallback for backward compatibility).  Tokens accumulate in the
+placeholder as they arrive; on `done`, the full observability payload is rendered.
+
+#### T8.2 â€” Sources/citations panel
+`_render_sources_panel(sources, web_fallback_used)` â€” collapsible expander showing each
+retrieved-and-kept chunk with its cosine score, title, URL, and truncated text.  Web sources
+are marked with a badge.  Only chunks that survived the cosine floor (the same ones the
+LLM used) are shown.
+
+#### T8.3 â€” Retrieval-debug panel
+`_render_retrieval_debug(response)` â€” collapsible expander showing:
+- Top cosine score from Pinecone, number of sources kept
+- CRAG iteration count and corrective action
+- T2.5 contextualized query (if it fired)
+- Latency breakdown: retrieve / generate / faithfulness ms
+- Whether Tavily web fallback was used
+- Whether the response was served from cache
+
+#### T8.4 â€” Grounding/quality indicator (four states)
+`_render_quality_indicator(response)` â€” rendered for every assistant turn (current + history).
+Five conditions, never collapsed:
+
+| Condition | UI |
+|---|---|
+| `insufficient_context=True` | `st.warning` â€” no usable context |
+| `grounded=False` | `st.error` â€” not well-supported |
+| `grounded=True` + unverified citations | `st.warning` â€” grounded but dangling refs |
+| `grounded=True` + no unverified | `st.success` â€” clean grounded |
+| `grounded=None` (flag OFF) | `st.info` â€” **"not evaluated"** (never fabricated) |
+
+**None â†’ "not evaluated"**: the UI never fabricates a value for absent fields.
+`grounded=None` means faithfulness was not evaluated; it is shown as "not evaluated",
+not as True or False.
+
+#### T8.5 â€” Token/cost display
+`_render_token_usage(usage)` â€” collapsible expander showing prompt/completion/total token
+counts and the estimated cost labeled explicitly as an **ESTIMATE**.  When `usage` is None
+(cached response), the section is not rendered â€” the UI never fabricates absent fields.
+
+### Session state persistence
+All observability fields are stored in `st.session_state.messages` alongside each assistant
+message, so `render_chat_history` can replay quality indicators, sources, debug panels, and
+token usage for scrolled-back messages without re-querying the backend.
+
+### Files changed
+
+| File | Change |
+|---|---|
+| `frontend/app.py` | Updated `iter_chat_stream` for T2.9 SSE protocol; added `_render_quality_indicator`, `_render_sources_panel`, `_render_retrieval_debug`, `_render_token_usage`, `_render_assistant_extras`; updated `render_chat_history` and `main` |

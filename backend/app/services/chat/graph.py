@@ -464,39 +464,34 @@ def web_search(state: ChatState, config: RunnableConfig | None = None) -> ChatSt
     return state
 
 
-def generate_answer(state: ChatState, config: RunnableConfig | None = None) -> ChatState:
-    """Generate an answer using the Groq-backed chat model.
+def _prepare_generation_inputs(
+    state: ChatState,
+) -> tuple[bool, list, list]:
+    """Apply cosine floor, optional rerank, and check for empty context.
 
-    Two new behaviours added here (routing in decide_next is unchanged):
+    Extracted from generate_answer so the streaming path can call it without
+    invoking the LLM — the streaming generator calls this synchronously, then
+    drives the LLM via llm.astream() itself.
 
-    1. Per-chunk score floor — Pinecone chunks are filtered by
-       settings.RAG_MIN_CHUNK_SCORE AFTER routing has already read top_score from
-       the unfiltered hit list.  Tavily web results bypass filtering (no comparable
-       cosine score).
+    Mutates state["retrieved"] and state["timings"] in place.
 
-    2. Empty-context guard — if no usable context survives filtering + web results,
-       a deterministic abstention (ABSTENTION_ANSWER) is returned WITHOUT calling
-       the Groq LLM.  Calling an LLM with empty context is the failure mode being
-       removed by this step.
+    Returns:
+        (should_abstain, usable_sources, messages)
+        If should_abstain=True, state["answer"] and state["insufficient_context"]
+        are already set; usable_sources and messages are empty lists.
     """
     settings = get_settings()
     timings = _ensure_timings(state)
 
-    # --- Stage 1: cosine floor (Pinecone chunks only) ---
-    # Routing in decide_next already read top_score from the full retrieved list;
-    # we are safe to filter state["retrieved"] here without affecting routing.
-    # Web results are NOT filtered — they carry no cosine score.
-    # IMPORTANT: the floor uses RAG_MIN_CHUNK_SCORE which is cosine-calibrated.
-    # It runs BEFORE reranking so only meaningful cosine-scored chunks reach the
-    # reranker.  Rerank scores live on a different scale — never threshold them.
+    # Stage 1: cosine floor (Pinecone chunks only).
+    # Routing in decide_next already read top_score from the full retrieved
+    # list, so filtering here is safe.  Web results bypass filtering (no score).
     filtered_pinecone = filter_chunks_by_score(
         state.get("retrieved") or [], settings.RAG_MIN_CHUNK_SCORE
     )
     state["retrieved"] = filtered_pinecone
 
-    # --- Stage 2: hosted rerank (when enabled) ---
-    # OFF path: byte-for-byte identical to baseline; rerank_chunks is NOT called.
-    # ON path: rerank the cosine-floor survivors and take the top_k result.
+    # Stage 2: hosted rerank (gated by RAG_RERANK_ENABLED).
     top_k = state.get("top_k") or settings.RAG_DEFAULT_TOP_K
     if settings.RAG_RERANK_ENABLED and filtered_pinecone:
         rerank_start = perf_counter()
@@ -515,7 +510,6 @@ def generate_answer(state: ChatState, config: RunnableConfig | None = None) -> C
     web_results = state.get("web_results") or []
     usable_sources = filtered_pinecone + web_results
 
-    # --- Empty-context guard: deterministic abstention, no LLM call ---
     if not usable_sources:
         state["answer"] = ABSTENTION_ANSWER
         state["insufficient_context"] = True
@@ -529,16 +523,30 @@ def generate_answer(state: ChatState, config: RunnableConfig | None = None) -> C
             len(web_results),
             settings.RAG_MIN_CHUNK_SCORE,
         )
-        return state
+        return True, [], []
 
-    # --- Normal path: context exists, call Groq ---
     messages = build_rag_messages(
         chat_history=state.get("chat_history") or [],
         question=state["query"],
         sources=usable_sources,
     )
+    return False, usable_sources, messages
+
+
+def generate_answer(state: ChatState, config: RunnableConfig | None = None) -> ChatState:
+    """Generate an answer using the Groq-backed chat model.
+
+    Two behaviours:
+    1. Per-chunk score floor + optional rerank (delegated to _prepare_generation_inputs).
+    2. Empty-context guard — if no usable context survives, a deterministic
+       abstention is returned WITHOUT calling the LLM.
+    """
+    should_abstain, _usable_sources, messages = _prepare_generation_inputs(state)
+    if should_abstain:
+        return state
 
     llm = get_llm()
+    timings = _ensure_timings(state)
     start = perf_counter()
     try:
         response = llm.invoke(messages, config=config or {})

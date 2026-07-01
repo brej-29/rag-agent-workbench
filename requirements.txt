@@ -43,7 +43,7 @@ cuda-bindings==13.3.1
     # via torch
 cuda-pathfinder==1.5.5
     # via cuda-bindings
-cuda-toolkit==13.0.2
+cuda-toolkit[cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.2
     # via torch
 defusedxml==0.7.1
     # via
@@ -53,7 +53,7 @@ dill==0.4.1
     # via multiprocess
 docling==2.107.0
     # via -r requirements.in
-docling-core==2.84.0
+docling-core[chunking]==2.84.0
     # via
     #   docling-ibm-models
     #   docling-parse
@@ -62,7 +62,7 @@ docling-ibm-models==3.13.3
     # via docling-slim
 docling-parse==7.0.0
     # via docling-slim
-docling-slim==2.107.0
+docling-slim[standard]==2.107.0
     # via docling
 et-xmlfile==2.0.0
     # via openpyxl
@@ -143,7 +143,7 @@ markupsafe==3.0.3
     # via jinja2
 mdurl==0.1.2
     # via markdown-it-py
-mpire==2.10.2
+mpire[dill]==2.10.2
     # via semchunk
 mpmath==1.3.0
     # via sympy
@@ -322,7 +322,7 @@ rtree==1.4.1
     # via
     #   docling-ibm-models
     #   docling-slim
-safetensors==0.8.0
+safetensors[numpy,torch]==0.8.0
     # via
     #   accelerate
     #   docling-ibm-models
@@ -331,8 +331,6 @@ scipy==1.18.0
     # via docling-slim
 semchunk==3.2.5
     # via docling-core
-setuptools==81.0.0
-    # via torch
 shapely==2.1.2
     # via rapidocr
 shellingham==1.5.4
@@ -401,7 +399,6 @@ typer==0.19.2
     #   docling-slim
 typing-extensions==4.15.0
     # via
-    #   altair
     #   beautifulsoup4
     #   docling-core
     #   huggingface-hub

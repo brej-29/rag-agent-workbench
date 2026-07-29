@@ -5,7 +5,7 @@
 #
 # Compiled file: backend/requirements.txt (fully pinned, incl. transitive deps)
 
-fastapi==0.128.0
+fastapi==0.140.13
 uvicorn[standard]
 pydantic-settings
 python-dotenv

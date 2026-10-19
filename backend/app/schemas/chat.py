@@ -234,8 +234,12 @@ class ChatResponse(BaseModel):
         default=None,
         description=(
             "Action taken by the CRAG loop, or None when no correction occurred.  "
-            "Current value: 'rewrite' (query was rewritten via LLM and Pinecone was "
-            "re-queried).  None when RAG_CRAG_ENABLED is False or retrieval was graded good."
+            "'rewrite' (query was rewritten via LLM and Pinecone was re-queried); "
+            "'rewrite_rejected:<empty|refusal|answer|new_facts>' (the rewriter returned "
+            "something other than a search query, so the original retrieval was kept); "
+            "'skipped:instruction_override' (the query reads as an instruction override and "
+            "is never sent to the rewriter).  None when RAG_CRAG_ENABLED is False or "
+            "retrieval was graded good."
         ),
     )
     contextualized_query: Optional[str] = Field(

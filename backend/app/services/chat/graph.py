@@ -11,7 +11,13 @@ from app.core.errors import UpstreamServiceError
 from app.core.logging import get_logger
 from app.schemas.chat import ChatRequest
 from app.services.contextualize import contextualize_followup
-from app.services.crag import grade_retrieval, rewrite_query, rewrite_query_with_usage
+from app.services.crag import (
+    grade_retrieval,
+    looks_like_instruction_override,
+    rewrite_query,
+    rewrite_query_with_usage,
+    validate_rewrite,
+)
 from app.services.faithfulness import (
     FaithfulnessVerdict,
     judge_faithfulness,
@@ -313,6 +319,12 @@ def corrective_retrieve(state: ChatState, config: RunnableConfig | None = None) 
             )
             break
 
+        # Rewrite guard (1/2): never hand instruction-override text to the rewriter.
+        if looks_like_instruction_override(state["query"]):
+            state["corrective_action"] = "skipped:instruction_override"
+            logger.warning("CRAG rewrite skipped: query reads as an instruction override")
+            break
+
         state["crag_iterations"] = iteration + 1
         logger.info(
             "CRAG iteration=%d grade=weak top_score=%.4f threshold=%.4f -- rewriting query",
@@ -326,6 +338,14 @@ def corrective_retrieve(state: ChatState, config: RunnableConfig | None = None) 
         rewritten, rewrite_usage = rewrite_query_with_usage(current_query, llm)
         _accumulate_token_usage(state, "crag_rewrite", rewrite_usage)
         if rewritten != current_query:
+            # Rewrite guard (2/2): only a plain search query may replace the current
+            # one; otherwise keep the retrieval we have and stop correcting.
+            rejection = validate_rewrite(state["query"], rewritten)
+            if rejection:
+                if state["corrective_action"] != "rewrite":
+                    state["corrective_action"] = f"rewrite_rejected:{rejection}"
+                logger.warning("CRAG rewrite rejected (%s): %r", rejection, rewritten[:120])
+                break
             current_query = rewritten
             state["corrective_action"] = "rewrite"
 

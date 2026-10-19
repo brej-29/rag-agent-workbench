@@ -80,8 +80,26 @@ class Settings(BaseSettings):
         description="Groq OpenAI-compatible base URL",
     )
     GROQ_MODEL: str = Field(
-        default="llama-3.1-8b-instant",
-        description="Default Groq chat model used for /chat",
+        default="openai/gpt-oss-20b",
+        description=(
+            "Primary chat model (any OpenAI-compatible endpoint at GROQ_BASE_URL). "
+            "llama-3.1-8b-instant was shut down by Groq on 2026-08-16."
+        ),
+    )
+    LLM_FALLBACK_MODELS: str = Field(
+        default="openai/gpt-oss-120b",
+        description=(
+            "Comma-separated models tried in order when the primary call fails "
+            "(model retired, 404, 429, timeout).  Same endpoint and key.  Empty disables."
+        ),
+    )
+    LLM_REASONING_EFFORT: str = Field(
+        default="low",
+        description=(
+            "reasoning_effort sent to reasoning models (gpt-oss: low|medium|high).  "
+            "'low' keeps judge/rewrite latency near non-reasoning models.  Empty = not sent "
+            "(required for non-reasoning models, which reject the parameter)."
+        ),
     )
 
     # Web search / Tavily

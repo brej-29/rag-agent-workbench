@@ -92,15 +92,25 @@ def _annex(anx: Tag, src: Source) -> List[dict]:
     title = " ".join(h for h in heads if not h.upper().startswith("ANNEX"))
     out = [{**common, "id": f"{src.prefix}/anx-{num}", "ref": f"{src.short} Annex {num}", "kind": "annex",
             "title": title, "text": _text(anx)}]
-    # Top-level numbered points: tables (OJ markup) or grid containers (consolidated markup).
-    for block in anx.find_all(["table", "div"], recursive=False):
-        if block.name == "div" and "grid-container" not in (block.get("class") or []):
+    # Top-level numbered points: tables (OJ markup), grid containers or plain divs (consolidated markup).
+    # Points restart in each section ("Section A", "Section B"), so the section is part of the id.
+    section = None
+    for block in anx.find_all(["p", "table", "div"], recursive=False):
+        if block.name == "p":
+            m = re.match(r"(?:Section|SECTION|Part|PART)\s+([A-Z0-9]+)\b", _text(block))
+            if m and "oj-normal" not in (block.get("class") or []) and "norm" not in (block.get("class") or []):
+                section = m.group(1)
             continue
-        first = block.find("td") if block.name == "table" else block.find("span")
-        label = first.get_text(strip=True).rstrip(".") if first else ""
+        if block.name == "table":
+            first = block.find("td")
+            label = first.get_text(strip=True).rstrip(".") if first else ""
+        else:
+            m = re.match(r"(\d+)\.\s", _text(block))
+            label = m.group(1) if m else ""
         if re.fullmatch(r"\d+", label):
-            out.append({**common, "id": f"{src.prefix}/anx-{num}/pt-{label}",
-                        "ref": f"{src.short} Annex {num}, point {label}", "kind": "annex_point",
+            sec_id, sec_ref = (f"/sec-{section}", f", Section {section}") if section else ("", "")
+            out.append({**common, "id": f"{src.prefix}/anx-{num}{sec_id}/pt-{label}",
+                        "ref": f"{src.short} Annex {num}{sec_ref}, point {label}", "kind": "annex_point",
                         "title": title, "text": _text(block)})
     if len(out) > 1:
         out[0]["text"] = " ".join(heads + [_text(p) for p in anx.find_all("p", class_=["oj-normal", "norm"], recursive=False)])

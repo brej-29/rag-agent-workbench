@@ -97,3 +97,21 @@ def test_consolidated_annex_grid_points():
     assert recs["eu-ai-act/anx-III/pt-2"]["text"] == "2. Critical infrastructure."
     assert recs["eu-ai-act/anx-III"]["title"] == "High-risk AI systems referred to in Article 6(2)"
     assert recs["eu-ai-act/anx-III"]["text"].startswith("ANNEX III High-risk AI systems referred to in Article 6(2)")
+
+
+SECTIONED = """<div class="eli-container" id="anx_VIII"><p class="title-annex-1">ANNEX VIII</p>
+<p class="title-annex-2">Information to be submitted upon registration</p>
+<p class="title-gr-seq-level-1">Section A — Information to be submitted by providers</p>
+<div class="grid-container grid-list"><div class="list grid-list-column-1"><span>1. </span></div>
+<div class="grid-list-column-2"><p class="norm">The name of the provider;</p></div></div>
+<p class="title-gr-seq-level-1">Section B. Information to be submitted by deployers</p>
+<div class="grid-container grid-list"><div class="list grid-list-column-1"><span>1. </span></div>
+<div class="grid-list-column-2"><p class="norm">The name of the deployer;</p></div></div>
+<div><p class="norm">2. A plain div point.</p></div></div>"""
+
+
+def test_sectioned_annex_points_are_unique_and_cite_their_section():
+    recs = {r["id"]: r for r in parse_eu(SECTIONED, AI)}
+    assert recs["eu-ai-act/anx-VIII/sec-A/pt-1"]["ref"] == "AI Act Annex VIII, Section A, point 1"
+    assert recs["eu-ai-act/anx-VIII/sec-B/pt-1"]["text"] == "1. The name of the deployer;"
+    assert recs["eu-ai-act/anx-VIII/sec-B/pt-2"]["text"] == "2. A plain div point."

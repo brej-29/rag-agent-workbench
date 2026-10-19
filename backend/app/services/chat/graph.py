@@ -262,6 +262,7 @@ def retrieve_context(state: ChatState, _config: RunnableConfig | None = None) ->
                 "url": url,
                 "score": hit_score,
                 "chunk_text": chunk_text,
+                "doc_id": str(fields.get("doc_id") or ""),
             }
         )
         top_score = max(top_score, hit_score)
@@ -372,6 +373,7 @@ def corrective_retrieve(state: ChatState, config: RunnableConfig | None = None) 
                 "url": str(fields.get("url") or ""),
                 "score": hit_score,
                 "chunk_text": chunk_text,
+                "doc_id": str(fields.get("doc_id") or ""),
             })
             new_top_score = max(new_top_score, hit_score)
 

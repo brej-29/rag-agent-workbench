@@ -79,3 +79,13 @@ def test_calibrate_reads_human_labels(tmp_path, capsys):
     assert calibrate(p) == 0
     out = capsys.readouterr().out
     assert "labelled=3" in out and "agreement=0.667" in out
+
+
+def test_resume_keeps_scored_rows_and_reruns_errors():
+    from eval.run_answers import split_resume
+
+    entries = [{"query": "a"}, {"query": "b"}, {"query": "c"}]
+    previous = [{"query": "a", "claim_recall": 1.0}, {"query": "b", "error": "429"}]
+    kept, todo = split_resume(entries, previous)
+    assert kept == {"a": {"query": "a", "claim_recall": 1.0}}
+    assert [e["query"] for e in todo] == ["b", "c"]

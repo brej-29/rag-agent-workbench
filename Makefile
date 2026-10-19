@@ -14,7 +14,7 @@ MAILTO       ?=
 CANDIDATES   ?= 20
 RERANK_MODEL ?= bge-reranker-v2-m3
 
-.PHONY: eval-corpus eval eval-ab eval-ab-topk eval-sweep corpus-manifest corpus-verify test help
+.PHONY: eval-corpus eval eval-ab eval-ab-topk eval-sweep corpus-manifest corpus-verify check-models test help
 
 ## help: Print this help message.
 help:
@@ -92,6 +92,10 @@ corpus-manifest:
 corpus-verify:
 	@echo ">>> Verifying eval corpus manifest (namespace='$(EVAL_NS)')..."
 	$(PYTHON) eval/corpus_manifest.py validate --namespace $(EVAL_NS)
+
+## check-models: Fail if a configured chat model is retired, deprecated or missing (live, needs GROQ_API_KEY).
+check-models:
+	$(PYTHON) scripts/check_models.py
 
 ## test: Run CI-safe unit tests (zero network calls).
 test:

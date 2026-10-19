@@ -11,20 +11,28 @@ from services.backend_client import post_upload_text
 from services.file_convert import convert_uploaded_file_to_text
 
 
+def _config(name: str, default: Optional[str] = None) -> Optional[str]:
+    """Streamlit secret, else environment variable, else default.
+
+    Accessing st.secrets raises when no secrets.toml exists, so env-only
+    deployments must not touch it unguarded.
+    """
+    try:
+        if name in st.secrets:
+            return str(st.secrets[name])
+    except Exception:  # noqa: BLE001 - StreamlitSecretNotFoundError / parse errors
+        pass
+    return os.getenv(name, default)
+
+
 def get_backend_base_url() -> str:
     """Prefer Streamlit secrets, then environment variable, then localhost."""
-    if "BACKEND_BASE_URL" in st.secrets:
-        base_url = st.secrets["BACKEND_BASE_URL"]
-    else:
-        base_url = os.getenv("BACKEND_BASE_URL", "http://localhost:8000")
-    return str(base_url).rstrip("/")
+    return str(_config("BACKEND_BASE_URL", "http://localhost:8000")).rstrip("/")
 
 
 def get_api_key() -> Optional[str]:
     """Read API key from Streamlit secrets or environment."""
-    if "API_KEY" in st.secrets:
-        return str(st.secrets["API_KEY"])
-    return os.getenv("API_KEY")
+    return _config("API_KEY")
 
 
 def ping_health(base_url: str, api_key: Optional[str]) -> Dict[str, Any]:

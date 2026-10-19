@@ -7,7 +7,7 @@ WORKDIR /app
 
 # Install dependencies
 COPY backend/requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+RUN pip install --no-cache-dir --require-hashes -r /app/requirements.txt
 
 # Copy application code
 COPY backend /app

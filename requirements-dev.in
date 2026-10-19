@@ -1,6 +1,6 @@
 # requirements-dev.in — test tooling, NOT installed in the production image.
 # DO NOT edit requirements-dev.txt directly; edit here and regenerate:
-#   uv pip compile --python-version 3.11 \
+#   uv pip compile --universal --generate-hashes --python-version 3.11 \
 #       --constraint backend/requirements.txt \
 #       requirements-dev.in -o requirements-dev.txt
 #

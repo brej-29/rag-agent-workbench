@@ -169,11 +169,19 @@ as the REST API.
 
 ---
 
-## Screenshot
+## The UI
 
-<img width="1919" height="967" alt="image" src="https://github.com/user-attachments/assets/fe979aa1-b125-415c-9a1d-64a96289af87" />
+Two pages (Streamlit 1.66, light and dark themes):
 
-<img width="1918" height="896" alt="image" src="https://github.com/user-attachments/assets/1d40bb2b-f477-4741-8014-0b2c2a7356bf" />
+- **Ask:** answers stream in with a live pipeline trace (retrieval, gate, generation, verification).
+  The gate draws every retrieved passage against the **relevance floor**; when none clears it, the app
+  says "not in the knowledge base" instead of guessing. Citations render as badges, and dangling ones
+  are flagged. Each source opens an evidence drawer showing its score against the floor, the sentences
+  that cite it, and the passage. While a sleeping Space boots, a wake-up indicator replaces the error.
+- **Evaluation:** retrieval metrics, the k sweep, the reranker A/B, answer quality and abstention, and
+  attack results, all read from `eval/results/` (refresh with `python eval/publish_results.py`).
+
+Screenshots predate the 2026-10 redesign and will be refreshed after deploy.
 
 ---
 

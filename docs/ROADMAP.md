@@ -27,14 +27,14 @@ Streamlit 1.66 (released 2026-10-14) now has custom components v2, custom light/
 
 | # | Item | Effort | Value |
 |---|---|---|---|
-| 7 | **App shell and design system**: top-nav multipage app (Chat · Evidence · Evaluation · Documents · About); custom light and dark themes in `config.toml` (fonts, palette, radius, chart colors); no CSS hacks | M | 4 |
-| 8 | **Live pipeline trace in chat**: the backend emits node-progress SSE events (`normalize → retrieve → CRAG → gate → generate → verify`) and the UI renders them as a `st.status` step list with `:shimmer[]` while running. Tokens stream with a cursor | M | 5 |
-| 9 | **Citation chips and evidence drawer**: `[1]` chips open a right-side `st.dialog` showing the chunk, source, cosine score against the floor, and which claims it supports. Unsupported claims highlighted | M | 5 |
+| 7 | **DONE**. **App shell and design system**: top-nav multipage app (Chat · Evidence · Evaluation · Documents · About); custom light and dark themes in `config.toml` (fonts, palette, radius, chart colors); no CSS hacks | M | 4 |
+| 8 | **DONE**. **Live pipeline trace in chat**: the backend emits node-progress SSE events (`normalize → retrieve → CRAG → gate → generate → verify`) and the UI renders them as a `st.status` step list with `:shimmer[]` while running. Tokens stream with a cursor | M | 5 |
+| 9 | **DONE**. **Citation chips and evidence drawer**: `[1]` chips open a right-side `st.dialog` showing the chunk, source, cosine score against the floor, and which claims it supports. Unsupported claims highlighted | M | 5 |
 | 10 | **Evidence page**: retrieval table (score bars plus the cosine-floor line), claim-by-claim faithfulness, and a latency/token/cost waterfall per request | M | 4 |
-| 11 | **Evaluation page**: run history, metric trends, per-query drill-down, A/B diff (reranker), k-sweep chart, all from `eval/reports/*.json` | M | 5 |
+| 11 | **DONE**. **Evaluation page**: run history, metric trends, per-query drill-down, A/B diff (reranker), k-sweep chart, all from `eval/reports/*.json` | M | 5 |
 | 12 | **Graph view**: `st.mermaid_chart` of the 8-node graph with the path the request took highlighted | S | 3 |
 | 13 | **Feedback loop**: `st.feedback` on every answer; thumbs-down items queue as golden-set candidates (labelled by you, never auto-labelled, per the anti-circularity rule) | S | 4 |
-| 14 | **Cold-start UX**: a background fragment pings `/health`; while the Space wakes, show `st.skeleton` and "waking backend… 6 s" instead of an error | S | 4 |
+| 14 | **DONE**. **Cold-start UX**: a background fragment pings `/health`; while the Space wakes, show `st.skeleton` and "waking backend… 6 s" instead of an error | S | 4 |
 | 15 | Chat input attachments: drop or paste a PDF into the chat to ingest it into a session namespace, then ask about it | M | 3 |
 
 ## Wave 3: retrieval, context and harness engineering

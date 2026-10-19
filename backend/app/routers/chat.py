@@ -54,6 +54,7 @@ def _build_chat_response(state: Dict) -> ChatResponse:
             url=str(src.get("url") or ""),
             score=float(src.get("score") or 0.0),
             chunk_text=str(src.get("chunk_text") or ""),
+            doc_id=str(src.get("doc_id") or ""),
         )
         for src in sources_raw
     ]

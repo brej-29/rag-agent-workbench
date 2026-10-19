@@ -123,6 +123,10 @@ class SourceHit(BaseModel):
         ...,
         description="Text content of the retrieved chunk or web snippet.",
     )
+    doc_id: str = Field(
+        "",
+        description="Knowledge-base document id (empty for web results).",
+    )
 
 
 class ChatTimings(BaseModel):

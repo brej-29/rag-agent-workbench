@@ -149,7 +149,9 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-.streamlit/
+# Streamlit: keep theme config, never secrets
+.streamlit/secrets.toml
+**/.streamlit/secrets.toml
 # Spyder project settings
 .spyderproject
 .spyproject

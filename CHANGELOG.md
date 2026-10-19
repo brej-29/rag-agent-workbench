@@ -28,3 +28,9 @@
 - feat(eval): adversarial suite (`make eval-adversarial`; structural cases in CI).
 - feat(mcp): read-only MCP server at `/mcp` (Streamable HTTP) and stdio; constant-time API-key check.
 - fix(eval): corpus manifest on pinecone 10 (`ListItem`).
+
+### 2026-10-19 — Roadmap Wave 2 (Streamlit UI)
+- feat(stream): `step` SSE events for a live pipeline trace; `doc_id` on sources.
+- feat(ui): top-nav shell, light/dark themes, cold-start wake indicator, live trace with relevance-floor bars,
+  citation badges, evidence drawer, Evaluation page from `eval/results/`; markdown images stripped from answers.
+- fix(ci): UI smoke test path for Streamlit 1.66 AppTest.

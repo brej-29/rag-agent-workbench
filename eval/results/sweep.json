@@ -1,0 +1,50 @@
+{
+  "timestamp": "20261019T141552Z",
+  "namespace": "eval",
+  "chunk_fetch_k": 20,
+  "sweep_k_values": [
+    1,
+    2,
+    3,
+    5,
+    8,
+    10
+  ],
+  "total_queries": 30,
+  "skipped_entries": 0,
+  "margin": 0.02,
+  "knee_k": 8,
+  "floor_safety_bound": 0.0,
+  "aggregate": {
+    "1": {
+      "mean_recall_at_k": 0.580556,
+      "mean_ndcg_at_k": 0.966667,
+      "mean_precision_at_k": 0.966667
+    },
+    "2": {
+      "mean_recall_at_k": 0.738889,
+      "mean_ndcg_at_k": 0.863506,
+      "mean_precision_at_k": 0.683333
+    },
+    "3": {
+      "mean_recall_at_k": 0.858333,
+      "mean_ndcg_at_k": 0.879149,
+      "mean_precision_at_k": 0.555556
+    },
+    "5": {
+      "mean_recall_at_k": 0.913889,
+      "mean_ndcg_at_k": 0.903041,
+      "mean_precision_at_k": 0.36
+    },
+    "8": {
+      "mean_recall_at_k": 0.969444,
+      "mean_ndcg_at_k": 0.92803,
+      "mean_precision_at_k": 0.241667
+    },
+    "10": {
+      "mean_recall_at_k": 0.980556,
+      "mean_ndcg_at_k": 0.932552,
+      "mean_precision_at_k": 0.196667
+    }
+  }
+}

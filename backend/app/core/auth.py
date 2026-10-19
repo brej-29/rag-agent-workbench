@@ -1,6 +1,7 @@
+import hmac
 import os
 from functools import lru_cache
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
@@ -84,8 +85,41 @@ async def require_api_key(api_key: Optional[str] = Security(api_key_header)) -> 
             detail="Missing API key. Provide X-API-Key header.",
         )
 
-    if api_key != configured:
+    if not api_key_matches(api_key):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid API key.",
         )
+
+
+def api_key_matches(provided: Optional[str]) -> bool:
+    """True when no API key is configured (dev mode) or `provided` matches it.
+
+    Constant-time comparison so response timing does not leak the key.
+    """
+    configured = _get_configured_api_key()
+    if not configured:
+        return True
+    return provided is not None and hmac.compare_digest(provided.encode(), configured.encode())
+
+
+class ApiKeyGate:
+    """ASGI wrapper applying the same X-API-Key check to a raw ASGI app (e.g. MCP).
+
+    Raw ASGI routes bypass FastAPI dependencies, so they need their own gate.  A class
+    (not a function) so Starlette's Route treats it as an ASGI app.
+    """
+
+    def __init__(self, app: Any):
+        self.app = app
+        self.__name__ = "api_key_gate"  # slowapi and Route naming read handler.__name__
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        from starlette.responses import JSONResponse  # noqa: PLC0415
+
+        if scope["type"] == "http":
+            provided = dict(scope.get("headers") or []).get(b"x-api-key")
+            if not api_key_matches(provided.decode("latin-1") if provided else None):
+                await JSONResponse({"detail": "Invalid or missing API key."}, status_code=403)(scope, receive, send)
+                return
+        await self.app(scope, receive, send)

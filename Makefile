@@ -14,7 +14,7 @@ MAILTO       ?=
 CANDIDATES   ?= 20
 RERANK_MODEL ?= bge-reranker-v2-m3
 
-.PHONY: eval-corpus eval eval-ab eval-ab-topk eval-sweep corpus-manifest corpus-verify check-models eval-answers test help
+.PHONY: eval-corpus eval eval-ab eval-ab-topk eval-sweep corpus-manifest corpus-verify check-models eval-answers eval-adversarial test help
 
 ## help: Print this help message.
 help:
@@ -98,6 +98,11 @@ corpus-verify:
 ##   Also writes eval/labels/judge_calibration_<ts>.csv for human labelling.
 eval-answers:
 	$(PYTHON) eval/run_answers.py --namespace $(EVAL_NS)
+
+## eval-adversarial: Live adversarial eval (injection, indirect injection, exfiltration).
+##   Structural cases also run in CI (tests/test_adversarial.py) against a compromised fake model.
+eval-adversarial:
+	$(PYTHON) eval/adversarial.py
 
 ## check-models: Fail if a configured chat model is retired, deprecated or missing (live, needs GROQ_API_KEY).
 check-models:

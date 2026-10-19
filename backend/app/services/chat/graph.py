@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 from time import perf_counter
 from typing import Any, Dict, List, Optional, TypedDict
@@ -419,7 +418,7 @@ def web_search(state: ChatState, config: RunnableConfig | None = None) -> ChatSt
 
     start = perf_counter()
     try:
-        # The TavilySearchResults tool is a Runnable, so we can pass config for tracing.
+        # The Tavily tool is a Runnable, so we can pass config for tracing.
         results: Any = tool.invoke({"query": state["query"]}, config=config or {})
     except Exception as exc:  # noqa: BLE001
         elapsed_ms = (perf_counter() - start) * 1000.0
@@ -436,7 +435,7 @@ def web_search(state: ChatState, config: RunnableConfig | None = None) -> ChatSt
     state["timings"] = timings
 
     web_hits: List[Dict[str, Any]] = []
-    # TavilySearchResults returns a list of dicts by default.
+    # The Tavily tool returns a list of result dicts.
     if isinstance(results, list):
         iterable = results
     else:

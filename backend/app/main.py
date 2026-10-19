@@ -1,9 +1,10 @@
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI
-from fastapi.responses import ORJSONResponse
 
 from app.core.auth import require_api_key, validate_api_key_configuration
 from app.core.config import get_settings
-from app.core.errors import PineconeIndexConfigError, setup_exception_handlers
+from app.core.errors import setup_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.core.metrics import setup_metrics
 from app.core.prometheus_metrics import setup_prometheus
@@ -28,10 +29,20 @@ validate_api_key_configuration()
 # Log runtime port / environment context at import time for easier diagnostics.
 get_port()
 
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Startup: initialise Pinecone.  PineconeIndexConfigError propagates so a
+    misconfigured deployment fails fast instead of serving broken retrieval."""
+    init_pinecone(settings)
+    logger.info("Pinecone initialisation completed")
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="RAG Agent Workbench API",
     version=settings.APP_VERSION,
-    default_response_class=ORJSONResponse,
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
@@ -55,14 +66,3 @@ app.include_router(metrics_router, tags=["metrics"], dependencies=[Depends(requi
 # Register exception handlers
 setup_exception_handlers(app)
 
-
-@app.on_event("startup")
-async def startup_event() -> None:
-    """Application startup hook."""
-    try:
-        init_pinecone(settings)
-        logger.info("Pinecone initialisation completed")
-    except PineconeIndexConfigError:
-        # Let the exception handler and FastAPI/uvicorn deal with the error.
-        # Re-raise to fail fast on misconfiguration.
-        raise

@@ -245,7 +245,7 @@ for i, m in enumerate(s.messages):
             st.markdown(m["content"])
 
 question = st.chat_input(
-    "Ask about the documents in this namespace…" if ready else "Waiting for the API…",
+    "Ask a question" if ready else "Waiting for the API…",
     disabled=not ready or not api_key(),
 )
 if not api_key():

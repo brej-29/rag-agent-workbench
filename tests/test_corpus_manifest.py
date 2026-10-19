@@ -76,3 +76,26 @@ class TestComputeDrift:
         drift = compute_drift(manifest, live)
         assert drift["missing"] == sorted(drift["missing"])
         assert drift["extra"] == sorted(drift["extra"])
+
+
+class TestCollectAllVectorIds:
+    def test_pinecone_v10_list_items_become_id_strings(self):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        from eval.corpus_manifest import _collect_all_vector_ids
+
+        index = MagicMock()
+        # pinecone>=10: list() yields pages of ListItem objects with an .id attribute
+        index.list.return_value = iter([[SimpleNamespace(id="a:0"), SimpleNamespace(id="a:1")],
+                                        [SimpleNamespace(id="b:0")]])
+        assert _collect_all_vector_ids(index, "eval") == ["a:0", "a:1", "b:0"]
+
+    def test_plain_string_pages_still_work(self):
+        from unittest.mock import MagicMock
+
+        from eval.corpus_manifest import _collect_all_vector_ids
+
+        index = MagicMock()
+        index.list.return_value = iter([["a:0", "b:0"]])
+        assert _collect_all_vector_ids(index, "eval") == ["a:0", "b:0"]

@@ -1,6 +1,6 @@
 # Resurrection Report: RAG Agent Workbench
 
-Audit date: 2026-10-19. Branch: `revive/2026-10` in both repos. Status: **Phase 3 complete, waiting for a direction choice.**
+Audit date: 2026-10-19. Branch: `revive/2026-10` in both repos. Status: **Phase 4 (option F: A + C-lite) implemented locally and verified; not pushed or deployed.** Phase 4 results are in section 9; the next roadmap is in `docs/ROADMAP.md`.
 
 Evidence tags: **VERIFIED** means read on an official page or reproduced by a command on 2026-10-19. **UNVERIFIED** means a secondary source, inference, or something that needs a live key.
 
@@ -21,12 +21,12 @@ Evidence tags: **VERIFIED** means read on an official page or reproduced by a co
 | Component | State | Evidence |
 |---|---|---|
 | HF Space `BrejBala/rag-agent-workbench-api` | **Was SLEEPING; now RUNNING and healthy.** My read-only `GET /health` woke it: 9.8 s cold start, then `{"status":"ok"}`. It will sleep again after 48 h idle | HF API `runtime.stage=SLEEPING`, `gcTimeout=172800`, `hardware=cpu-basic`; then stage `RUNNING` (VERIFIED) |
-| Space `/chat` generation | **Almost certainly broken.** The default model `llama-3.1-8b-instant` was shut down on 2026-08-16 | Groq deprecations page (VERIFIED). A live call needs your Space `API_KEY` and Groq key, so the failure itself is UNVERIFIED |
+| Space `/chat` generation | **BROKEN (VERIFIED).** Groq returns `404 model_not_found` for `llama-3.1-8b-instant` with both of your keys, and one chat through the UI against the live Space returned "LLM generation failed" | Key check + live UI request, 2026-10-19 |
 | Streamlit UI `rag-agent-workbench.streamlit.app` | **Asleep** ("This app has gone to sleep due to inactivity"). I did not wake it | Browser fetch (VERIFIED) |
 | GitHub Actions CI | **Green.** The last CI run was 2026-08-12, on Dependabot PRs. Three Dependabot PRs are still open (#24, #25, #27) | `gh run list` / `gh pr list` (VERIFIED) |
-| Pinecone index | **Unknown, needs a key.** Starter plan: 5 indexes, 2 GB, `us-east-1` only, 1M RU and 2M WU a month, 5M embed tokens a month per model, 500 rerank requests a month | Pinecone pricing, object-limits and rate-limits pages (VERIFIED). The current docs contain no inactivity pause or archive rule. A Pinecone blog post says auto-archiving was removed (UNVERIFIED, search summary only) |
+| Pinecone index | **Ready (VERIFIED).** `rag-agent-workbench`: serverless aws/us-east-1, 1024-dim cosine, integrated `llama-text-embed-v2`; 34 vectors in `eval`, 42 in `dev`. Not paused. Starter limits: 5 indexes, 2 GB, 1M RU and 2M WU a month, 5M embed tokens a month per model, 500 rerank requests a month | `describe_index` / `describe_index_stats` with your key; Pinecone pricing and limits pages |
 | Groq | Key and model status need your key | See section 2 |
-| Tavily | Unknown, needs a key. Free plan: 1,000 credits a month, basic search 1 credit, no card | docs.tavily.com/documentation/api-credits (VERIFIED) |
+| Tavily | **OK (VERIFIED).** Researcher plan, 0 of 1,000 credits used before testing; 1 credit used by the revival check | `/usage` endpoint with your key; docs.tavily.com |
 
 ## 2. Checks against your list of known risks
 
@@ -67,7 +67,7 @@ Evidence tags: **VERIFIED** means read on an official page or reproduced by a co
 |---|---|---|---|
 | 1 | **Critical** | The default `GROQ_MODEL=llama-3.1-8b-instant` was shut down. Answer generation, the CRAG grader, query rewriting and the faithfulness judge all use it. The model is already read from config (`config.py:78`), so the fix is to change the Space secret or variable and re-validate. `openai/gpt-oss-*` are reasoning models, so the judge and grader output parsing must be re-tested | S (config) + S–M (re-validation) |
 | 2 | High | 52 vulnerabilities in the backend lock; 3 Dependabot PRs unmerged | S–M (re-lock with hashes, run tests) |
-| 3 | High | The UI lock bundles docling, torch and CUDA, although `frontend/app.py` imports only streamlit and httpx. It is not hash-pinned and is Linux-only, which risks Streamlit Cloud's 2.7 GB cap and slow builds | S (move ingest tooling to its own lock; UI lock becomes streamlit + httpx with hashes) |
+| 3 | High | The UI lock bundles docling, torch and 22 CUDA wheels; it is Linux-only and not hash-pinned. **Correction:** `frontend/services/file_convert.py` *does* import docling and pypdf (optionally, with fallbacks); my first grep missed it | S |
 | 4 | Medium | Tests are not hermetic: `config.py:10` calls `load_dotenv()` at import, which picks up a developer's real `.env` | S (make `tests/conftest.py` set safe env) |
 | 5 | Medium | Deploys are manual copies into the Space repo, which drift and include committed `.pyc` files | S (CI job that pushes `backend/` and the Dockerfile to the Space) |
 | 6 | Medium | Startup hard-fails if Pinecone is unreachable or the key is wrong, so the Space crash-loops instead of reporting "degraded" | S |
@@ -117,3 +117,57 @@ Evidence tags: **VERIFIED** means read on an official page or reproduced by a co
 
 - **Keys, for read-only checks:** `GROQ_API_KEY`, and `PINECONE_API_KEY` + `PINECONE_INDEX_NAME` + `PINECONE_HOST` (for the index state and the live eval baseline). `TAVILY_API_KEY` is optional. You can also tell me to use the existing local `backend/.env.docker` or `.env` without my reading the values.
 - **Approval:** for deploying to the Space and pushing to GitHub. Both are needed in Phase 4 only.
+
+
+## 9. Phase 4 results (option F: A + C-lite), 2026-10-19
+
+The work is on local branches merged into `revive/2026-10`: `fix/hermetic-tests`, `feat/model-chain`, `feat/model-smoke-check`, `chore/relock-deps`, `chore/ui-lock-and-ci` and `docs/revive-readme`. Nothing is pushed or deployed. The API repo is untouched apart from its new branch.
+
+**Keys:** both `GROQ_API_KEY` and `GROQ_API_KEY_1` are valid. `GROQ_API_KEY_1` is not needed and nothing reads it.
+
+### Baseline vs final
+
+| Check | Baseline (as found) | Final |
+|---|---|---|
+| Tests (hermetic) | 343 passed | **351 passed**, 0 warnings (was 6–32) |
+| Tests read developer `.env` | yes (LangSmith tracing active) | no (`DISABLE_DOTENV=1` in `tests/conftest.py`) |
+| Retrieval eval, 30 queries, k=10 | R@10 0.9694 · MRR 0.9833 · nDCG@10 0.9280 | **identical** |
+| k sweep at k=5 (production) | R 0.9139 · nDCG 0.9030 · P 0.36 | **identical** |
+| `/chat` on default config | 404, generation fails | answers; grounded 1.0 on the RAG probe |
+| Known vulnerabilities (pip-audit) | 52 in 15 packages (backend) | **0** across all 4 locks |
+| Hash-pinned locks | backend only | backend, UI, dev, docling (all `--universal`) |
+| UI lock | Linux-only, about 3 GB of CUDA, no hashes | 48 packages, hashed, installs on Windows and Linux |
+| UI boots with env-only config | **crashed** (`st.secrets` raised) | fixed; CI boot test added |
+| Stream time to first token (local, gpt-oss-20b) | n/a (broken) | 1.25 s with `reasoning_effort=low` (6.4 s at default effort) |
+| Faithfulness judge latency | n/a | about 0.7 s (2–12 s at default effort) |
+| Cost per RAG answer (estimate) | `None` (model not priced) | about $0.0003 |
+
+### Changes
+
+- **Model chain (config only):** `GROQ_MODEL=openai/gpt-oss-20b`, `LLM_FALLBACK_MODELS=openai/gpt-oss-120b` (via `Runnable.with_fallbacks`), and `LLM_REASONING_EFFORT=low`. Fallback was verified live: the retired model as primary returned 404, then gpt-oss answered for both `invoke` and `astream`.
+- **`scripts/check_models.py`, `make check-models` and a weekly `model-check.yml` workflow** fail loudly (exit 1) when a configured model is not listed, does not answer, or appears in a heading on Groq's deprecations page. Verified: exit 0 on the defaults, exit 1 with `llama-3.1-8b-instant`.
+- **Re-lock:** langchain-core 1.6.12, langgraph 1.2.16, langchain-openai 1.7.2, pinecone 10.0, fastapi 0.148, uvicorn 0.54, streamlit 1.66, docling 2.140. Dropped `langchain-community` (Tavily now goes through `tavily-python`) and `orjson`/`ORJSONResponse` (deprecated). Moved to a FastAPI lifespan handler.
+
+### Bugs found and fixed during the revival
+
+1. **pinecone 10 regression (caught by the live probe, not by the eval):** `to_dict()` now returns `id_`/`score_`. Every score read as 0.0 and every chat abstained. Fixed once in the shared `search()`. `eval/run.py` now fails if hits lack `_score`, because ranking metrics alone could not see this. The system failed safe: it abstained rather than answering.
+2. **Pre-existing: LangGraph never passed `RunnableConfig` to 4 nodes.** `from __future__ import annotations` made the annotations strings, so LangGraph skipped injection with only a warning. A regression test now fails if this returns.
+3. **Pre-existing: env-only UI config crashed** on `st.secrets` access when no `secrets.toml` exists.
+
+### Decisions to confirm
+
+- **docling is not in the hosted UI lock.** PDFs use pypdf; Office files show an install hint. `requirements-docling.txt` restores it locally. Roadmap item 20 moves conversion server-side.
+- **CRAG query laundering** (live, CRAG enabled): the rewriter once turned an injection prompt into a benign question and answered it. It did not leak the system prompt. CRAG is off by default. Roadmap items 2 and 3 address it.
+
+### Not done or not verified
+
+- **Docker image build:** Docker Desktop was started but its engine had not come up when checked (it may be waiting on a first-run dialog). CI and the Space build on Linux; `--require-hashes` in the Dockerfile has not been built locally.
+- **Corpus manifest drift:** the manifest lists 8 doc_ids, the live `eval` namespace has 23. This is pre-existing; regenerate with `make corpus-manifest` (roadmap item 28).
+- **Deploy:** not done; it needs your approval (see the manual steps below).
+
+### What you must do manually (before or for deploy)
+
+1. **HF Space settings:** remove or replace any `GROQ_MODEL=llama-3.1-8b-instant` variable or secret. The new default applies only if it is unset, or set it to `openai/gpt-oss-20b`.
+2. **GitHub repo secrets** (only if you want the workflows): `GROQ_API_KEY` for the weekly model check and the deploy gate; `HF_TOKEN` (write access to the Space) for `deploy-space.yml`.
+3. **Approve:** pushing `revive/2026-10` to GitHub (then a PR to `main`; Streamlit Cloud redeploys from `main`) and deploying the backend to the existing Space.
+4. Optional: rotate nothing (no secrets were ever committed); `GROQ_API_KEY_1` can be removed from `.env`.

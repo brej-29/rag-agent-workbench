@@ -171,3 +171,21 @@ The work is on local branches merged into `revive/2026-10`: `fix/hermetic-tests`
 2. **GitHub repo secrets** (only if you want the workflows): `GROQ_API_KEY` for the weekly model check and the deploy gate; `HF_TOKEN` (write access to the Space) for `deploy-space.yml`.
 3. **Approve:** pushing `revive/2026-10` to GitHub (then a PR to `main`; Streamlit Cloud redeploys from `main`) and deploying the backend to the existing Space.
 4. Optional: rotate nothing (no secrets were ever committed); `GROQ_API_KEY_1` can be removed from `.env`.
+
+## 10. Roadmap Wave 1 results, 2026-10-19 (built locally; not pushed or deployed)
+
+| # | Item | Result |
+|---|---|---|
+| 3 | CRAG rewrite guard | Deterministic: refusal, answer-shaped and new-number rewrites are rejected; instruction-override queries never reach the rewriter; the rewrite prompt delimits the query as data. Live, CRAG on, 4 runs each: injection 4/4 skipped and abstained; off-topic 4/4 abstained with clean rewrites (no more invented scores); in-domain 4/4 answered |
+| 4 | Strict structured judge | JSON-schema strict `response_format` on the faithfulness judge. Paired A/B on 30 golden answers: plain and strict both had **0 parse failures and 0 mistyped verdicts**, so this is a guarantee, not a measured gain on gpt-oss. It also fixed a latent bug: `bool("false")` counted a string "false" verdict as grounded |
+| 1 | Answer-quality and abstention eval | `make eval-answers`; 30 answerable (87 reference claims) + 12 unanswerable questions; judge = gpt-oss-120b (≠ generator); calibration CSV → κ. **Partial live run** (21 of 42 scored before Groq's daily token cap): false-abstain 0/13, correct-abstain 8/8, claim recall 0.936, faithfulness 0.946, citation precision 0.861, 0 dangling citations. The hallucination probe (#30; the corpus never mentions hallucination) was answered with an unsupported claim and correctly flagged (faithfulness 0.5, grounded=false). Finish with `python eval/run_answers.py --resume eval/reports/answers_20261019T154022Z.json` once the window frees |
+| 2 | Adversarial eval | 10 cases, deterministic detection. CI: 4 structural defences hold against a fully compromised fake model (mutation-checked). Live (gpt-oss-20b, one run): **0/10 attacks succeeded**; the off-topic/override/CRAG attacks abstained with 0 LLM calls. The 6 model-dependent cases are a small sample; repeat runs before quoting a rate |
+| 5 | MCP server | Read-only `ask` / `search_knowledge_base`, resources `rag://guardrails` and `rag://namespaces`, prompt `grounded_answer`; Streamable HTTP at `/mcp` behind the same API key (constant-time check), stdio via `python -m app.mcp_server`. Live: HTTP and stdio both work; ask 3.9 s answered / 0.3 s abstained; wrong key → 403. No ingestion tool by design (SSRF and index-write risk) |
+
+**Also fixed:** pinecone 10 `list()` returns `ListItem` objects, which broke `make corpus-verify`; the API-key check was not constant-time; a Mount answered `POST /mcp` with a 307 that MCP clients do not follow (found by the live probe, not the TestClient).
+
+**New verified limit (Groq response headers and 429 body, 2026-10-19):** the free tier for `openai/gpt-oss-20b` allows **8,000 tokens per minute, 1,000 requests per day and 200,000 tokens per day**, per model. At about 1.5k tokens per answer (judge off), that is roughly 130 answers a day before the fallback model's separate budget takes over. This makes the fallback chain an availability feature, not just a deprecation guard.
+
+**Totals now:** 412 tests (hermetic), retrieval eval unchanged (0.9694 / 0.9833 / 0.9280), 0 known vulnerabilities across the 4 locks, UI smoke OK.
+
+**Pending your review:** (a) the drafted reference claims in `eval/answers_golden.jsonl`; (b) golden.jsonl #21 likely missing the clustering doc `9e590954`; (c) human labels in `eval/labels/judge_calibration_*.csv` for judge κ.

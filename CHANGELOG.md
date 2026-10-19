@@ -20,3 +20,11 @@
 - fix(ui): env-only config no longer crashes on `st.secrets`; UI lock slimmed, docling split out.
 - ci: `--require-hashes`, UI boot smoke (py3.13), pip-audit on all locks; manual `deploy-space.yml`.
 - docs: README live/eval/limits section, `docs/ROADMAP.md`.
+
+### 2026-10-19 — Roadmap Wave 1
+- feat(crag): deterministic rewrite guard + hardened rewrite prompt.
+- feat(judge): strict JSON-schema structured output; fix string-boolean verdict parsing.
+- feat(eval): answer-quality/abstention harness (`make eval-answers`, `--resume`, `--calibrate`).
+- feat(eval): adversarial suite (`make eval-adversarial`; structural cases in CI).
+- feat(mcp): read-only MCP server at `/mcp` (Streamable HTTP) and stdio; constant-time API-key check.
+- fix(eval): corpus manifest on pinecone 10 (`ListItem`).

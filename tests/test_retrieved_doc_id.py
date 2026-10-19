@@ -37,3 +37,10 @@ def test_crag_re_retrieval_keeps_doc_id():
          patch("app.services.chat.graph.pinecone_search", return_value=[HIT]):
         result = corrective_retrieve(state)
     assert result["retrieved"][0]["doc_id"] == "abc"
+
+
+def test_chat_response_sources_expose_doc_id():
+    from app.schemas.chat import SourceHit
+
+    assert SourceHit(source="wiki", title="t", chunk_text="c", doc_id="abc").doc_id == "abc"
+    assert SourceHit(source="web", title="t", chunk_text="c").doc_id == ""  # web results have none

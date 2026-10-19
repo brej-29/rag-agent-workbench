@@ -29,6 +29,9 @@ SSE event protocol (T2.9)
   event: token   data: {"text": "<text>"}                    # zero or more
   event: done    data: {<ChatResponse-like fields> + "cached": bool}  # exactly one
   event: error   data: {"message": "<human-readable error>"} # exactly one, no done follows
+  event: step    data: {"id", "status", "ms", "detail"}   # pipeline trace, as each phase completes
+                 ids: retrieve, correct (CRAG ran), web (fallback ran), gate (scores vs floor),
+                 generate (running/done/skipped), verify.  Facts only; clients may ignore.
 
 See docs/CONTEXT.md § "Streaming (T2.9)" for the full protocol and payload shapes.
 
@@ -78,6 +81,26 @@ def _sse(event: str, data: Any) -> str:
     return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
 
 
+def _step(step_id: str, status: str, ms: Optional[float] = None, **detail: Any) -> str:
+    """A pipeline-trace frame: facts only (ids, counts, scores, ms); the UI owns wording."""
+    return _sse("step", {"id": step_id, "status": status, "ms": round(ms, 1) if ms is not None else None,
+                         "detail": detail})
+
+
+def _pre_generation_steps(state: Dict) -> list[str]:
+    """Trace frames for phase 1, emitted once it completes."""
+    timings = state.get("timings") or {}
+    frames = [_step("retrieve", "done", timings.get("retrieve_ms"),
+                    hits=len(state.get("retrieved") or []), top_score=float(state.get("top_score") or 0.0),
+                    namespace=state.get("namespace"), rewritten_query=state.get("contextualized_query"))]
+    if state.get("crag_iterations") or state.get("corrective_action"):
+        frames.append(_step("correct", "done", iterations=int(state.get("crag_iterations") or 0),
+                            action=state.get("corrective_action")))
+    if state.get("web_fallback_used"):
+        frames.append(_step("web", "done", timings.get("web_ms"), results=len(state.get("web_results") or [])))
+    return frames
+
+
 def _build_done_payload(state: Dict, total_ms: float, *, cached: bool = False) -> Dict:
     """Assemble the 'done' SSE event payload from pipeline state.
 
@@ -94,6 +117,7 @@ def _build_done_payload(state: Dict, total_ms: float, *, cached: bool = False) -
             "url": str(s.get("url") or ""),
             "score": float(s.get("score") or 0.0),
             "chunk_text": str(s.get("chunk_text") or ""),
+            "doc_id": str(s.get("doc_id") or ""),
         }
         for s in sources_raw
     ]
@@ -269,6 +293,10 @@ async def stream_chat_response(
         yield _sse("error", {"message": str(exc)})
         return
 
+    for frame in _pre_generation_steps(state):
+        yield frame
+    candidate_scores = [round(float(s.get("score") or 0.0), 4) for s in state.get("retrieved") or []]
+
     # -------------------------------------------------------------------------
     # Determine generation inputs: apply cosine floor, rerank, abstention check
     # -------------------------------------------------------------------------
@@ -281,11 +309,16 @@ async def stream_chat_response(
         yield _sse("error", {"message": "Generation preparation failed. Please try again."})
         return
 
+    yield _step("gate", "done", scores=candidate_scores, floor=get_settings().RAG_MIN_CHUNK_SCORE,
+                kept=len(state.get("retrieved") or []), web=len(state.get("web_results") or []),
+                abstain=bool(should_abstain))
+
     # -------------------------------------------------------------------------
     # Path B: Empty-context abstention (T1.3) — no LLM call
     # -------------------------------------------------------------------------
     if should_abstain:
         logger.info("Streaming: abstention path (no usable context).")
+        yield _step("generate", "skipped")
         yield _sse("token", {"text": str(state.get("answer") or ABSTENTION_ANSWER)})
         try:
             state = await run_in_threadpool(_run_post_generation, state)
@@ -306,6 +339,7 @@ async def stream_chat_response(
     answer_chunks: list[str] = []
     last_chunk: Any = None
     gen_start = perf_counter()
+    yield _step("generate", "running")
 
     try:
         async for chunk in llm.astream(messages, config=config or {}):
@@ -325,6 +359,7 @@ async def stream_chat_response(
     timings = state.get("timings") or {}
     timings["generate_ms"] = generate_ms
     state["timings"] = timings
+    yield _step("generate", "done", generate_ms)
 
     # Capture generation token usage from the final streaming chunk.
     # The Groq streaming API may include usage in the last chunk.
@@ -340,6 +375,9 @@ async def stream_chat_response(
         state = await run_in_threadpool(_run_post_generation, state)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Streaming: post-generation step failed: %s", exc)
+    yield _step("verify", "done", (state.get("timings") or {}).get("faithfulness_ms"),
+                grounded=state.get("grounded"), faithfulness_score=state.get("faithfulness_score"),
+                dangling=list(state.get("unverified_citations") or []))
 
     total_ms = (perf_counter() - start_total) * 1000.0
     timings = state.get("timings") or {}

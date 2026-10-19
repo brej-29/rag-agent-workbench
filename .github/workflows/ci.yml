@@ -24,14 +24,46 @@ jobs:
 
       # Install the runtime lock first (matches the production image),
       # then the dev lock (adds pytest and its transitives).
-      # This is the clean-environment validation of the T1.4 dependency pins.
+      # --require-hashes: every lock is hash-pinned; a tampered or re-tagged wheel fails here.
       - name: Install runtime dependencies
-        run: pip install -r backend/requirements.txt
+        run: pip install --require-hashes -r backend/requirements.txt
 
       - name: Install dev dependencies
-        run: pip install -r requirements-dev.txt
+        run: pip install --require-hashes -r requirements-dev.txt
 
       # Offline pytest only.  make eval / make eval-corpus are NOT run:
       # they require live Pinecone credentials and incur index query cost.
       - name: Run tests
         run: pytest tests/ -v
+
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Streamlit Community Cloud runs the UI on Python 3.13.
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install UI dependencies
+        run: pip install --require-hashes -r requirements.txt
+
+      - name: UI boot smoke test (env-only config, no secrets.toml)
+        run: PYTHONPATH=frontend python tests/ui/smoke_app.py
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - run: pip install pip-audit
+      - name: Audit every lock for known vulnerabilities
+        run: |
+          for f in backend/requirements.txt requirements.txt requirements-dev.txt requirements-docling.txt; do
+            echo "== $f"; pip-audit --progress-spinner off --disable-pip --no-deps -r "$f"
+          done

@@ -93,6 +93,14 @@ class Settings(BaseSettings):
             "(model retired, 404, 429, timeout).  Same endpoint and key.  Empty disables."
         ),
     )
+    LLM_STRUCTURED_OUTPUT: bool = Field(
+        default=True,
+        description=(
+            "Send a strict JSON-schema response_format for the faithfulness judge.  "
+            "Supported by Groq gpt-oss; set false for models/providers without "
+            "structured outputs (the judge then relies on prompt + tolerant parsing)."
+        ),
+    )
     LLM_REASONING_EFFORT: str = Field(
         default="low",
         description=(

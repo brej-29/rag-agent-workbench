@@ -213,3 +213,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Corpus build cache (official downloads; rebuilt by python -m corpus.build)
+corpus/raw/

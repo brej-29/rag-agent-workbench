@@ -19,6 +19,7 @@ langchain-text-splitters
 langgraph
 langchain-openai
 tavily-python
+mcp
 slowapi
 cachetools
 prometheus-client

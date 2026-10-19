@@ -12,7 +12,7 @@
   <img alt="Vector Store" src="https://img.shields.io/badge/Vector%20Store-Pinecone-3776AB">
   <img alt="Frameworks" src="https://img.shields.io/badge/Frameworks-LangChain%20%7C%20LangGraph-ff9800">
   <img alt="Frontend" src="https://img.shields.io/badge/Frontend-Streamlit-ff4b4b">
-  <img alt="Tests" src="https://img.shields.io/badge/Tests-351%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/Tests-411%20passing-brightgreen">
   <img alt="License" src="https://img.shields.io/badge/License-MIT-black">
 </div>
 
@@ -129,6 +129,46 @@ flowchart TD
 
 ---
 
+## Use it from any MCP client
+
+The API also serves an **MCP server** (spec 2026-07-28, `mcp` SDK 2.3). It is read-only, so an
+agent can ask and search but never write to the index:
+
+| | |
+|---|---|
+| `ask(question, namespace?, top_k?, use_web_fallback?)` | Full pipeline: answer, numbered `sources`, explicit `abstained` flag, `dangling_citations`, judge fields |
+| `search_knowledge_base(query, namespace?, top_k?)` | Cosine-scored chunks, no LLM |
+| `rag://guardrails` · `rag://namespaces` | How to read results · vector counts |
+
+**Remote (Streamable HTTP):** `POST https://<api-host>/mcp` with header `X-API-Key`, the same key
+as the REST API.
+
+**Local (stdio)**, e.g. in a desktop client's `mcpServers` config (keys come from your `.env`):
+
+```json
+{
+  "mcpServers": {
+    "rag-workbench": {
+      "command": "D:/Project/rag-agent-workbench/.venv/Scripts/python.exe",
+      "args": ["-m", "app.mcp_server"],
+      "env": { "PYTHONPATH": "D:/Project/rag-agent-workbench/backend" }
+    }
+  }
+}
+```
+
+---
+
+## Evaluation beyond retrieval
+
+| Harness | What it measures | Run |
+|---|---|---|
+| Retrieval (`eval/run.py`) | Recall@k, MRR, nDCG@k on 30 hand-labelled queries | `make eval` |
+| Answers (`eval/run_answers.py`) | Claim recall vs reference claims, faithfulness, citation precision against labelled evidence docs, false/correct abstain rates on 30 answerable and 12 unanswerable questions. The judge is a different model from the generator; a calibration CSV yields judge-vs-human κ | `make eval-answers` |
+| Adversarial (`eval/adversarial.py`) | Direct and indirect injection, delimiter forgery, CRAG laundering, exfiltration. Structural defences are checked in CI against a fully compromised fake model; model-dependent ones are measured live | `make eval-adversarial` |
+
+---
+
 ## Screenshot
 
 <img width="1919" height="967" alt="image" src="https://github.com/user-attachments/assets/fe979aa1-b125-415c-9a1d-64a96289af87" />
@@ -170,7 +210,7 @@ Set `BACKEND_BASE_URL` and (if the backend is protected) `API_KEY` in
 ### Tests
 
 ```bash
-pytest tests/ -v        # 351 tests, zero network, zero credentials (never reads .env)
+pytest tests/ -v        # 411 tests, zero network, zero credentials (never reads .env)
 make check-models       # live: fails if a configured model is retired or deprecated
 ```
 
@@ -190,7 +230,7 @@ rag-agent-workbench/
 │  └─ requirements.txt   # pinned lock (uv pip compile)
 ├─ frontend/app.py       # Streamlit chatbot UI
 ├─ eval/                 # retrieval harness, golden.jsonl, corpus manifest
-├─ tests/                # 351 tests — unit + integration (+ tests/ui/smoke_app.py)
+├─ tests/                # 411 tests — unit + integration (+ tests/ui/smoke_app.py)
 ├─ scripts/              # bench_local.py, bench_mocked.py, smoke tests
 └─ docs/
    ├─ DESIGN.md          # ← design decisions + limitations (start here)

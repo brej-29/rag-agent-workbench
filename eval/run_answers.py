@@ -123,6 +123,12 @@ def _write(report: Dict[str, Any], rows: List[Dict[str, Any]], ts: str) -> Path:
     return json_path
 
 
+def split_resume(entries: List[Dict[str, Any]], previous_rows: List[Dict[str, Any]]):
+    """Return (scored rows to keep by query, entries still to run)."""
+    kept = {r["query"]: r for r in previous_rows if "error" not in r}
+    return kept, [e for e in entries if e["query"] not in kept]
+
+
 def calibrate(path: Path) -> int:
     with open(path, encoding="utf-8") as f:
         pairs = [(r["judge_supported"] == "true", r["human_supported"].strip().lower() == "true")
@@ -142,6 +148,8 @@ def main() -> int:
     ap.add_argument("--namespace", default="eval")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--calibrate", type=Path)
+    ap.add_argument("--resume", type=Path, help="Previous report: keep its scored rows, re-run errored/missing ones "
+                                                "(Groq free tier allows 200k tokens/day per model)")
     args = ap.parse_args()
     if args.calibrate:
         return calibrate(args.calibrate)
@@ -162,8 +170,14 @@ def main() -> int:
     entries = _load(Path(args.golden))[: args.limit or None]
     meta = json.loads(Path(args.golden).read_text(encoding="utf-8").splitlines()[0])
 
+    kept: Dict[str, Dict[str, Any]] = {}
+    if args.resume:
+        kept, _ = split_resume(entries, json.loads(args.resume.read_text(encoding="utf-8"))["rows"])
     rows: List[Dict[str, Any]] = []
     for i, entry in enumerate(entries, 1):
+        if entry["query"] in kept:
+            rows.append(kept[entry["query"]])
+            continue
         for attempt in (1, 2):
             try:
                 rows.append(_evaluate(entry, graph, judge_llm, args.namespace))

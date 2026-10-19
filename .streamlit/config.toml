@@ -1,0 +1,51 @@
+# Theme: "relevance floor" instrument look.
+#   verdigris = grounded / primary;  signal orange = the relevance floor and abstention.
+#   Headings Bricolage Grotesque, body IBM Plex Sans, readouts Martian Mono.
+
+[client]
+toolbarMode = "minimal"
+
+[theme]
+font = "IBM Plex Sans:https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+headingFont = "Bricolage Grotesque:https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&display=swap"
+codeFont = "Martian Mono:https://fonts.googleapis.com/css2?family=Martian+Mono:wght@400;500&display=swap"
+headingFontWeights = [800, 700, 700, 600, 600, 600]
+baseRadius = "0.4rem"
+buttonRadius = "2rem"
+showWidgetBorder = true
+
+[theme.light]
+primaryColor = "#2E6B5B"
+backgroundColor = "#F5F7F4"
+secondaryBackgroundColor = "#E8EDE7"
+textColor = "#17202A"
+borderColor = "#C9D1C8"
+linkColor = "#2E6B5B"
+codeTextColor = "#2E6B5B"
+codeBackgroundColor = "#E8EDE7"
+greenColor = "#2E6B5B"
+orangeColor = "#C9661E"
+redColor = "#B23A3A"
+grayColor = "#5E6B66"
+chartCategoricalColors = ["#2E6B5B", "#C9661E", "#5E6B66", "#7FA99B", "#E3B07B"]
+
+[theme.light.sidebar]
+backgroundColor = "#E8EDE7"
+
+[theme.dark]
+primaryColor = "#6DB89E"
+backgroundColor = "#11161B"
+secondaryBackgroundColor = "#1A2229"
+textColor = "#E4EAE5"
+borderColor = "#2C3740"
+linkColor = "#6DB89E"
+codeTextColor = "#6DB89E"
+codeBackgroundColor = "#1A2229"
+greenColor = "#6DB89E"
+orangeColor = "#E8913F"
+redColor = "#E07070"
+grayColor = "#93A19B"
+chartCategoricalColors = ["#6DB89E", "#E8913F", "#93A19B", "#3F7F6C", "#B9733A"]
+
+[theme.dark.sidebar]
+backgroundColor = "#161D23"

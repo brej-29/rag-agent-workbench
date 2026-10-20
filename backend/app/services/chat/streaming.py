@@ -30,7 +30,8 @@ SSE event protocol (T2.9)
   event: done    data: {<ChatResponse-like fields> + "cached": bool}  # exactly one
   event: error   data: {"message": "<human-readable error>"} # exactly one, no done follows
   event: step    data: {"id", "status", "ms", "detail"}   # pipeline trace, as each phase completes
-                 ids: retrieve, correct (CRAG ran), web (fallback ran), gate (scores vs floor),
+                 ids: route (regs namespace: intent / scope guard), retrieve, correct (CRAG ran),
+                 web (fallback ran), gate (scores vs floor),
                  generate (running/done/skipped), verify.  Facts only; clients may ignore.
 
 See docs/CONTEXT.md § "Streaming (T2.9)" for the full protocol and payload shapes.
@@ -64,6 +65,7 @@ from app.services.chat.graph import (
     format_response,
     normalize_input,
     retrieve_context,
+    route_request,
     web_search,
 )
 from app.services.llm.groq_llm import get_llm
@@ -90,7 +92,13 @@ def _step(step_id: str, status: str, ms: Optional[float] = None, **detail: Any) 
 def _pre_generation_steps(state: Dict) -> list[str]:
     """Trace frames for phase 1, emitted once it completes."""
     timings = state.get("timings") or {}
-    frames = [_step("retrieve", "done", timings.get("retrieve_ms"),
+    frames = []
+    if state.get("is_regs"):
+        frames.append(_step("route", "done", intent=state.get("intent"), abstain_reason=state.get("abstain_reason"),
+                            profile_updates=state.get("profile_updates") or {}))
+        if state.get("route") == "respond":
+            return frames
+    frames += [_step("retrieve", "done", timings.get("retrieve_ms"),
                     hits=len(state.get("retrieved") or []), top_score=float(state.get("top_score") or 0.0),
                     namespace=state.get("namespace"), rewritten_query=state.get("contextualized_query"))]
     if state.get("crag_iterations") or state.get("corrective_action"):
@@ -118,6 +126,7 @@ def _build_done_payload(state: Dict, total_ms: float, *, cached: bool = False) -
             "score": float(s.get("score") or 0.0),
             "chunk_text": str(s.get("chunk_text") or ""),
             "doc_id": str(s.get("doc_id") or ""),
+            **_regs_source_fields(s),
         }
         for s in sources_raw
     ]
@@ -167,7 +176,19 @@ def _build_done_payload(state: Dict, total_ms: float, *, cached: bool = False) -
         "cached": cached,
         "top_score": float(state.get("top_score") or 0.0),
         "web_fallback_used": bool(state.get("web_fallback_used") or False),
+        **regs_response_fields(state),
     }
+
+
+def _regs_source_fields(s: Dict) -> Dict:
+    return {"ref": str(s.get("ref") or ""), "framework": str(s.get("framework") or ""), "status": s.get("status"),
+            "applies_from": s.get("applies_from"), "status_note": s.get("status_note")}
+
+
+def regs_response_fields(state: Dict) -> Dict:
+    """Compliance-path fields shared by the JSON response and the SSE done payload."""
+    return {"as_of": state.get("as_of"), "intent": state.get("intent"), "abstain_reason": state.get("abstain_reason"),
+            "warnings": list(state.get("warnings") or []), "profile_updates": dict(state.get("profile_updates") or {})}
 
 
 # ---------------------------------------------------------------------------
@@ -182,10 +203,13 @@ def _run_pre_generation_pipeline(state: Dict, config: Dict) -> Dict:
     Synchronous; intended to be called via run_in_threadpool.
 
     Node order:
-      normalize_input → contextualize_query → retrieve_context →
-      corrective_retrieve → decide_next → [web_search if routed]
+      normalize_input → route_request → [stop if it replied] → contextualize_query →
+      retrieve_context → corrective_retrieve → decide_next → [web_search if routed]
     """
     state = normalize_input(state)
+    state = route_request(state)
+    if state.get("route") == "respond":
+        return state
     state = contextualize_query(state)
     state = retrieve_context(state)
     state = corrective_retrieve(state)
@@ -275,6 +299,11 @@ async def stream_chat_response(
             "cached": True,
             "top_score": 0.0,
             "web_fallback_used": False,
+            "as_of": cached_response.as_of,
+            "intent": cached_response.intent,
+            "abstain_reason": cached_response.abstain_reason,
+            "warnings": list(cached_response.warnings or []),
+            "profile_updates": dict(cached_response.profile_updates or {}),
         }
         yield _sse("done", done_payload)
         return
@@ -309,9 +338,12 @@ async def stream_chat_response(
         yield _sse("error", {"message": "Generation preparation failed. Please try again."})
         return
 
-    yield _step("gate", "done", scores=candidate_scores, floor=get_settings().RAG_MIN_CHUNK_SCORE,
-                kept=len(state.get("retrieved") or []), web=len(state.get("web_results") or []),
-                abstain=bool(should_abstain))
+    if state.get("route") != "respond":
+        settings = get_settings()
+        floor = settings.REGS_MIN_SCORE if state.get("is_regs") else settings.RAG_MIN_CHUNK_SCORE
+        yield _step("gate", "done", scores=candidate_scores, floor=floor,
+                    kept=len(state.get("retrieved") or []), web=len(state.get("web_results") or []),
+                    abstain=bool(should_abstain))
 
     # -------------------------------------------------------------------------
     # Path B: Empty-context abstention (T1.3) — no LLM call

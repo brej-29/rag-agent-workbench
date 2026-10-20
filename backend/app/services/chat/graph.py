@@ -1,4 +1,5 @@
 
+from datetime import date
 from time import perf_counter
 from typing import Any, Dict, List, Optional, TypedDict
 
@@ -32,10 +33,27 @@ from app.services.prompts.rag_prompt import (
     filter_chunks_by_score,
 )
 from app.services.pinecone_store import search as pinecone_search
+from app.services.prompts.regs_prompt import build_regs_messages
+from app.services.regs.ask import mismatch_warning, retrieve_regs, scope_guard
+from app.services.regs.router import understand_request
 from app.services.rerank import RERANK_CANDIDATES_MAX, rerank_chunks
 from app.services.tools.tavily_tool import get_tavily_tool, is_tavily_configured
 
 logger = get_logger(__name__)
+
+# Compliance path (namespace == REGS_NAMESPACE): deterministic replies, no LLM call behind them.
+REGS_ABSTENTION = (
+    "Nothing in the covered frameworks matches this question closely enough to answer from "
+    "official text. Try naming the framework or the topic (for example: GDPR breach notification)."
+)
+NOT_YET = {
+    "checklist": "Checklists of obligations for your profile are coming next. Meanwhile, ask about a specific "
+                 "rule (for example: what does the AI Act require of deployers?).",
+    "gap_check": "Checking your own policies against the rules is coming soon. Meanwhile, ask what a specific "
+                 "rule requires and compare it with your policy.",
+    "clarify": "Tell me what you need: what a specific rule requires, whether it applies to your product yet, "
+               "or which frameworks cover a topic (for example: incident reporting deadlines).",
+}
 
 # Returned verbatim when no usable context survives retrieval + chunk filtering.
 # Defined once so tests can assert against a known constant rather than a
@@ -82,6 +100,17 @@ class ChatState(TypedDict, total=False):
 
     # T2.7 token accounting — accumulated across ALL LLM calls in the request
     token_usage_by_call: Dict[str, Dict[str, int]]
+
+    # Compliance path (regs namespace only)
+    is_regs: bool
+    as_of: str
+    frameworks: Optional[List[str]]
+    profile: Dict[str, Any]
+    profile_updates: Dict[str, Any]
+    intent: Optional[str]
+    route: str  # "ask" | "respond" (reply already set, skip retrieval and generation)
+    abstain_reason: Optional[str]
+    warnings: List[str]
 
 
 def _ensure_timings(state: ChatState) -> Dict[str, float]:
@@ -143,7 +172,14 @@ def normalize_input(state: ChatState, _config: RunnableConfig | None = None) -> 
         "timings": state.get("timings") or {},
         "tavily_available": is_tavily_configured(),
         "web_fallback_used": False,
+        "is_regs": namespace == settings.REGS_NAMESPACE,
     }
+    if new_state["is_regs"]:
+        as_of = state.get("as_of")
+        new_state["as_of"] = as_of.isoformat() if isinstance(as_of, date) else (as_of or date.today().isoformat())
+        new_state["frameworks"] = list(state.get("frameworks") or []) or None
+        new_state["profile"] = dict(state.get("profile") or {})
+        new_state["warnings"] = []
 
     logger.info(
         "Chat graph input normalised namespace='%s' top_k=%d min_score=%.3f "
@@ -156,6 +192,48 @@ def normalize_input(state: ChatState, _config: RunnableConfig | None = None) -> 
         new_state["tavily_available"],
     )
     return new_state
+
+
+def _respond(state: ChatState, answer: str, reason: str) -> ChatState:
+    """Finish with a deterministic reply: no retrieval, no generation."""
+    state["answer"] = answer
+    state["insufficient_context"] = True
+    state["abstain_reason"] = reason
+    state["route"] = "respond"
+    return state
+
+
+def route_request(state: ChatState, _config: RunnableConfig | None = None) -> ChatState:
+    """Compliance path only: scope guard (deterministic, before any LLM call), then the typed router.
+
+    Legacy namespaces pass straight through to retrieval.
+    """
+    if not state.get("is_regs"):
+        state["route"] = "ask"
+        return state
+
+    guard = scope_guard(state["query"])
+    if guard["abstain"]:
+        return _respond(state, guard["message"], guard["kind"])
+    if guard["warning"]:
+        state["warnings"] = [*(state.get("warnings") or []), guard["warning"]]
+
+    profile = state.get("profile") or {}
+    decision, usage = understand_request(get_llm(), state["query"], profile)
+    _accumulate_token_usage(state, "router", usage)
+    state["intent"] = decision["intent"]
+    state["profile_updates"] = decision["profile_updates"]
+    # What the user set explicitly wins over what the router read from the message.
+    state["profile"] = {**decision["profile_updates"], **{k: v for k, v in profile.items() if v not in (None, [], "")}}
+    if decision["intent"] != "ask":
+        reason = "clarify" if decision["intent"] == "clarify" else "not_available"
+        return _respond(state, NOT_YET[decision["intent"]], reason)
+    state["route"] = "ask"
+    return state
+
+
+def _route_after_route_request(state: ChatState) -> str:
+    return "format_response" if state.get("route") == "respond" else "contextualize_query"
 
 
 def contextualize_query(state: ChatState, config: RunnableConfig | None = None) -> ChatState:  # noqa: ARG001
@@ -216,6 +294,20 @@ def retrieve_context(state: ChatState, _config: RunnableConfig | None = None) ->
     """
     settings = get_settings()
     timings = _ensure_timings(state)
+
+    if state.get("is_regs"):
+        # Pinecone ranks provision ids; text and applicability come from the committed corpus + registry.
+        high_risk = (state.get("profile") or {}).get("high_risk")
+        start = perf_counter()
+        retrieved, top_score = retrieve_regs(
+            state["query"], state.get("frameworks"), date.fromisoformat(state["as_of"]),
+            high_risk if high_risk in ("annex_iii", "annex_i") else None, settings, pinecone_search,
+        )
+        timings["retrieve_ms"] = (perf_counter() - start) * 1000.0
+        state["retrieved"], state["top_score"], state["timings"] = retrieved, top_score, timings
+        logger.info("Regs retrieval hits=%d top_score=%.4f frameworks=%s", len(retrieved), top_score,
+                    state.get("frameworks"))
+        return state
 
     # Stage-1 retrieval: when reranking is enabled, fetch a wider candidate pool.
     # When disabled, fetch exactly top_k — byte-for-byte identical to baseline.
@@ -297,7 +389,8 @@ def corrective_retrieve(state: ChatState, config: RunnableConfig | None = None) 
     node and are unmodified.
     """
     settings = get_settings()
-    if not settings.RAG_CRAG_ENABLED:
+    if not settings.RAG_CRAG_ENABLED or state.get("is_regs"):
+        # Regs path: re-retrieval would bypass the provision mapping; the scope guard + floor handle weak hits.
         return state
 
     _ensure_timings(state)
@@ -398,7 +491,9 @@ def decide_next(state: ChatState, _config: RunnableConfig | None = None) -> Chat
     top_score = float(state.get("top_score") or 0.0)
 
     should_use_web = False
-    if use_web and tavily_available:
+    if state.get("is_regs"):
+        pass  # answers come from official text only
+    elif use_web and tavily_available:
         if not retrieved:
             should_use_web = True
         elif top_score < min_score:
@@ -507,6 +602,23 @@ def _prepare_generation_inputs(
     """
     settings = get_settings()
     timings = _ensure_timings(state)
+
+    if state.get("route") == "respond":
+        return True, [], []  # reply already set by route_request
+
+    if state.get("is_regs"):
+        kept = filter_chunks_by_score(state.get("retrieved") or [], settings.REGS_MIN_SCORE)
+        state["retrieved"] = kept
+        timings["rerank_ms"] = 0.0
+        if not kept:
+            state["answer"] = REGS_ABSTENTION
+            state["insufficient_context"] = True
+            state["abstain_reason"] = "no_match"
+            timings.setdefault("generate_ms", 0.0)
+            logger.info("Regs: nothing above floor %.2f — abstaining (LLM not called)", settings.REGS_MIN_SCORE)
+            return True, [], []
+        return False, kept, build_regs_messages(state.get("chat_history") or [], state["query"], kept,
+                                                date.fromisoformat(state["as_of"]))
 
     # Stage 1: cosine floor (Pinecone chunks only).
     # Routing in decide_next already read top_score from the full retrieved
@@ -625,6 +737,12 @@ def format_response(state: ChatState, _config: RunnableConfig | None = None) -> 
     unverified = verify_citations(answer_text, all_sources)
     state["unverified_citations"] = unverified
 
+    # Regs path, layer 3 of abstention: the question names a framework none of the sources come from.
+    if state.get("is_regs") and not is_abstention:
+        warning = mismatch_warning(state["query"], retrieved)
+        if warning:
+            state["warnings"] = [*(state.get("warnings") or []), warning]
+
     # Defaults — overwritten below when the judge runs successfully.
     state["grounded"] = None
     state["faithfulness_score"] = None
@@ -673,6 +791,7 @@ def get_chat_graph() -> Any:
     workflow: StateGraph = StateGraph(ChatState)
 
     workflow.add_node("normalize_input", normalize_input)
+    workflow.add_node("route_request", route_request)
     workflow.add_node("contextualize_query", contextualize_query)
     workflow.add_node("retrieve_context", retrieve_context)
     workflow.add_node("corrective_retrieve", corrective_retrieve)
@@ -682,7 +801,12 @@ def get_chat_graph() -> Any:
     workflow.add_node("format_response", format_response)
 
     workflow.set_entry_point("normalize_input")
-    workflow.add_edge("normalize_input", "contextualize_query")
+    workflow.add_edge("normalize_input", "route_request")
+    workflow.add_conditional_edges(
+        "route_request",
+        _route_after_route_request,
+        {"format_response": "format_response", "contextualize_query": "contextualize_query"},
+    )
     workflow.add_edge("contextualize_query", "retrieve_context")
     workflow.add_edge("retrieve_context", "corrective_retrieve")
     workflow.add_edge("corrective_retrieve", "decide_next")

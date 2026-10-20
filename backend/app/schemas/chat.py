@@ -48,7 +48,8 @@ class ChatTokenUsage(BaseModel):
             "Per-call-type token breakdown. Keys: 'generation' (main answer LLM), "
             "'judge' (faithfulness check, when RAG_FAITHFULNESS_ENABLED=True), "
             "'crag_rewrite' (CRAG corrective rewrite, when RAG_CRAG_ENABLED=True), "
-            "'contextualize' (history-aware rewrite, when RAG_CONTEXTUALIZE_ENABLED=True). "
+            "'contextualize' (history-aware rewrite, when RAG_CONTEXTUALIZE_ENABLED=True), "
+            "'router' (intent + profile extraction, regs namespace only). "
             "Each value is a dict with prompt_tokens / completion_tokens / total_tokens. "
             "Call types with zero tokens are omitted."
         ),

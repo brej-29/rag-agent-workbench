@@ -20,3 +20,13 @@ def test_every_golden_label_exists_in_the_corpus():
     missing = [lab for r in rows if not r.get("_meta") for lab in r["relevant"]
                if not any(i == lab or i.startswith(lab + "/") for i in ids)]
     assert missing == []
+
+
+def test_floor_stats_finds_a_separating_floor_or_reports_overlap():
+    from eval.run_regs import floor_stats
+
+    sep = floor_stats(answerable_best=[0.42, 0.55, 0.61], unanswerable_top=[0.12, 0.18, 0.25])
+    assert sep["min_answerable"] == 0.42 and sep["max_unanswerable"] == 0.25
+    assert sep["overlap"] == 0 and 0.25 < sep["suggested_floor"] < 0.42
+    over = floor_stats(answerable_best=[0.30, 0.50], unanswerable_top=[0.20, 0.35])
+    assert over["overlap"] == 2  # 0.30 <= 0.35 and 0.35 >= 0.30: one each side

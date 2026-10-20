@@ -171,3 +171,33 @@ transposition deadline, with the note that obligations reach companies through n
 
 Legal advice; non-EU national laws other than via NIST frameworks; automatic monitoring of new
 legislation; storing licensed standards in the public corpus.
+
+## 8. Sub-project 1 results (2026-10-20)
+
+Corpus `regs-v1`: 3,830 provisions (AI Act 854 incl. 180 recitals, GDPR 563, NIS2 349, DORA 375, CRA 475,
+SP 800-53 1,014, CSF 2.0 128, AI RMF 72); every date quoted from its basis provision and checked in CI.
+Uploaded to Pinecone namespace `regs-v1` (3,830 vectors) with approval.
+
+Retrieval, 46 hand-labelled questions, provision level, k = 10:
+
+| Mode | Recall | MRR | nDCG | reference R/MRR | concept R/MRR | cross R/MRR |
+|---|---|---|---|---|---|---|
+| Lexical (BM25) | 0.661 | 0.436 | 0.473 | 1.00 / 0.54 | 0.69 / 0.46 | 0.29 / 0.24 |
+| **Dense** | **0.864** | **0.750** | **0.729** | 1.00 / 0.71 | 0.91 / 0.77 | 0.48 / 0.64 |
+| Fused RRF, lexical weight 1.0 | 0.846 | 0.580 | 0.611 | 1.00 / 0.56 | 0.90 / 0.60 | 0.43 / 0.49 |
+| Fused RRF, lexical weight 0.25 | 0.864 | 0.703 | 0.698 | 1.00 / 0.71 | 0.91 / 0.73 | 0.48 / 0.53 |
+
+Decisions for sub-project 2 (measured, like the earlier reranker decision):
+- **Dense retrieval is the default.** Fusion did not beat it at any tested weight; BM25 stays available for
+  explicit identifier lookups, to be re-measured with the reference resolver.
+- **Cross-framework questions are the weak spot (recall 0.48)** for every method: a single ranked list fills
+  with one framework. Sub-project 2 retrieves per in-scope framework and merges (diversification), measured
+  on the `cross` subset.
+- **A cosine floor alone cannot abstain correctly on legal questions.** 14 unanswerable questions
+  (`eval/regs_unanswerable.jsonl`): off-topic ones score 0.09–0.29, but wrong-jurisdiction and licensed-text
+  questions score as high as real answers (CCPA → CRA Art. 64 at 0.450; DPDP → GDPR recital 32 at 0.426;
+  ISO 42001 → AI Act Art. 43 at 0.431), while the lowest answerable relevant hit scores 0.412 (overlap 6).
+  Sub-project 2 therefore uses three layers: (1) a recalibrated floor near 0.30 for off-topic text,
+  (2) a deterministic scope guard for named out-of-scope instruments (CCPA, HIPAA, DPDP, SOX, PCI DSS,
+  UK Online Safety Act; ISO/SOC 2 → "bring your licensed copy"), (3) an instrument/jurisdiction mismatch
+  check at verification. All three are scored on the unanswerable set.

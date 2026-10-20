@@ -9,7 +9,7 @@ def test_status_label_per_status():
     assert status_label({**GDPR, "status": "not_yet", "applies_from": "2027-12-02"}) == ("orange", "applies from 2027-12-02")
     assert status_label({**GDPR, "status": "depends"})[0] == "violet"
     assert status_label({**GDPR, "status": "voluntary"}) == ("gray", "voluntary framework")
-    assert status_label({**GDPR, "status": "no_date"}) == ("gray", "interpretive, no date of its own")
+    assert status_label({**GDPR, "status": "no_date"}) == ("gray", "no date of its own")
     assert status_label({"title": "legacy", "score": 0.5}) is None
 
 
@@ -36,3 +36,10 @@ def test_verdicts_and_summaries_for_regs_abstentions():
     assert verdict({"insufficient_context": True})[1] == "Not in the knowledge base"
     assert "outside the covered rules" in trace_summary(True, 1200, 0, "out_of_scope")
     assert "nothing relevant" in trace_summary(True, 1200, 0)
+
+
+def test_dates_note_names_the_high_risk_classes():
+    from frontend.services.presenters import dates_note
+
+    assert dates_note("2027-12-02 if annex_iii; 2028-08-02 if annex_i") == \
+        "2027-12-02 for Annex III systems; 2028-08-02 for Annex I systems"

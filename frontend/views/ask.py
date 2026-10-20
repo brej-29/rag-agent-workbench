@@ -11,8 +11,8 @@ import streamlit as st
 from services.backend_client import namespace_stats, post_upload_text, stream_chat
 from services.file_convert import DocumentConverter, convert_uploaded_file_to_text
 from services.presenters import (
-    EXAMPLES, FRAMEWORKS, HIGH_RISK, REGS_EXAMPLES, REGS_NAMESPACE, chip_label, cite_markdown, citing_sentences, esc,
-    floor_bars_html, profile_words, status_label, step_line, trace_summary, verdict,
+    EXAMPLES, FRAMEWORKS, HIGH_RISK, REGS_EXAMPLES, REGS_NAMESPACE, chip_label, cite_markdown, citing_sentences,
+    dates_note, esc, floor_bars_html, profile_words, status_label, step_line, trace_summary, verdict,
 )
 from services.shell import api_key, backend_state, backend_url, is_dark, wake_watcher
 
@@ -29,7 +29,7 @@ s.setdefault("uploads", [])
 
 @st.dialog("Evidence", position="right", width="medium")
 def evidence_drawer(n: int, src: Dict[str, Any], answer: str, floor: Optional[float],
-                    as_of: Optional[str] = None) -> None:
+                    as_of: Optional[str] = None, n_sources: Optional[int] = None) -> None:
     web = src.get("source") == "web"
     st.caption(f"Source {n} · {'web result' if web else src.get('source') or 'knowledge base'}")
     st.subheader(src.get("title") or f"Source {n}", anchor=False)
@@ -40,7 +40,7 @@ def evidence_drawer(n: int, src: Dict[str, Any], answer: str, floor: Optional[fl
             if as_of:
                 st.caption(f"on {as_of}")
         if src.get("status_note"):
-            st.caption(f"Dates: {src['status_note']}")
+            st.caption(f"Dates: {dates_note(src['status_note'])}")
     if src.get("url"):
         st.markdown(f"[Official text]({src['url']})" if label else f"[{src['url']}]({src['url']})")
     if floor is not None and not web:
@@ -48,7 +48,7 @@ def evidence_drawer(n: int, src: Dict[str, Any], answer: str, floor: Optional[fl
     cited = citing_sentences(answer, n)
     st.markdown("**Cited for**" if cited else "**Not cited in the answer**")
     for sentence in cited:
-        st.markdown(f"> {cite_markdown(sentence, n_sources=n)}")
+        st.markdown(f"> {cite_markdown(sentence, n_sources=n_sources or n)}")
     st.markdown("**Passage**")
     with st.container(border=True):
         st.html(f'<div style="white-space:pre-wrap;line-height:1.6">{esc(src.get("chunk_text") or "")}</div>')
@@ -106,7 +106,7 @@ def render_answer(msg: Dict[str, Any], idx: int) -> None:
             for n, src in enumerate(sources, 1):
                 if st.button(chip_label(n, src), key=f"src-{idx}-{n}", type="secondary",
                              icon=":material/gavel:" if src.get("ref") else ":material/description:"):
-                    evidence_drawer(n, src, msg["content"], floor, resp.get("as_of"))
+                    evidence_drawer(n, src, msg["content"], floor, resp.get("as_of"), len(sources))
 
 
 # ---------------------------------------------------------------------------

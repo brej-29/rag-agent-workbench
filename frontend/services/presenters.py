@@ -151,7 +151,12 @@ def status_label(src: Dict[str, Any]) -> Optional[Tuple[str, str]]:
         "not_yet": ("orange", f"applies from {frm}"),
         "depends": ("violet", "date depends on classification"),
         "voluntary": ("gray", "voluntary framework"),
-    }.get(st, ("gray", "interpretive, no date of its own"))
+    }.get(st, ("gray", "no date of its own"))
+
+
+def dates_note(note: str) -> str:
+    """'2027-12-02 if annex_iii; 2028-08-02 if annex_i' -> readable class names."""
+    return re.sub(r"\bif (annex_iii|annex_i)\b", lambda m: f"for {_ROLE_WORDS[m.group(1)]} systems", note)
 
 
 def chip_label(n: int, src: Dict[str, Any]) -> str:

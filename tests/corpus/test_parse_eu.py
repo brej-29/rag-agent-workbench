@@ -115,3 +115,10 @@ def test_sectioned_annex_points_are_unique_and_cite_their_section():
     assert recs["eu-ai-act/anx-VIII/sec-A/pt-1"]["ref"] == "AI Act Annex VIII, Section A, point 1"
     assert recs["eu-ai-act/anx-VIII/sec-B/pt-1"]["text"] == "1. The name of the deployer;"
     assert recs["eu-ai-act/anx-VIII/sec-B/pt-2"]["text"] == "2. A plain div point."
+
+
+def test_quoted_amendment_paragraph_labels_are_ascii():
+    html = """<div class="eli-subdivision" id="art_105"><p class="title-article-norm">Article 105</p>
+<div class="norm"><span class="no-parag">‘5. </span><div class="norm inline-element">For AI systems...</div></div></div>"""
+    (rec,) = parse_eu(html, AI)
+    assert rec["id"] == "eu-ai-act/art-105/par-5" and rec["id"].isascii()

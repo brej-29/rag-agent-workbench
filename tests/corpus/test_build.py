@@ -10,3 +10,15 @@ def test_long_records_split_on_sentence_boundaries_with_part_ids():
 def test_short_records_untouched():
     rec = {"id": "x", "ref": "X", "text": "short"}
     assert split_long(rec) == [rec]
+
+
+def test_built_corpus_ids_are_ascii_and_unique():
+    """Pinecone rejects non-ASCII vector ids; catch them here, not mid-upload."""
+    import pytest
+    from app.services.regs import DATA_DIR, load_provisions
+
+    if not (DATA_DIR / "regs-v1.jsonl").exists():
+        pytest.skip("corpus not built")
+    ids = [p["id"] for p in load_provisions()]
+    assert [i for i in ids if not i.isascii()] == []
+    assert len(ids) == len(set(ids))

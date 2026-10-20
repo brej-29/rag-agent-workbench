@@ -57,7 +57,8 @@ def _paragraphs(art: Tag):
             yield m.group(1).lstrip("0") or "0", child, prev
         elif "norm" in cls and child.find("span", class_="no-parag", recursive=False):
             label = child.find("span", class_="no-parag", recursive=False).get_text(strip=True).rstrip(".")
-            yield label, child, prev
+            # Amending articles quote inserted paragraphs ("‘5."): ids must stay ASCII.
+            yield re.sub(r"[^0-9A-Za-z]", "", label), child, prev
         prev = child.get_text(" ", strip=True) if len(child.get_text(strip=True)) < 12 else ""
 
 

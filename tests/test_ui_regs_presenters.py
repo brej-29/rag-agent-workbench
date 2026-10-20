@@ -23,7 +23,7 @@ def test_route_step_lines():
     assert "not cover" in step_line({"id": "route", "status": "done", "detail": {"abstain_reason": "out_of_scope"}})
     assert "licensed" in step_line({"id": "route", "status": "done", "detail": {"abstain_reason": "licensed"}})
     line = step_line({"id": "route", "status": "done",
-                      "detail": {"intent": "ask", "profile_updates": {"roles": ["deployer"], "high_risk": "annex_iii"}}})
+                      "detail": {"intent": "ask", "profile_updates": {"ai_roles": ["deployer"], "high_risk": "annex_iii"}}})
     assert "question about the rules" in line and "deployer" in line and "Annex III" in line
     assert "not available yet" in step_line({"id": "route", "status": "done",
                                              "detail": {"intent": "checklist", "abstain_reason": "not_available"}})

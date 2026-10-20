@@ -1,0 +1,136 @@
+# Profile facts the checklist decides on (spec §11.1). Ids and order match app.schemas.chat.Profile.
+# type: bool | choice | multi. A fact not given is unknown; for multi, [] means "none of these".
+- id: ai_system
+  type: bool
+  group: Your AI
+  label: Do you build, sell or use AI systems?
+  short: AI system
+  help: Software that infers from its inputs how to produce outputs such as predictions, content, recommendations or decisions (AI Act Art. 3(1)).
+  basis: eu-ai-act/art-3
+- id: ai_roles
+  type: multi
+  group: Your AI
+  label: Your role for the AI system
+  values: [provider, deployer, importer, distributor]
+  labels: {provider: AI provider, deployer: AI deployer, importer: AI importer, distributor: AI distributor}
+  help: Provider = develops it (or has it developed) and markets it under its own name. Deployer = uses it under its own authority.
+  basis: eu-ai-act/art-3
+- id: high_risk
+  type: choice
+  group: Your AI
+  label: High-risk class of the AI system
+  values: [annex_iii, annex_i, none]
+  labels: {annex_iii: Annex III high-risk, annex_i: Annex I high-risk, none: not high-risk}
+  help: Annex III = uses such as hiring, credit scoring, education, essential services, law enforcement. Annex I = safety component of a product under EU product laws (medical devices, machinery, toys).
+  basis: eu-ai-act/art-6
+- id: ai_uses
+  type: multi
+  group: Your AI
+  label: What the AI does with people
+  values: [chatbot, synthetic_content, emotion_or_biometric, deepfake]
+  labels: {chatbot: talks with people, synthetic_content: generates synthetic content, emotion_or_biometric: emotion recognition or biometric categorisation, deepfake: produces deepfakes}
+  help: Decides the transparency duties of AI Act Art. 50.
+  basis: eu-ai-act/art-50
+- id: fria_trigger
+  type: bool
+  group: Your AI
+  label: Public body, public service, or credit / life and health insurance use?
+  short: public service or credit/insurance use
+  help: Decides the fundamental rights impact assessment (AI Act Art. 27).
+  basis: eu-ai-act/art-27
+- id: gpai_model
+  type: bool
+  group: Your AI
+  label: Do you provide a general-purpose AI model?
+  short: general-purpose AI model
+  help: A model trained on broad data that can perform a wide range of tasks and is integrated into other systems.
+  basis: eu-ai-act/art-3
+- id: gpai_systemic_risk
+  type: bool
+  group: Your AI
+  label: Is that model classified as having systemic risk?
+  short: systemic-risk model
+  basis: eu-ai-act/art-51
+- id: eu_established
+  type: bool
+  group: Where and how big
+  label: Established in the EU?
+  short: established in the EU
+  basis: gdpr/art-3
+- id: eu_market
+  type: bool
+  group: Where and how big
+  label: Do you offer products or services in the EU, or to people in the EU?
+  short: EU market
+  basis: gdpr/art-3
+- id: size
+  type: choice
+  group: Where and how big
+  label: Size of the organisation
+  values: [micro, small, medium, large]
+  labels: {micro: "micro (under 10 staff)", small: "small (under 50)", medium: "medium (under 250)", large: "large (250 or more)"}
+  help: EU SME bands (Recommendation 2003/361) by headcount; turnover and balance sheet also count.
+  basis: nis2/art-2
+- id: personal_data
+  type: bool
+  group: Personal data
+  label: Do you process personal data?
+  short: personal data
+  basis: gdpr/art-2
+- id: data_roles
+  type: multi
+  group: Personal data
+  label: Your role for personal data
+  values: [controller, processor]
+  labels: {controller: data controller, processor: data processor}
+  help: Controller = decides why and how data is processed. Processor = processes it on a controller's behalf (e.g. as a SaaS or cloud vendor).
+  basis: gdpr/art-4
+- id: sensitive_data
+  type: bool
+  group: Personal data
+  label: Special-category or criminal-offence data?
+  short: special-category data
+  help: Health, biometric, genetic, ethnic origin, religion, political opinions, sexual orientation, trade union membership, criminal records.
+  basis: gdpr/art-9
+- id: large_scale_core
+  type: bool
+  group: Personal data
+  label: Large-scale monitoring or sensitive data as a core activity?
+  short: large-scale core processing
+  help: Decides the data protection officer (GDPR Art. 37) and often the impact assessment (Art. 35).
+  basis: gdpr/art-37
+- id: automated_decisions
+  type: bool
+  group: Personal data
+  label: Fully automated decisions with legal or similar effects on people?
+  short: automated decisions
+  basis: gdpr/art-22
+- id: third_country_transfers
+  type: bool
+  group: Personal data
+  label: Do you transfer personal data outside the EU/EEA?
+  short: transfers outside the EU
+  basis: gdpr/art-44
+- id: nis2_sector
+  type: choice
+  group: Sector and products
+  label: Main NIS2 sector
+  values: [cloud, data_centre, cdn, dns_tld, trust_services, electronic_comms, managed_services, online_platform, other_annex, none]
+  labels: {cloud: cloud computing, data_centre: data centre, cdn: content delivery network, dns_tld: DNS or TLD registry, trust_services: trust services, electronic_comms: public electronic communications, managed_services: managed (security) services, online_platform: "online marketplace, search engine or social network", other_annex: another NIS2 Annex I/II sector, none: none of these}
+  help: NIS2 Annex I/II. "Another sector" covers energy, transport, health, water, manufacturing, food, postal, research and others.
+  basis: nis2/art-2
+- id: financial_entity
+  type: bool
+  group: Sector and products
+  label: A financial entity under DORA?
+  short: financial entity
+  help: Banks, payment and e-money institutions, investment firms, crypto-asset service providers, insurers and the others listed in DORA Art. 2(1).
+  basis: dora/art-2
+- id: product_roles
+  type: multi
+  group: Sector and products
+  label: Your role for products with digital elements
+  values: [manufacturer, importer, distributor]
+  labels: {manufacturer: product manufacturer, importer: product importer, distributor: product distributor}
+  help: Hardware or software products that connect to a device or network, made available on the EU market (CRA Art. 2(1)).
+  basis: cra/art-2

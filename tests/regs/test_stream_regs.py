@@ -7,8 +7,8 @@ from app.services.chat.streaming import stream_chat_response
 
 STATE = {"query": "When must a personal data breach be notified?", "namespace": "regs-v1", "top_k": 5,
          "use_web_fallback": True, "min_score": 0.25, "max_web_results": 5, "chat_history": [], "as_of": "2026-10-20"}
-ROUTE = ('{"intent": "ask", "profile_updates": {"roles": ["controller"], "ai_system": null, "gpai_model": null, '
-         '"high_risk": null, "personal_data": true, "eu_market": null, "sector": null}}')
+ROUTE = ('{"intent": "ask", "profile_updates": {"data_roles": ["controller"], "ai_system": null, "gpai_model": null, '
+         '"high_risk": null, "personal_data": true, "eu_market": null, "size": null}}')
 
 
 async def _astream(messages, config=None):  # noqa: ARG001
@@ -36,7 +36,7 @@ def test_regs_stream_emits_route_step_and_regs_fields():
     assert gate["detail"]["floor"] == 0.30
     done = events[-1][1]
     assert done["as_of"] == "2026-10-20" and done["intent"] == "ask"
-    assert done["profile_updates"] == {"roles": ["controller"], "personal_data": True}
+    assert done["profile_updates"] == {"data_roles": ["controller"], "personal_data": True}
     src = done["sources"][0]
     assert (src["ref"], src["framework"], src["status"], src["applies_from"]) == (
         "GDPR Art. 33(1)", "GDPR", "applies", "2018-05-25")
@@ -60,7 +60,7 @@ def test_regs_request_fields_reach_the_graph_and_the_cache_key():
 
     req = ChatRequest(query="q", as_of="2027-01-01", frameworks=["GDPR"], profile={"high_risk": "annex_iii"})
     assert _regs_inputs(req) == {"as_of": "2027-01-01", "frameworks": ["GDPR"],
-                                 "profile": {"roles": [], "high_risk": "annex_iii"}}
+                                 "profile": {"high_risk": "annex_iii"}}
     assert _cache_query(req, "eval") == "q"
     later = ChatRequest(query="q", as_of="2028-01-01", frameworks=["GDPR"], profile={"high_risk": "annex_iii"})
     assert _cache_query(req, "regs-v1") != _cache_query(later, "regs-v1")

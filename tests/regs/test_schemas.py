@@ -14,7 +14,7 @@ def test_regs_settings_defaults():
 
 def test_request_accepts_as_of_frameworks_and_profile():
     r = ChatRequest(query="q", as_of="2026-10-20", frameworks=["GDPR"],
-                    profile={"high_risk": "annex_iii", "roles": ["deployer"]})
+                    profile={"high_risk": "annex_iii", "ai_roles": ["deployer"]})
     assert r.as_of == date(2026, 10, 20) and r.frameworks == ["GDPR"] and r.profile.high_risk == "annex_iii"
 
 
@@ -22,7 +22,7 @@ def test_profile_rejects_unknown_values():
     with pytest.raises(ValidationError):
         Profile(high_risk="very")
     with pytest.raises(ValidationError):
-        Profile(roles=["wizard"])
+        Profile(ai_roles=["wizard"])
 
 
 def test_regs_fields_default_empty():

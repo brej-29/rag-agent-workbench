@@ -129,15 +129,23 @@ def step_line(step: Dict[str, Any]) -> str:
     return sid
 
 
-def profile_words(profile: Dict[str, Any]) -> str:
-    words = [str(r).replace("_", " ") for r in profile.get("roles") or []]
-    if profile.get("high_risk"):
-        words.append(_ROLE_WORDS.get(profile["high_risk"], str(profile["high_risk"])))
-    words += [label for key, label in (("ai_system", "AI system"), ("gpai_model", "general-purpose AI model"),
-                                      ("personal_data", "personal data"), ("eu_market", "EU market"))
-              if profile.get(key)]
-    if profile.get("sector"):
-        words.append(str(profile["sector"]))
+def profile_words(profile: Dict[str, Any], facts: Optional[List[Dict[str, Any]]] = None) -> str:
+    """'AI deployer, Annex III high-risk, EU market' from a profile; facts.yaml labels when given."""
+    by_id = {f["id"]: f for f in facts or []}
+    words: List[str] = []
+    for key, value in profile.items():
+        f = by_id.get(key, {})
+        labels = f.get("labels") or {}
+
+        def name(v: Any) -> str:
+            return labels.get(v) or _ROLE_WORDS.get(v) or str(v).replace("_", " ")
+
+        if value is True:
+            words.append(f.get("short") or key.replace("_", " "))
+        elif isinstance(value, list):
+            words += [name(v) for v in value]
+        elif value not in (False, None, ""):
+            words.append(name(value))
     return ", ".join(words)
 
 

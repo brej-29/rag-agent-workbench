@@ -56,20 +56,36 @@ class ChatTokenUsage(BaseModel):
     )
 
 
-Role = Literal["provider", "deployer", "importer", "distributor", "manufacturer", "controller", "processor",
-               "financial_entity", "essential_entity", "important_entity"]
+AiRole = Literal["provider", "deployer", "importer", "distributor"]
+DataRole = Literal["controller", "processor"]
+ProductRole = Literal["manufacturer", "importer", "distributor"]
+AiUse = Literal["chatbot", "synthetic_content", "emotion_or_biometric", "deepfake"]
+Nis2Sector = Literal["cloud", "data_centre", "cdn", "dns_tld", "trust_services", "electronic_comms",
+                     "managed_services", "online_platform", "other_annex", "none"]
 
 
 class Profile(BaseModel):
-    """What the user has told us about their product or organisation.  None = not known."""
+    """Facts about the product or organisation (backend/app/data/regs/facts.yaml).  None = not known."""
 
-    roles: List[Role] = Field(default_factory=list)
     ai_system: Optional[bool] = None
+    ai_roles: Optional[List[AiRole]] = None
+    high_risk: Optional[Literal["annex_iii", "annex_i", "none", "unknown"]] = None
+    ai_uses: Optional[List[AiUse]] = None
+    fria_trigger: Optional[bool] = None
     gpai_model: Optional[bool] = None
-    high_risk: Optional[Literal["none", "annex_iii", "annex_i", "unknown"]] = None
-    personal_data: Optional[bool] = None
+    gpai_systemic_risk: Optional[bool] = None
+    eu_established: Optional[bool] = None
     eu_market: Optional[bool] = None
-    sector: Optional[str] = None
+    size: Optional[Literal["micro", "small", "medium", "large"]] = None
+    personal_data: Optional[bool] = None
+    data_roles: Optional[List[DataRole]] = None
+    sensitive_data: Optional[bool] = None
+    large_scale_core: Optional[bool] = None
+    automated_decisions: Optional[bool] = None
+    third_country_transfers: Optional[bool] = None
+    nis2_sector: Optional[Nis2Sector] = None
+    financial_entity: Optional[bool] = None
+    product_roles: Optional[List[ProductRole]] = None
 
 
 class ChatRequest(BaseModel):

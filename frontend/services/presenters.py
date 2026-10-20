@@ -21,6 +21,33 @@ EXAMPLES = [
     "Who won the 2018 FIFA World Cup?",
 ]
 
+# Regulatory knowledge base (namespace regs-v1): official EU and NIST text, with dates.
+REGS_NAMESPACE = "regs-v1"
+FRAMEWORKS = ["EU AI Act", "GDPR", "NIS2", "DORA", "Cyber Resilience Act", "NIST SP 800-53", "NIST CSF 2.0",
+              "NIST AI RMF"]
+REGS_EXAMPLES = [
+    "When must a personal data breach be reported?",
+    "Do the AI Act's high-risk obligations already apply to a CV-screening tool?",
+    "What are the incident reporting deadlines across EU rules?",
+    "What does HIPAA require?",
+]
+HIGH_RISK = {"Not sure": None, "Annex III (e.g. hiring, credit, education)": "annex_iii",
+             "Annex I (safety component of a regulated product)": "annex_i", "Not high-risk": "none"}
+
+_ROLE_WORDS = {"annex_iii": "Annex III", "annex_i": "Annex I", "none": "not high-risk", "unknown": "high-risk unknown"}
+_ROUTE_REPLY = {
+    "out_of_scope": "The question names rules this knowledge base does not cover, so nothing was searched",
+    "licensed": "The question names a licensed standard, whose text is not in the public knowledge base",
+    "not_available": "Recognised a request for a {intent}, which is not available yet",
+    "clarify": "The request needs more detail before anything can be looked up",
+}
+_ABSTAIN_VERDICT = {
+    "out_of_scope": ("gray", "Not covered here"),
+    "licensed": ("gray", "Licensed standard"),
+    "not_available": ("blue", "Not available yet"),
+    "clarify": ("blue", "Needs more detail"),
+}
+
 _REJECTED = {
     "refusal": "it was a refusal",
     "answer": "it answered instead of searching",
@@ -59,6 +86,12 @@ def citing_sentences(answer: str, n: int) -> List[str]:
 def step_line(step: Dict[str, Any]) -> str:
     """One line of the pipeline trace, in plain language."""
     sid, status, d, ms = step["id"], step["status"], step.get("detail") or {}, step.get("ms")
+    if sid == "route":
+        reason = d.get("abstain_reason")
+        if reason in _ROUTE_REPLY:
+            return _ROUTE_REPLY[reason].format(intent=str(d.get("intent") or "").replace("_", " "))
+        noted = profile_words(d.get("profile_updates") or {})
+        return "Understood as a question about the rules" + (f" · noted: {noted}" if noted else "")
     if sid == "retrieve":
         line = f"Retrieved {d.get('hits', 0)} passages · best match `{d.get('top_score', 0.0):.2f}`"
         if d.get("rewritten_query"):
@@ -96,8 +129,46 @@ def step_line(step: Dict[str, Any]) -> str:
     return sid
 
 
-def trace_summary(abstained: bool, total_ms: float, n_sources: int) -> str:
+def profile_words(profile: Dict[str, Any]) -> str:
+    words = [str(r).replace("_", " ") for r in profile.get("roles") or []]
+    if profile.get("high_risk"):
+        words.append(_ROLE_WORDS.get(profile["high_risk"], str(profile["high_risk"])))
+    words += [label for key, label in (("ai_system", "AI system"), ("gpai_model", "general-purpose AI model"),
+                                      ("personal_data", "personal data"), ("eu_market", "EU market"))
+              if profile.get(key)]
+    if profile.get("sector"):
+        words.append(str(profile["sector"]))
+    return ", ".join(words)
+
+
+def status_label(src: Dict[str, Any]) -> Optional[Tuple[str, str]]:
+    """(badge color, text) for a provision's applicability on the as-of date; None outside the regs corpus."""
+    st, frm = src.get("status"), src.get("applies_from")
+    if not st:
+        return None
+    return {
+        "applies": ("green", f"in force since {frm}"),
+        "not_yet": ("orange", f"applies from {frm}"),
+        "depends": ("violet", "date depends on classification"),
+        "voluntary": ("gray", "voluntary framework"),
+    }.get(st, ("gray", "interpretive, no date of its own"))
+
+
+def chip_label(n: int, src: Dict[str, Any]) -> str:
+    label = status_label(src)
+    if src.get("ref") and label:
+        return f"{n} · {src['ref']} · {label[1]}"
+    title = (src.get("title") or f"Source {n}")[:42]
+    score = "web" if src.get("source") == "web" else f"{float(src.get('score') or 0):.2f}"
+    return f"{n} · {title} · {score}"
+
+
+def trace_summary(abstained: bool, total_ms: float, n_sources: int, reason: Optional[str] = None) -> str:
     secs = f"{total_ms / 1000:.1f} s"
+    if abstained and reason in ("out_of_scope", "licensed"):
+        return f"Declined in {secs} · outside the covered rules"
+    if abstained and reason in ("not_available", "clarify"):
+        return f"Replied in {secs} · nothing was searched"
     if abstained:
         return f"Abstained in {secs} · nothing relevant enough in the knowledge base"
     return f"Answered in {secs} · {n_sources} source{'s' if n_sources != 1 else ''}"
@@ -106,7 +177,7 @@ def trace_summary(abstained: bool, total_ms: float, n_sources: int) -> str:
 def verdict(response: Dict[str, Any]) -> Tuple[str, str]:
     """(badge color, label) for the answer's trust state."""
     if response.get("insufficient_context"):
-        return "orange", "Not in the knowledge base"
+        return _ABSTAIN_VERDICT.get(response.get("abstain_reason"), ("orange", "Not in the knowledge base"))
     grounded, score = response.get("grounded"), response.get("faithfulness_score")
     if grounded is True:
         return "green", f"Grounded · {score:.2f}" if score is not None else "Grounded"

@@ -1,7 +1,7 @@
 """Ask: grounded chat with a live pipeline trace and per-source evidence."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -11,11 +11,12 @@ import streamlit as st
 from services.backend_client import namespace_stats, post_upload_text, stream_chat
 from services.file_convert import DocumentConverter, convert_uploaded_file_to_text
 from services.presenters import (
-    EXAMPLES, cite_markdown, citing_sentences, esc, floor_bars_html, step_line, trace_summary, verdict,
+    EXAMPLES, FRAMEWORKS, HIGH_RISK, REGS_EXAMPLES, REGS_NAMESPACE, chip_label, cite_markdown, citing_sentences, esc,
+    floor_bars_html, profile_words, status_label, step_line, trace_summary, verdict,
 )
 from services.shell import api_key, backend_state, backend_url, is_dark, wake_watcher
 
-DEFAULT_NAMESPACE = "eval"
+DEFAULT_NAMESPACE = REGS_NAMESPACE
 AVATARS = {"user": ":material/person:", "assistant": ":material/fact_check:"}
 s = st.session_state
 s.setdefault("messages", [])
@@ -27,12 +28,21 @@ s.setdefault("uploads", [])
 # ---------------------------------------------------------------------------
 
 @st.dialog("Evidence", position="right", width="medium")
-def evidence_drawer(n: int, src: Dict[str, Any], answer: str, floor: Optional[float]) -> None:
+def evidence_drawer(n: int, src: Dict[str, Any], answer: str, floor: Optional[float],
+                    as_of: Optional[str] = None) -> None:
     web = src.get("source") == "web"
     st.caption(f"Source {n} · {'web result' if web else src.get('source') or 'knowledge base'}")
     st.subheader(src.get("title") or f"Source {n}", anchor=False)
+    label = status_label(src)
+    if label:
+        with st.container(horizontal=True, vertical_alignment="center", gap="small"):
+            st.badge(label[1], color=label[0])
+            if as_of:
+                st.caption(f"on {as_of}")
+        if src.get("status_note"):
+            st.caption(f"Dates: {src['status_note']}")
     if src.get("url"):
-        st.markdown(f"[{src['url']}]({src['url']})")
+        st.markdown(f"[Official text]({src['url']})" if label else f"[{src['url']}]({src['url']})")
     if floor is not None and not web:
         st.html(floor_bars_html([float(src.get("score") or 0.0)], floor, is_dark()))
     cited = citing_sentences(answer, n)
@@ -66,9 +76,12 @@ def render_answer(msg: Dict[str, Any], idx: int) -> None:
     sources = resp.get("sources") or []
     abstained = bool(resp.get("insufficient_context"))
     total_ms = float((resp.get("timings") or {}).get("total_ms") or 0.0)
-    with st.status(trace_summary(abstained, total_ms, len(sources)), state="complete", expanded=False):
+    with st.status(trace_summary(abstained, total_ms, len(sources), resp.get("abstain_reason")),
+                   state="complete", expanded=False):
         render_trace(steps)
     st.markdown(cite_markdown(msg["content"], len(sources)))
+    for warning in resp.get("warnings") or []:
+        st.caption(f":material/warning: {warning}")
 
     color, label = verdict(resp)
     usage = resp.get("usage") or {}
@@ -79,17 +92,21 @@ def render_answer(msg: Dict[str, Any], idx: int) -> None:
         meta.append(f"≈ ${usage['estimated_cost_usd']:.4f}")
     with st.container(horizontal=True, vertical_alignment="center", gap="small"):
         st.badge(label, color=color)
+        if resp.get("as_of"):
+            meta.insert(0, f"as of {resp['as_of']}")
+            meta.append("not legal advice")
         st.caption(" · ".join(meta))
+    noted = profile_words(resp.get("profile_updates") or {})
+    if noted:
+        st.caption(f":material/person_check: Noted from your question: {noted}")
 
     if sources:
         floor = _floor(steps)
         with st.container(horizontal=True, gap="small", wrap=True):
             for n, src in enumerate(sources, 1):
-                title = (src.get("title") or f"Source {n}")[:42]
-                score = "web" if src.get("source") == "web" else f"{float(src.get('score') or 0):.2f}"
-                if st.button(f"{n} · {title} · {score}", key=f"src-{idx}-{n}", type="secondary",
-                             icon=":material/description:"):
-                    evidence_drawer(n, src, msg["content"], floor)
+                if st.button(chip_label(n, src), key=f"src-{idx}-{n}", type="secondary",
+                             icon=":material/gavel:" if src.get("ref") else ":material/description:"):
+                    evidence_drawer(n, src, msg["content"], floor, resp.get("as_of"))
 
 
 # ---------------------------------------------------------------------------
@@ -154,17 +171,33 @@ def sidebar(ready: bool) -> Dict[str, Any]:
         for u in reversed(s.uploads):
             st.caption(f":material/check: {u['title']} → `{u['namespace']}` · {u['at']}")
 
-        st.subheader("Retrieval", anchor=False)
-        top_k = st.slider("Passages to retrieve", 1, 20, 5)
-        web = st.toggle("Search the web when the knowledge base is weak", value=False)
-        web_threshold = st.slider(
-            "Web search threshold", 0.0, 1.0, 0.25, 0.05, disabled=not web,
-            help="If the best passage scores below this, web results are added (Tavily).",
-        )
+        if namespace == REGS_NAMESPACE:
+            settings = regs_controls()
+        else:
+            st.subheader("Retrieval", anchor=False)
+            top_k = st.slider("Passages to retrieve", 1, 20, 5)
+            web = st.toggle("Search the web when the knowledge base is weak", value=False)
+            web_threshold = st.slider(
+                "Web search threshold", 0.0, 1.0, 0.25, 0.05, disabled=not web,
+                help="If the best passage scores below this, web results are added (Tavily).",
+            )
+            settings = {"top_k": top_k, "use_web_fallback": web, "min_score": web_threshold}
         if s.messages and st.button("Clear conversation", icon=":material/delete_sweep:", type="tertiary"):
             s.messages = []
             st.rerun()
-    return {"namespace": namespace, "top_k": top_k, "use_web_fallback": web, "min_score": web_threshold}
+    return {"namespace": namespace, **settings}
+
+
+def regs_controls() -> Dict[str, Any]:
+    st.subheader("Your situation", anchor=False)
+    as_of = st.date_input("Answer as of", value=date.today(), min_value=date(2016, 1, 1),
+                          max_value=date(2035, 12, 31), help="Each cited rule shows whether it applies on this date.")
+    frameworks = st.multiselect("Frameworks", FRAMEWORKS, placeholder="All covered frameworks")
+    high_risk = HIGH_RISK[st.selectbox("High-risk AI class", list(HIGH_RISK),
+                                       help="Sets which AI Act dates apply to high-risk obligations.")]
+    st.caption("Answers come from official EU and NIST text only. Not legal advice.")
+    return {"as_of": as_of.isoformat(), "frameworks": frameworks or None,
+            "profile": {"high_risk": high_risk} if high_risk else None, "use_web_fallback": False}
 
 
 # ---------------------------------------------------------------------------
@@ -221,18 +254,29 @@ state = backend_state()
 ready = state == "ready"
 settings = sidebar(ready)
 
+regs = settings["namespace"] == REGS_NAMESPACE
 if not s.messages:
-    st.title("Ask the knowledge base", anchor=False)
-    st.markdown(
-        "Answers cite the passages they use. When no passage clears the **relevance floor**, "
-        "you get a plain “not in the knowledge base” instead of a guess."
-    )
+    if regs:
+        st.title("Ask the rules for AI, data and cyber", anchor=False)
+        st.markdown(
+            "Answers quote the EU AI Act, GDPR, NIS2, DORA, the Cyber Resilience Act and NIST frameworks, "
+            "cite the exact provision, and say whether each one **applies on your date**. Questions about "
+            "rules not covered here get a plain decline instead of a guess."
+        )
+    else:
+        st.title("Ask the knowledge base", anchor=False)
+        st.markdown(
+            "Answers cite the passages they use. When no passage clears the **relevance floor**, "
+            "you get a plain “not in the knowledge base” instead of a guess."
+        )
     if state == "waking":
         wake_watcher()
         st.skeleton(height=120)
     elif ready:
-        pick = st.pills("Try a question", EXAMPLES, key="example", label_visibility="visible")
-        st.caption("The last one is not in the knowledge base: watch it decline.")
+        pick = st.pills("Try a question", REGS_EXAMPLES if regs else EXAMPLES, key="example",
+                        label_visibility="visible")
+        st.caption("The last one is outside the covered rules: watch it decline." if regs
+                   else "The last one is not in the knowledge base: watch it decline.")
     else:
         st.error(f"Cannot reach the API at `{backend_url()}`. Check BACKEND_BASE_URL.",
                  icon=":material/cloud_off:")

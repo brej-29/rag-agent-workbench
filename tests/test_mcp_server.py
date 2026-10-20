@@ -45,8 +45,8 @@ def test_ask_returns_grounded_answer_with_numbered_sources():
     result, graph = _call("ask", {"question": "What is a vector database?"}, state=ANSWERED)
     out = result.structured_content
     assert out["abstained"] is False and out["grounded"] is True
-    assert out["sources"][0] == {"n": 1, "title": "Vector database", "url": "https://w/vdb",
-                                 "doc_id": "2b529e6a", "score": 0.62}
+    assert out["sources"][0] == {"n": 1, "title": "Vector database", "url": "https://w/vdb", "doc_id": "2b529e6a",
+                                 "score": 0.62, "ref": "", "status": None, "applies_from": None}
     assert out["dangling_citations"] == []
     sent = graph.invoke.call_args.args[0]
     assert sent["query"] == "What is a vector database?" and sent["use_web_fallback"] is False
@@ -73,3 +73,26 @@ def test_guardrails_resource_explains_how_to_read_results():
 
     text = anyio.run(go).contents[0].text
     assert "abstained" in text and "never" in text.lower()
+
+
+REGS = {"answer": "Within 72 hours [1].", "insufficient_context": False, "as_of": "2026-10-20", "warnings": [],
+        "retrieved": [{"doc_id": "gdpr/art-33/par-1", "title": "GDPR Art. 33(1) — Notification", "url": "u",
+                       "source": "GDPR", "score": 0.62, "chunk_text": "...", "ref": "GDPR Art. 33(1)",
+                       "status": "applies", "applies_from": "2018-05-25"}], "web_results": []}
+
+
+def test_ask_defaults_to_the_regulatory_corpus_with_provision_status():
+    result, graph = _call("ask", {"question": "When must a breach be notified?", "as_of": "2026-10-20",
+                                  "frameworks": ["GDPR"]}, state=REGS)
+    sent = graph.invoke.call_args.args[0]
+    assert sent["namespace"] == "regs-v1" and sent["as_of"] == "2026-10-20" and sent["frameworks"] == ["GDPR"]
+    out = result.structured_content
+    src = out["sources"][0]
+    assert (src["ref"], src["status"], src["applies_from"]) == ("GDPR Art. 33(1)", "applies", "2018-05-25")
+    assert out["as_of"] == "2026-10-20"
+
+
+def test_ask_rejects_a_malformed_date():
+    result, graph = _call("ask", {"question": "q", "as_of": "20 Oct"}, state=REGS)
+    assert result.is_error and "YYYY-MM-DD" in result.content[0].text
+    graph.invoke.assert_not_called()

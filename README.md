@@ -12,7 +12,7 @@
   <img alt="Vector Store" src="https://img.shields.io/badge/Vector%20Store-Pinecone-3776AB">
   <img alt="Frameworks" src="https://img.shields.io/badge/Frameworks-LangChain%20%7C%20LangGraph-ff9800">
   <img alt="Frontend" src="https://img.shields.io/badge/Frontend-Streamlit-ff4b4b">
-  <img alt="Tests" src="https://img.shields.io/badge/Tests-411%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/Tests-526%20passing-brightgreen">
   <img alt="License" src="https://img.shields.io/badge/License-MIT-black">
 </div>
 
@@ -39,6 +39,33 @@ measurement-driven, every limitation is documented, and every feature ships with
 - **Bounded CRAG:** hard `max_iters=2` loop guard, disabled by default on a saturated corpus.
 - **Honest streaming:** `llm.astream` for real TTFT; cache hits and abstentions are served
   honestly with explicit `done.cached` / `insufficient_context` flags — never fake word-splits.
+
+---
+
+## Ask the rules for AI, data and cyber
+
+The default knowledge base (`regs-v1`) is the official text of the **EU AI Act, GDPR, NIS2, DORA, the Cyber
+Resilience Act, NIST SP 800-53, CSF 2.0 and the AI RMF**: 3,830 provisions, each with a stable reference
+(`GDPR Art. 33(1)`) and, for EU law, the date it applies from. Ask a question and you get:
+
+- an answer that cites the exact provisions it uses;
+- for each provision, whether it **applies on your date** (pick any as-of date; set the high-risk class when the
+  AI Act dates depend on it). Dates come from a registry that quotes the provision setting them, never from the model;
+- a plain decline, with no model call, when the question names rules not covered here (HIPAA, CCPA, PCI DSS…) or a
+  licensed standard whose text is not public (ISO/IEC 27001, 42001, SOC 2);
+- "nothing relevant enough" when no provision clears the relevance floor.
+
+Measured on 2026-10-20 (details in [the design spec](docs/superpowers/specs/2026-10-20-compliance-copilot-design.md)):
+
+| | |
+|---|---|
+| Retrieval, 46 hand-labelled questions, top 6 | recall 0.860, MRR 0.834 (plain dense: 0.835, 0.750) |
+| Abstention, no LLM | 13 of 14 out-of-scope questions declined; 0 of 46 answerable questions refused |
+| Router (ask / checklist / gap check / clarify) | 27 of 30 correct; every miss fell back to answering |
+| Latency, local API | about 2–3 s per answer; declines are instant |
+
+Checklists and gap checks against your own policies are next (see the spec's build order). This is information
+from official text, not legal advice.
 
 ---
 

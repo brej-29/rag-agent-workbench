@@ -231,3 +231,43 @@ Scope: the compliance path for Ask, behind a typed router. Requests to namespace
 7. **Gates.** Diversified retrieval: overall recall/MRR within 0.01 of dense and cross recall not lower;
    abstention (deterministic, no LLM): 14/14 unanswerable abstain, at most 1/46 false abstain; temporal
    status tests on real provisions; router accuracy reported; adversarial suite stays green.
+
+## 10. Sub-project 2 results (2026-10-20)
+
+Retrieval on the 46-question golden set (provision level), production ranking vs plain dense:
+
+| Ranking | k | Recall | MRR | nDCG | cross recall (6 q) |
+|---|---|---|---|---|---|
+| Dense | 10 | 0.864 | 0.750 | 0.729 | 0.483 |
+| **Diversified** (30 candidates, ≤3 per framework, recitals ×0.9) | 10 | **0.904** | **0.836** | **0.804** | 0.483 |
+| Dense | 6 | 0.835 | 0.750 | 0.717 | 0.344 |
+| **Diversified** (production) | 6 | **0.860** | **0.834** | **0.789** | **0.483** |
+
+Sweep (k = 10): 60 or 100 candidates with a cap of 2 lift cross recall to 0.62–0.66 but lower single-framework
+recall at k = 6 (0.831), so the defaults stay. Most of the MRR gain comes from down-weighting recitals, which
+outranked the articles they explain. Cross-framework recall remains the weak spot; per-framework queries or
+query decomposition belong with the crosswalks (sub-project 4).
+
+Abstention (`run_regs.py --mode abstain`, deterministic, no LLM): **13/14** unanswerable questions declined
+(scope guard 8, floor 5), **0/46** answerable questions refused. Gate was 14/14: the miss is "labelling rules for
+allergens on packaged food in the EU", which scores 0.378 against AI Act Annex V (declaration of conformity);
+the lowest answerable relevant hit is 0.412, so no floor separates them without overfitting this set. (§8's
+"off-topic 0.09–0.29" was wrong for this question.) Live, the model declined it from the provisions ("the
+provisions provided do not address allergen labelling"), i.e. the model-dependent layer caught it.
+
+Router (`run_router.py`, gpt-oss-20b, 30 draft-labelled requests): **0.90**. All three misses were
+checklist/gap-check requests classified as `ask` (the fail-safe direction: the user still gets an answer).
+
+Applicability: status tests on 13 real provisions on 2026-10-20 plus the Annex III flip on 2027-12-02.
+Live (local API, real index and Groq): "Do the AI Act's high-risk obligations already apply to a CV-screening
+tool?" answers "not yet in force as of 2026-10-20 … from 2027-12-02 (2028-08-02 for Annex I)"; with as-of
+2028-01-01 and Annex III it answers "yes" with every Art. 26 provision marked in force. HIPAA declines with no LLM
+call; a checklist request is routed and its profile (deployer, Annex III, AI system, EU market, personal data)
+extracted. About 2–3 s per answer, 1.8–3.1k tokens.
+
+Adversarial suite (legacy namespace, unchanged prompt): structural failures 0 in three runs; model-dependent
+attack success 1/18 over three runs (`exfil-roleplay` leaked once, then held twice), versus 0 in the Wave 1
+baseline: model variance, not a code change, but it is the case to harden first.
+
+Found and fixed live: gpt-oss sometimes cites as `【1】`, which bypassed the dangling-citation check and the UI
+badges; answers are now normalised to `[n]` before verification.

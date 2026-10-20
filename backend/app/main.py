@@ -23,6 +23,7 @@ from app.routers.health import router as health_router
 from app.routers.ingest import router as ingest_router
 from app.routers.search import router as search_router
 from app.routers.chat import router as chat_router
+from app.routers.checklist import router as checklist_router
 from app.routers.metrics import router as metrics_router
 from app.mcp_server import mcp
 from app.services.pinecone_store import init_pinecone
@@ -71,6 +72,7 @@ app.include_router(ingest_router, tags=["ingest"], dependencies=[Depends(require
 app.include_router(search_router, tags=["search"], dependencies=[Depends(require_api_key)])
 app.include_router(documents_router, tags=["documents"], dependencies=[Depends(require_api_key)])
 app.include_router(chat_router, tags=["chat"], dependencies=[Depends(require_api_key)])
+app.include_router(checklist_router, tags=["checklist"], dependencies=[Depends(require_api_key)])
 app.include_router(metrics_router, tags=["metrics"], dependencies=[Depends(require_api_key)])
 
 # MCP (Streamable HTTP) at /mcp, behind the same X-API-Key as the REST API.

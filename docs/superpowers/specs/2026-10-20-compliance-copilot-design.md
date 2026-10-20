@@ -308,18 +308,22 @@ shows why it applies (the facts that made it true). The checklist is a pure func
 `{profile, as_of}` → grouped JSON (API key, rate limit). Chat: the `checklist` intent builds the checklist from
 the merged profile; the reply carries a deterministic summary, the `checklist` object and the top questions.
 The UI keeps one session profile, sends it with each request and merges `profile_updates`. Request field
-`previous_intent`: when it is `checklist`, the message states facts (`profile_updates` non-empty) and the
-router did not return `gap_check`, the intent is `checklist` (deterministic override). New Checklist page:
+`previous_intent`: when it is `checklist`, the message states facts (`profile_updates` non-empty), does not end
+with a question mark and the router did not return `gap_check`, the intent is `checklist` (deterministic
+override; a new question after a checklist is still answered). Facts stated in a message update the profile the
+client sent (the message is the latest word; the Checklist page form remains the place to edit them). New Checklist page:
 profile form ("Not sure" defaults) and as-of date; groups of item cards (official title, status, why, paragraphs
 and official link via the evidence drawer); deciding questions as inline controls; Markdown and CSV download
 built in the UI. The profile is shared with Ask. MCP `checklist` tool stays in sub-project 6.
 
 **11.4 Gates.** (1) Catalog integrity in CI: articles exist, quotes verbatim in their basis, facts defined with
-the compared values. (2) About 12 golden profiles (`eval/regs_profiles.jsonl`) with expected applies / depends /
-not-applicable article sets, labelled from the scope articles before the rules are written (draft, for review);
-every profile must match exactly, and each mismatch is investigated as a rule or label bug. (3) Properties:
+the compared values. (2) 12 golden profiles (`eval/regs_profiles.jsonl`), each listing the articles whose outcome
+(binds / depends / does not bind) was labelled from the scope articles before the rules were written (draft,
+for review); every listed outcome must match, and each mismatch is investigated as a rule or label bug. Labels
+cover the legally interesting articles per profile rather than all ~99: full sets written by the rules' author
+would only restate the rules. (3) Properties:
 answering an unknown never moves an item from applies to depends; every depends item names a deciding fact;
-an all-unknown profile marks nothing as applies beyond universal items. (4) Time: a high-risk deployer's AI Act
+an all-unknown profile marks nothing as applies. (4) Time: a high-risk deployer's AI Act
 items move from Coming to Applies now on 2027-12-02 (Annex III); NIS2 items carry the national-law note.
 (5) Routing: ~6 fact-only follow-ups added to `eval/regs_router.jsonl`; unit tests for the `previous_intent`
 override. (6) UI: AppTest smoke for the page, export tests, a live two-turn chat check.

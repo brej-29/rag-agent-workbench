@@ -1,0 +1,137 @@
+# When each provision starts to apply. Hand-reviewed; every dated rule cites the provision that
+# sets the date (`basis`) and a verbatim `quote` from it. tests/corpus/test_registry_corpus.py
+# fails if a quote is not found in the built corpus, so a wrong date cannot be committed.
+#
+# Matching: `prefix` selects the instrument; `kinds` filters; chapters / sections / articles /
+# paragraphs are alternatives; exclusions win. Later rules override earlier ones.
+# Dates: `from` (ISO date) and optional `condition` (caller-supplied, e.g. the AI system's class).
+
+# ---------------------------------------------------------------- EU AI Act (consolidated 27.7.2026)
+- id: ai-act-general
+  match: {prefix: eu-ai-act, kinds: [article, article_paragraph]}
+  dates: [{from: 2026-08-02}]
+  basis: eu-ai-act/art-113
+  quote: "It shall apply from 2 August 2026."
+
+- id: ai-act-chapters-1-2
+  match: {prefix: eu-ai-act, kinds: [article, article_paragraph], chapters: [I, II]}
+  dates: [{from: 2025-02-02}]
+  basis: eu-ai-act/art-113
+  quote: "(a) Chapters I and II shall apply from 2 February 2025"
+
+- id: ai-act-new-prohibitions
+  match: {prefix: eu-ai-act, paragraphs: ["5(1a)", "5(1b)"]}
+  dates: [{from: 2026-12-02}]
+  basis: eu-ai-act/art-113
+  quote: "Article 5(1a) and (1b) which shall apply from 2 December 2026"
+  note: "Article 5(1), first subparagraph, points (ba) and (bb) also apply from 2026-12-02; the rest of Article 5(1) applies from 2025-02-02"
+
+- id: ai-act-gpai-governance
+  match: {prefix: eu-ai-act, kinds: [article, article_paragraph], sections: [III.4], chapters: [V, VII, XII], articles: [78], exclude_articles: [101]}
+  dates: [{from: 2025-08-02}]
+  basis: eu-ai-act/art-113
+  quote: "(b) Chapter III Section 4, Chapter V, Chapter VII and Chapter XII and Article 78 shall apply from 2 August 2025, with the exception of Article 101"
+
+- id: ai-act-high-risk
+  match: {prefix: eu-ai-act, kinds: [article, article_paragraph], sections: [III.1, III.2, III.3], exclude_paragraphs: ["6(5)"]}
+  dates:
+    - {from: 2027-12-02, condition: annex_iii}
+    - {from: 2028-08-02, condition: annex_i}
+  basis: eu-ai-act/art-113
+  quote: "(i) 2 December 2027 as regards AI systems classified as high-risk pursuant to Article 6(2) and Annex III; and (ii) 2 August 2028 as regards AI systems classified as high-risk pursuant to Article 6(1) and Annex I"
+
+- id: ai-act-articles-102-110
+  match: {prefix: eu-ai-act, articles: [102, 103, 104, 105, 106, 107, 108, 109, 110]}
+  dates: [{from: 2026-07-27}]
+  basis: eu-ai-act/art-113
+  quote: "(d) Articles 102 to 110 shall apply from 27 July 2026."
+
+- id: ai-act-recitals-annexes
+  match: {prefix: eu-ai-act, kinds: [recital, annex, annex_point]}
+  dates: [{}]
+  basis: eu-ai-act/art-113
+  note: "no date of its own: recitals guide interpretation; annexes apply through the articles that reference them"
+
+# ---------------------------------------------------------------- GDPR
+- id: gdpr
+  match: {prefix: gdpr, kinds: [article, article_paragraph]}
+  dates: [{from: 2018-05-25}]
+  basis: gdpr/art-99/par-2
+  quote: "It shall apply from 25 May 2018."
+
+- id: gdpr-recitals
+  match: {prefix: gdpr, kinds: [recital]}
+  dates: [{}]
+  basis: gdpr/art-99/par-2
+  note: "recital: guides interpretation, no date of its own"
+
+# ---------------------------------------------------------------- NIS2 (directive)
+- id: nis2
+  match: {prefix: nis2, kinds: [article, article_paragraph, annex, annex_point]}
+  dates: [{from: 2024-10-18}]
+  basis: nis2/art-41/par-1
+  quote: "They shall apply those measures from 18 October 2024."
+  note: "directive: obligations reach companies through each Member State's transposing law"
+
+- id: nis2-recitals
+  match: {prefix: nis2, kinds: [recital]}
+  dates: [{}]
+  basis: nis2/art-41/par-1
+  note: "recital: guides interpretation, no date of its own"
+
+# ---------------------------------------------------------------- DORA
+- id: dora
+  match: {prefix: dora, kinds: [article, article_paragraph]}
+  dates: [{from: 2025-01-17}]
+  basis: dora/art-64
+  quote: "It shall apply from 17 January 2025."
+
+- id: dora-recitals
+  match: {prefix: dora, kinds: [recital]}
+  dates: [{}]
+  basis: dora/art-64
+  note: "recital: guides interpretation, no date of its own"
+
+# ---------------------------------------------------------------- Cyber Resilience Act
+- id: cra-general
+  match: {prefix: cra, kinds: [article, article_paragraph, annex, annex_point]}
+  dates: [{from: 2027-12-11}]
+  basis: cra/art-71/par-2
+  quote: "This Regulation shall apply from 11 December 2027."
+
+- id: cra-chapter-4
+  match: {prefix: cra, kinds: [article, article_paragraph], articles: [35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51]}
+  dates: [{from: 2026-06-11}]
+  basis: cra/art-71/par-2
+  quote: "Chapter IV (Articles 35 to 51) shall apply from 11 June 2026."
+
+- id: cra-article-14
+  match: {prefix: cra, articles: [14]}
+  dates: [{from: 2026-09-11}]
+  basis: cra/art-71/par-2
+  quote: "Article 14 shall apply from 11 September 2026"
+
+- id: cra-recitals
+  match: {prefix: cra, kinds: [recital]}
+  dates: [{}]
+  basis: cra/art-71/par-2
+  note: "recital: guides interpretation, no date of its own"
+
+# ---------------------------------------------------------------- NIST (voluntary)
+- id: nist-800-53
+  match: {prefix: nist-800-53}
+  dates: [{}]
+  basis: ""
+  note: "voluntary framework: no legal effective date"
+
+- id: nist-csf
+  match: {prefix: nist-csf}
+  dates: [{}]
+  basis: ""
+  note: "voluntary framework: no legal effective date"
+
+- id: nist-ai-rmf
+  match: {prefix: nist-ai-rmf}
+  dates: [{}]
+  basis: ""
+  note: "voluntary framework: no legal effective date"

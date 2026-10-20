@@ -249,7 +249,7 @@ outranked the articles they explain. Cross-framework recall remains the weak spo
 query decomposition belong with the crosswalks (sub-project 4).
 
 Abstention (`run_regs.py --mode abstain`, deterministic, no LLM): **13/14** unanswerable questions declined
-(scope guard 8, floor 5), **0/46** answerable questions refused. Gate was 14/14: the miss is "labelling rules for
+(scope guard 9, floor 4), **0/46** answerable questions refused. Gate was 14/14: the miss is "labelling rules for
 allergens on packaged food in the EU", which scores 0.378 against AI Act Annex V (declaration of conformity);
 the lowest answerable relevant hit is 0.412, so no floor separates them without overfitting this set. (§8's
 "off-topic 0.09–0.29" was wrong for this question.) Live, the model declined it from the provisions ("the

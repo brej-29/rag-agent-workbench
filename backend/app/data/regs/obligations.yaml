@@ -1,0 +1,588 @@
+# Checklist catalog (spec §11.1): one entry per duty-bearing article of the five EU laws.
+# `when` is evaluated in three-valued logic over facts.yaml (services/regs/rules.py).
+# `basis` is the provision stating whom the article binds; `quote` is copied from it verbatim (checked in CI).
+# Requirements without an addressee of their own cite the provision that puts them on someone
+# (e.g. AI Act Arts. 9-15 via Art. 16(a); GDPR Arts. 6, 9, 10 via the controller's duty in Art. 24(1)).
+defs:
+  eu_nexus: {any: [{eu_established: true}, {eu_market: true}]}
+  ai_provider: {all: [{ai_system: true}, {ai_roles: provider}, {use: eu_nexus}]}
+  ai_deployer: {all: [{ai_system: true}, {ai_roles: deployer}, {use: eu_nexus}]}
+  ai_operator: {any: [{use: ai_provider}, {use: ai_deployer}]}
+  high_risk: {high_risk: [annex_iii, annex_i]}
+  hr_provider: {all: [{use: ai_provider}, {use: high_risk}]}
+  hr_deployer: {all: [{use: ai_deployer}, {use: high_risk}]}
+  hr_importer: {all: [{ai_system: true}, {ai_roles: importer}, {eu_market: true}, {use: high_risk}]}
+  hr_distributor: {all: [{ai_system: true}, {ai_roles: distributor}, {eu_market: true}, {use: high_risk}]}
+  gpai_provider: {all: [{gpai_model: true}, {ai_roles: provider}, {eu_market: true}]}
+  gdpr_scope: {all: [{personal_data: true}, {use: eu_nexus}]}
+  controller: {all: [{use: gdpr_scope}, {data_roles: controller}]}
+  processor: {all: [{use: gdpr_scope}, {data_roles: processor}]}
+  controller_or_processor: {any: [{use: controller}, {use: processor}]}
+  # NIS2 Art. 2(1) size rule and Art. 2(2)(a) size-independent types; DORA is lex specialis for
+  # financial entities (NIS2 Art. 4(1)).
+  nis2_entity:
+    all:
+      - {use: eu_nexus}
+      - {not: {financial_entity: true}}
+      - any:
+          - {nis2_sector: [dns_tld, trust_services, electronic_comms]}
+          - all: [{nis2_sector: [cloud, data_centre, cdn, managed_services, online_platform, other_annex]}, {size: [medium, large]}]
+  dora_entity: {financial_entity: true}
+  cra_manufacturer: {all: [{product_roles: manufacturer}, {eu_market: true}]}
+  cra_importer: {all: [{product_roles: importer}, {eu_market: true}]}
+  cra_distributor: {all: [{product_roles: distributor}, {eu_market: true}]}
+  cra_operator: {any: [{use: cra_manufacturer}, {use: cra_importer}, {use: cra_distributor}]}
+
+obligations:
+- article: eu-ai-act/art-4
+  when: {use: ai_operator}
+  basis: eu-ai-act/art-4/par-1
+  quote: Providers and deployers of AI systems shall take measures to support the development
+- article: eu-ai-act/art-5
+  when: {use: ai_operator}
+  basis: eu-ai-act/art-5/par-1
+  quote: The following AI practices shall be prohibited
+  kind: prohibition
+- article: eu-ai-act/art-9
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-16
+  quote: 'Providers of high-risk AI systems shall: (a) ensure that their high-risk AI systems are compliant with the requirements
+    set out in Section 2'
+- article: eu-ai-act/art-10
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-16
+  quote: 'Providers of high-risk AI systems shall: (a) ensure that their high-risk AI systems are compliant with the requirements
+    set out in Section 2'
+- article: eu-ai-act/art-11
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-16
+  quote: 'Providers of high-risk AI systems shall: (a) ensure that their high-risk AI systems are compliant with the requirements
+    set out in Section 2'
+- article: eu-ai-act/art-12
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-16
+  quote: 'Providers of high-risk AI systems shall: (a) ensure that their high-risk AI systems are compliant with the requirements
+    set out in Section 2'
+- article: eu-ai-act/art-13
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-16
+  quote: 'Providers of high-risk AI systems shall: (a) ensure that their high-risk AI systems are compliant with the requirements
+    set out in Section 2'
+- article: eu-ai-act/art-14
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-16
+  quote: 'Providers of high-risk AI systems shall: (a) ensure that their high-risk AI systems are compliant with the requirements
+    set out in Section 2'
+- article: eu-ai-act/art-15
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-16
+  quote: 'Providers of high-risk AI systems shall: (a) ensure that their high-risk AI systems are compliant with the requirements
+    set out in Section 2'
+- article: eu-ai-act/art-16
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-16
+  quote: 'Providers of high-risk AI systems shall: (a) ensure that their high-risk AI systems are compliant with the requirements
+    set out in Section 2'
+- article: eu-ai-act/art-17
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-17/par-1
+  quote: Providers of high-risk AI systems shall put a quality management system in
+- article: eu-ai-act/art-18
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-18/par-1
+  quote: The provider shall, for a period ending 10 years after the high-risk AI system has been placed on the market or put
+    into service, keep at the disposal of the national competent authorities
+- article: eu-ai-act/art-19
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-19/par-1
+  quote: Providers of high-risk AI systems shall keep the logs referred to in
+- article: eu-ai-act/art-20
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-20/par-1
+  quote: Providers of high-risk AI systems which consider or have reason to consider that a high-risk AI system that they
+    have placed on the market or put into service is not in conformity with this Regulation shall immediately take the necessary
+    corrective actions
+- article: eu-ai-act/art-21
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-21/par-1
+  quote: Providers of high-risk AI systems shall, upon a reasoned request by a competent authority
+- article: eu-ai-act/art-22
+  when:
+    all:
+    - {use: hr_provider}
+    - {eu_established: false}
+  basis: eu-ai-act/art-22/par-1
+  quote: providers established in third countries shall
+- article: eu-ai-act/art-23
+  when: {use: hr_importer}
+  basis: eu-ai-act/art-23/par-1
+  quote: Before placing a high-risk AI system on the market, importers shall ensure that the system is in conformity with
+    this Regulation
+- article: eu-ai-act/art-24
+  when: {use: hr_distributor}
+  basis: eu-ai-act/art-24/par-1
+  quote: Before making a high-risk AI system available on the market, distributors shall verify that it bears the required
+    CE marking
+- article: eu-ai-act/art-25
+  when:
+    any:
+    - {use: hr_importer}
+    - {use: hr_distributor}
+    - {use: hr_deployer}
+  basis: eu-ai-act/art-25/par-1
+  quote: distributor, importer, deployer or other third-party shall be considered to be a provider
+  note: You take on provider obligations if you put your name on a high-risk system, substantially modify it or change its
+    intended purpose.
+- article: eu-ai-act/art-26
+  when: {use: hr_deployer}
+  basis: eu-ai-act/art-26/par-1
+  quote: Deployers of high-risk AI systems shall take appropriate technical and organisational measures
+  note: Some paragraphs bind only employers or public authorities.
+- article: eu-ai-act/art-27
+  when:
+    all:
+    - {use: hr_deployer}
+    - {fria_trigger: true}
+  basis: eu-ai-act/art-27/par-1
+  quote: deployers of high-risk AI systems referred to in points 5 (b) and (c) of Annex III, shall perform an assessment of
+    the impact
+- article: eu-ai-act/art-43
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-43/par-1
+  quote: the provider shall opt for one of the following conformity assessment procedures
+  note: Its own date under Art. 113 is 2 August 2026; the high-risk requirements it builds on (Chapter III, Sections 1-3)
+    apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).
+- article: eu-ai-act/art-47
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-47/par-1
+  quote: The provider shall draw up a written machine readable, physical or electronically signed EU declaration of conformity
+  note: Its own date under Art. 113 is 2 August 2026; the high-risk requirements it builds on (Chapter III, Sections 1-3)
+    apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).
+- article: eu-ai-act/art-48
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-16
+  quote: affix the CE marking to the high-risk AI system or, where that is not possible, on its packaging or its accompanying
+    documentation, to indicate conformity with this Regulation, in accordance with Article 48
+  note: Its own date under Art. 113 is 2 August 2026; the high-risk requirements it builds on (Chapter III, Sections 1-3)
+    apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).
+- article: eu-ai-act/art-49
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-49/par-1
+  quote: provider or, where applicable, the authorised representative shall register themselves and their system in
+  note: Deployers that are public authorities also register. Its own date under Art. 113 is 2 August 2026; the high-risk requirements
+    it builds on (Chapter III, Sections 1-3) apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).
+- article: eu-ai-act/art-50
+  when:
+    any:
+    - all:
+      - {use: ai_provider}
+      - ai_uses: [chatbot, synthetic_content]
+    - all:
+      - {use: ai_deployer}
+      - ai_uses: [emotion_or_biometric, deepfake]
+  basis: eu-ai-act/art-50/par-1
+  quote: Providers shall ensure that AI systems intended to interact directly with natural persons are designed and developed
+- article: eu-ai-act/art-53
+  when: {use: gpai_provider}
+  basis: eu-ai-act/art-53/par-1
+  quote: Providers of general-purpose AI models shall
+- article: eu-ai-act/art-54
+  when:
+    all:
+    - {use: gpai_provider}
+    - {eu_established: false}
+  basis: eu-ai-act/art-54/par-1
+  quote: providers established in third countries shall
+- article: eu-ai-act/art-55
+  when:
+    all:
+    - {use: gpai_provider}
+    - {gpai_systemic_risk: true}
+  basis: eu-ai-act/art-55/par-1
+  quote: providers of general-purpose AI models with systemic risk shall
+- article: eu-ai-act/art-72
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-72/par-1
+  quote: Providers shall establish and document a post-market monitoring
+  note: Its own date under Art. 113 is 2 August 2026; the high-risk requirements it builds on (Chapter III, Sections 1-3)
+    apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).
+- article: eu-ai-act/art-73
+  when: {use: hr_provider}
+  basis: eu-ai-act/art-73/par-1
+  quote: Providers of high-risk AI systems placed on the Union market shall report any serious incident to the
+  note: Its own date under Art. 113 is 2 August 2026; the high-risk requirements it builds on (Chapter III, Sections 1-3)
+    apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).
+- article: eu-ai-act/art-86
+  when:
+    all:
+    - {use: ai_deployer}
+    - {high_risk: annex_iii}
+  basis: eu-ai-act/art-86/par-1
+  quote: Any affected person subject to a decision which is taken by the deployer on the basis of the output from a high-risk
+    AI system listed in Annex III
+  note: Annex III systems (except critical infrastructure) whose decisions have legal or similarly significant effects.
+- article: gdpr/art-5
+  when: {use: controller}
+  basis: gdpr/art-5/par-2
+  quote: The controller shall be responsible for, and be able
+- article: gdpr/art-6
+  when: {use: controller}
+  basis: gdpr/art-24/par-1
+  quote: the controller shall implement appropriate technical and organisational measures to ensure and to be able to demonstrate
+    that processing is performed in accordance with this Regulation
+- article: gdpr/art-7
+  when: {use: controller}
+  basis: gdpr/art-7/par-1
+  quote: the controller shall be able to demonstrate that the
+  note: When you rely on consent.
+- article: gdpr/art-8
+  when: {use: controller}
+  basis: gdpr/art-8/par-2
+  quote: The controller shall make reasonable efforts to verify in
+  note: Online services offered directly to children, on consent.
+- article: gdpr/art-9
+  when:
+    all:
+    - {use: controller}
+    - {sensitive_data: true}
+  basis: gdpr/art-24/par-1
+  quote: the controller shall implement appropriate technical and organisational measures to ensure and to be able to demonstrate
+    that processing is performed in accordance with this Regulation
+- article: gdpr/art-10
+  when:
+    all:
+    - {use: controller}
+    - {sensitive_data: true}
+  basis: gdpr/art-24/par-1
+  quote: the controller shall implement appropriate technical and organisational measures to ensure and to be able to demonstrate
+    that processing is performed in accordance with this Regulation
+- article: gdpr/art-12
+  when: {use: controller}
+  basis: gdpr/art-12/par-1
+  quote: The controller shall take appropriate measures to provide any
+- article: gdpr/art-13
+  when: {use: controller}
+  basis: gdpr/art-13/par-1
+  quote: the controller shall, at the time when personal data are obtained, provide the data subject with all of the following
+    information
+- article: gdpr/art-14
+  when: {use: controller}
+  basis: gdpr/art-14/par-1
+  quote: the controller shall provide the data subject with the
+  note: When the data was not collected from the person.
+- article: gdpr/art-15
+  when: {use: controller}
+  basis: gdpr/art-15/par-1
+  quote: The data subject shall have the right to obtain from the controller confirmation as to whether or not personal data
+    concerning him or her are being processed
+- article: gdpr/art-16
+  when: {use: controller}
+  basis: gdpr/art-16
+  quote: The data subject shall have the right to obtain from the controller without undue delay the rectification of inaccurate
+    personal data concerning him or her
+- article: gdpr/art-17
+  when: {use: controller}
+  basis: gdpr/art-17/par-1
+  quote: The data subject shall have the right to obtain from the controller the erasure of personal data concerning him or
+    her without undue delay
+- article: gdpr/art-18
+  when: {use: controller}
+  basis: gdpr/art-18/par-1
+  quote: The data subject shall have the right to obtain from the controller restriction of processing
+- article: gdpr/art-19
+  when: {use: controller}
+  basis: gdpr/art-19
+  quote: The controller shall communicate any rectification or erasure of
+- article: gdpr/art-20
+  when: {use: controller}
+  basis: gdpr/art-20/par-1
+  quote: The data subject shall have the right to receive the personal data concerning him or her, which he or she has provided
+    to a controller
+  note: Data processed on consent or contract by automated means.
+- article: gdpr/art-21
+  when: {use: controller}
+  basis: gdpr/art-21/par-1
+  quote: The controller shall no longer process the personal data
+- article: gdpr/art-22
+  when:
+    all:
+    - {use: controller}
+    - {automated_decisions: true}
+  basis: gdpr/art-22/par-3
+  quote: controller shall implement suitable measures to safeguard the
+- article: gdpr/art-24
+  when: {use: controller}
+  basis: gdpr/art-24/par-1
+  quote: the controller shall implement appropriate technical and organisational measures
+- article: gdpr/art-25
+  when: {use: controller}
+  basis: gdpr/art-25/par-1
+  quote: the controller shall, both at the time of the determination of the means for processing and at the time of the processing
+    itself, implement appropriate technical and organisational measures
+- article: gdpr/art-27
+  when:
+    all:
+    - {use: controller_or_processor}
+    - {eu_established: false}
+  basis: gdpr/art-27/par-1
+  quote: the controller or the processor shall designate in writing a representative in
+  note: Not for occasional, low-risk processing.
+- article: gdpr/art-28
+  when: {use: controller_or_processor}
+  basis: gdpr/art-28/par-1
+  quote: the controller shall use only processors providing sufficient guarantees
+- article: gdpr/art-29
+  when: {use: controller_or_processor}
+  basis: gdpr/art-29
+  quote: The processor and any person acting under the authority of the controller or of the processor, who has access to
+    personal data, shall not process those data except on instructions from the controller
+- article: gdpr/art-30
+  when: {use: controller_or_processor}
+  basis: gdpr/art-30/par-1
+  quote: Each controller and, where applicable, the controller's representative, shall maintain a record of processing activities
+    under its responsibility
+  note: Organisations under 250 staff are exempt only for occasional, low-risk processing without special-category data.
+- article: gdpr/art-31
+  when: {use: controller_or_processor}
+  basis: gdpr/art-31
+  quote: The controller and the processor and, where applicable, their representatives, shall cooperate, on request, with
+    the supervisory authority
+- article: gdpr/art-32
+  when: {use: controller_or_processor}
+  basis: gdpr/art-32/par-1
+  quote: the controller and the processor shall implement appropriate technical and organisational measures
+- article: gdpr/art-33
+  when: {use: controller_or_processor}
+  basis: gdpr/art-33/par-1
+  quote: the controller shall without undue delay and, where feasible, not later than 72 hours after having become aware of
+    it, notify the personal data breach to the supervisory authority
+  note: Processors notify the controller.
+- article: gdpr/art-34
+  when: {use: controller}
+  basis: gdpr/art-34/par-1
+  quote: the controller shall communicate the personal data breach to
+- article: gdpr/art-35
+  when:
+    all:
+    - {use: controller}
+    - any:
+      - {large_scale_core: true}
+      - {automated_decisions: true}
+  basis: gdpr/art-35/par-1
+  quote: the controller shall, prior to the processing, carry out an assessment of the impact of the envisaged processing
+    operations on the protection of personal data
+- article: gdpr/art-36
+  when:
+    all:
+    - {use: controller}
+    - any:
+      - {large_scale_core: true}
+      - {automated_decisions: true}
+  basis: gdpr/art-36/par-1
+  quote: The controller shall consult the supervisory authority prior to
+  note: When the impact assessment shows a high risk you cannot mitigate.
+- article: gdpr/art-37
+  when:
+    all:
+    - {use: controller_or_processor}
+    - {large_scale_core: true}
+  basis: gdpr/art-37/par-1
+  quote: The controller and the processor shall designate a data protection officer in any case where
+  note: Public authorities always need one.
+- article: gdpr/art-38
+  when:
+    all:
+    - {use: controller_or_processor}
+    - {large_scale_core: true}
+  basis: gdpr/art-38/par-1
+  quote: The controller and the processor shall ensure that the data protection officer is involved, properly and in a timely
+    manner
+- article: gdpr/art-39
+  when:
+    all:
+    - {use: controller_or_processor}
+    - {large_scale_core: true}
+  basis: gdpr/art-39/par-1
+  quote: 'The data protection officer shall have at least the following tasks: (a) to inform and advise the controller or
+    the processor'
+- article: gdpr/art-44
+  when:
+    all:
+    - {use: controller_or_processor}
+    - {third_country_transfers: true}
+  basis: gdpr/art-44
+  quote: the conditions laid down in this Chapter are complied with by the controller and processor
+- article: gdpr/art-46
+  when:
+    all:
+    - {use: controller_or_processor}
+    - {third_country_transfers: true}
+  basis: gdpr/art-46/par-1
+  quote: a controller or processor may transfer personal data to a third country or an international organisation only if
+    the controller or processor has provided appropriate safeguards
+- article: nis2/art-20
+  when: {use: nis2_entity}
+  basis: nis2/art-20/par-1
+  quote: Member States shall ensure that the management bodies of essential and important entities approve the cybersecurity
+    risk-management measures
+  note: 'Directive: duties reach you through your Member State''s law.'
+- article: nis2/art-21
+  when: {use: nis2_entity}
+  basis: nis2/art-21/par-1
+  quote: Member States shall ensure that essential and important entities take appropriate and proportionate technical, operational
+    and organisational measures
+  note: 'Directive: duties reach you through your Member State''s law.'
+- article: nis2/art-23
+  when: {use: nis2_entity}
+  basis: nis2/art-23/par-1
+  quote: Each Member State shall ensure that essential and important entities notify, without undue delay, its CSIRT
+  note: 'Directive: duties reach you through your Member State''s law.'
+- article: nis2/art-27
+  when:
+    all:
+    - {use: nis2_entity}
+    - nis2_sector: [dns_tld, cloud, data_centre, cdn, managed_services, online_platform]
+  basis: nis2/art-27/par-2
+  quote: Member States shall require entities referred to in paragraph 1 to submit the following information to the competent
+    authorities
+  note: 'Directive: duties reach you through your Member State''s law.'
+- article: dora/art-5
+  when: {use: dora_entity}
+  basis: dora/art-5/par-1
+  quote: Financial entities shall have in place an internal governance
+- article: dora/art-6
+  when: {use: dora_entity}
+  basis: dora/art-6/par-1
+  quote: Financial entities shall have a sound, comprehensive and well-documented
+  note: Some smaller entities use the simplified framework of Art. 16 instead.
+- article: dora/art-7
+  when: {use: dora_entity}
+  basis: dora/art-7
+  quote: financial entities shall use and maintain updated ICT systems
+- article: dora/art-8
+  when: {use: dora_entity}
+  basis: dora/art-8/par-1
+  quote: financial entities shall identify, classify and adequately document all
+- article: dora/art-9
+  when: {use: dora_entity}
+  basis: dora/art-9/par-1
+  quote: financial entities shall continuously monitor and control the security
+- article: dora/art-10
+  when: {use: dora_entity}
+  basis: dora/art-10/par-1
+  quote: Financial entities shall have in place mechanisms to promptly
+- article: dora/art-11
+  when: {use: dora_entity}
+  basis: dora/art-11/par-1
+  quote: financial entities shall put in place a comprehensive ICT
+- article: dora/art-12
+  when: {use: dora_entity}
+  basis: dora/art-12/par-1
+  quote: 'financial entities shall develop and document: (a) backup policies'
+- article: dora/art-13
+  when: {use: dora_entity}
+  basis: dora/art-13/par-1
+  quote: Financial entities shall have in place capabilities and staff
+- article: dora/art-14
+  when: {use: dora_entity}
+  basis: dora/art-14/par-1
+  quote: financial entities shall have in place crisis communication plans
+- article: dora/art-17
+  when: {use: dora_entity}
+  basis: dora/art-17/par-1
+  quote: Financial entities shall define, establish and implement an ICT-related
+- article: dora/art-18
+  when: {use: dora_entity}
+  basis: dora/art-18/par-1
+  quote: Financial entities shall classify ICT-related incidents and shall determine
+- article: dora/art-19
+  when: {use: dora_entity}
+  basis: dora/art-19/par-1
+  quote: Financial entities shall report major ICT-related incidents to the
+- article: dora/art-24
+  when: {use: dora_entity}
+  basis: dora/art-24/par-1
+  quote: financial entities, other than microenterprises, shall, taking into account the criteria
+- article: dora/art-25
+  when: {use: dora_entity}
+  basis: dora/art-24/par-1
+  quote: financial entities, other than microenterprises, shall, taking into account the criteria
+- article: dora/art-26
+  when: {use: dora_entity}
+  basis: dora/art-26/par-1
+  quote: which are identified in accordance with paragraph 8, third subparagraph, of this Article, shall carry out at least
+    every 3 years advanced testing by means of TLPT
+  note: Only entities identified by their competent authority.
+- article: dora/art-28
+  when: {use: dora_entity}
+  basis: dora/art-28/par-1
+  quote: Financial entities shall manage ICT third-party risk as an
+- article: dora/art-29
+  when: {use: dora_entity}
+  basis: dora/art-29/par-1
+  quote: financial entities shall also take into account whether the
+- article: dora/art-30
+  when: {use: dora_entity}
+  basis: dora/art-30/par-1
+  quote: The rights and obligations of the financial entity and of the ICT third-party service provider shall be clearly allocated
+    and set out in writing
+- article: cra/art-13
+  when: {use: cra_manufacturer}
+  basis: cra/art-13/par-1
+  quote: When placing a product with digital elements on the market, manufacturers shall ensure that it has been designed,
+    developed and produced in accordance with the essential cybersecurity requirements
+- article: cra/art-14
+  when: {use: cra_manufacturer}
+  basis: cra/art-14/par-1
+  quote: A manufacturer shall notify any actively exploited vulnerability contained in the product with digital elements
+- article: cra/art-19
+  when: {use: cra_importer}
+  basis: cra/art-19/par-1
+  quote: Importers shall place on the market only products
+- article: cra/art-20
+  when: {use: cra_distributor}
+  basis: cra/art-20/par-1
+  quote: distributors shall act with due care in relation
+- article: cra/art-21
+  when:
+    any:
+    - {use: cra_importer}
+    - {use: cra_distributor}
+  basis: cra/art-21
+  quote: importer or distributor shall be considered to be a manufacturer
+  note: You become the manufacturer if you sell it under your name or substantially modify it.
+- article: cra/art-23
+  when: {use: cra_operator}
+  basis: cra/art-23/par-1
+  quote: Economic operators shall, on request, provide the market surveillance authorities with the following information
+- article: cra/art-28
+  when: {use: cra_manufacturer}
+  basis: cra/art-13/par-12
+  quote: manufacturers shall draw up the EU declaration of conformity in accordance with Article 28 and affix the CE marking
+    in accordance with Article 30
+- article: cra/art-30
+  when: {use: cra_manufacturer}
+  basis: cra/art-13/par-12
+  quote: affix the CE marking in accordance with Article 30
+- article: cra/art-31
+  when: {use: cra_manufacturer}
+  basis: cra/art-13/par-12
+  quote: Before placing a product with digital elements on the market, manufacturers shall draw up the technical documentation
+    referred to in Article 31
+- article: cra/art-32
+  when: {use: cra_manufacturer}
+  basis: cra/art-32/par-1
+  quote: manufacturer shall perform a conformity assessment of the
+
+# Recommended practices (voluntary): shown when `when` is true; never mixed with legal obligations.
+practices:
+  - framework: NIST CSF 2.0
+    prefix: nist-csf
+    kinds: [category]
+    when: {any: [{use: nis2_entity}, {use: dora_entity}, {use: cra_manufacturer}]}
+    reason: Cybersecurity outcomes that support the NIS2, DORA and CRA duties.
+  - framework: NIST AI RMF
+    prefix: nist-ai-rmf
+    kinds: [subcategory]
+    when: {use: ai_operator}
+    reason: Practices for trustworthy AI that support the AI Act duties.

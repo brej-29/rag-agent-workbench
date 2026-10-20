@@ -188,7 +188,8 @@ def _regs_source_fields(s: Dict) -> Dict:
 def regs_response_fields(state: Dict) -> Dict:
     """Compliance-path fields shared by the JSON response and the SSE done payload."""
     return {"as_of": state.get("as_of"), "intent": state.get("intent"), "abstain_reason": state.get("abstain_reason"),
-            "warnings": list(state.get("warnings") or []), "profile_updates": dict(state.get("profile_updates") or {})}
+            "warnings": list(state.get("warnings") or []), "profile_updates": dict(state.get("profile_updates") or {}),
+            "checklist": state.get("checklist")}
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +305,7 @@ async def stream_chat_response(
             "abstain_reason": cached_response.abstain_reason,
             "warnings": list(cached_response.warnings or []),
             "profile_updates": dict(cached_response.profile_updates or {}),
+            "checklist": cached_response.checklist,
         }
         yield _sse("done", done_payload)
         return

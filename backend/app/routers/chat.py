@@ -111,6 +111,7 @@ def _regs_inputs(payload: ChatRequest) -> Dict:
         "as_of": payload.as_of.isoformat() if payload.as_of else None,
         "frameworks": payload.frameworks,
         "profile": payload.profile.model_dump(exclude_none=True) if payload.profile else {},
+        "previous_intent": payload.previous_intent,
     }
 
 

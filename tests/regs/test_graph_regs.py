@@ -1,4 +1,5 @@
 """Compliance path through the compiled graph (regs namespace); legacy namespaces unchanged."""
+import json
 from unittest.mock import MagicMock, patch
 
 from app.services.chat import graph
@@ -6,8 +7,12 @@ from app.services.chat import graph
 REGS = {"query": "When must a personal data breach be notified?", "namespace": "regs-v1", "top_k": 5,
         "use_web_fallback": True, "min_score": 0.25, "max_web_results": 5, "chat_history": [], "as_of": "2026-10-20"}
 HITS = [{"_id": "gdpr/art-33/par-1", "_score": 0.62}, {"_id": "eu-ai-act/rct-1", "_score": 0.05}]
-ROUTE = ('{"intent": "%s", "profile_updates": {"roles": [], "ai_system": null, "gpai_model": null, '
-         '"high_risk": null, "personal_data": null, "eu_market": null, "sector": null}}')
+ROUTE = '{"intent": "%s", "profile_updates": []}'
+
+
+def _route(intent, *facts):
+    return json.dumps({"intent": intent, "profile_updates": [
+        {"fact": f, "values": v, "evidence": e} for f, v, e in facts]})
 
 
 def _llm(*contents):
@@ -46,16 +51,30 @@ def test_out_of_scope_question_abstains_before_any_llm_or_search_call():
     search.assert_not_called()
 
 
-def test_checklist_intent_is_routed_and_explained():
-    out, search = _run({**REGS, "query": "Which rules apply to us?"}, _llm(ROUTE % "checklist"))
-    assert out["intent"] == "checklist" and out["abstain_reason"] == "not_available"
-    assert out["answer"] == graph.NOT_YET["checklist"] and out["insufficient_context"]
+def test_checklist_intent_builds_the_checklist_without_retrieval_or_generation():
+    llm = _llm(_route("checklist", ("ai_roles", ["deployer"], "We deploy"), ("high_risk", ["annex_iii"], "CV screener")))
+    out, search = _run({**REGS, "query": "We deploy a CV screener in the EU. What do we need to do?",
+                        "profile": {"eu_established": True}}, llm)
+    assert out["intent"] == "checklist" and not out["insufficient_context"] and out.get("abstain_reason") is None
+    arts = {i["article"] for i in out["checklist"]["groups"]["coming"]}
+    assert "eu-ai-act/art-26" in arts and out["answer"].startswith("For this profile on 2026-10-20")
+    assert llm.invoke.call_count == 1
     search.assert_not_called()
 
 
+def test_fact_only_follow_up_after_a_checklist_rebuilds_it():
+    route = _route("ask", ("ai_roles", ["provider"], "We are also the provider"))
+    out, _ = _run({**REGS, "query": "We are also the provider.", "previous_intent": "checklist",
+                   "profile": {"ai_roles": ["deployer"], "high_risk": "annex_iii", "eu_established": True}}, _llm(route))
+    # List facts accumulate: the message adds a role, it does not replace the ones already known.
+    assert out["intent"] == "checklist" and out["profile"]["ai_roles"] == ["deployer", "provider"]
+    assert "eu-ai-act/art-16" in {i["article"] for i in out["checklist"]["groups"]["coming"]}
+
+
 def test_router_profile_updates_drive_the_high_risk_condition():
-    route = ROUTE.replace('"high_risk": null', '"high_risk": "annex_iii"') % "ask"
-    out, _ = _run({**REGS, "query": "Must deployers keep logs?", "as_of": "2028-01-01"}, _llm(route, "Yes [1]."),
+    route = _route("ask", ("high_risk", ["annex_iii"], "Annex III hiring tool"))
+    out, _ = _run({**REGS, "query": "We run an Annex III hiring tool. Must deployers keep logs?", "as_of": "2028-01-01"},
+                  _llm(route, "Yes [1]."),
                   hits=[{"_id": "eu-ai-act/art-26/par-6", "_score": 0.7}])
     assert out["profile_updates"] == {"high_risk": "annex_iii"}
     assert out["retrieved"][0]["status"] == "applies" and out["retrieved"][0]["applies_from"] == "2027-12-02"

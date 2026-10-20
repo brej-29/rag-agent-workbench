@@ -6,7 +6,9 @@ none clear it the system abstains instead of generating.  The UI draws that line
 """
 from __future__ import annotations
 
+import csv
 import html
+import io
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -91,7 +93,10 @@ def step_line(step: Dict[str, Any]) -> str:
         if reason in _ROUTE_REPLY:
             return _ROUTE_REPLY[reason].format(intent=str(d.get("intent") or "").replace("_", " "))
         noted = profile_words(d.get("profile_updates") or {})
-        return "Understood as a question about the rules" + (f" · noted: {noted}" if noted else "")
+        tail = f" · noted: {noted}" if noted else ""
+        if d.get("intent") == "checklist":
+            return "Recognised a checklist request; built it from the rules table" + tail
+        return "Understood as a question about the rules" + tail
     if sid == "retrieve":
         line = f"Retrieved {d.get('hits', 0)} passages · best match `{d.get('top_score', 0.0):.2f}`"
         if d.get("rewritten_query"):
@@ -129,15 +134,22 @@ def step_line(step: Dict[str, Any]) -> str:
     return sid
 
 
-def profile_words(profile: Dict[str, Any]) -> str:
-    words = [str(r).replace("_", " ") for r in profile.get("roles") or []]
-    if profile.get("high_risk"):
-        words.append(_ROLE_WORDS.get(profile["high_risk"], str(profile["high_risk"])))
-    words += [label for key, label in (("ai_system", "AI system"), ("gpai_model", "general-purpose AI model"),
-                                      ("personal_data", "personal data"), ("eu_market", "EU market"))
-              if profile.get(key)]
-    if profile.get("sector"):
-        words.append(str(profile["sector"]))
+def profile_words(profile: Dict[str, Any], facts: Optional[List[Dict[str, Any]]] = None) -> str:
+    """'AI deployer, Annex III high-risk, EU market' from a profile; facts.yaml labels when given."""
+    by_id = {f["id"]: f for f in facts or []}
+    words: List[str] = []
+    for key, value in profile.items():
+        f = by_id.get(key, {})
+        labels = f.get("labels") or {}
+
+        if value is True:
+            words.append(f.get("short") or key.replace("_", " "))
+        elif isinstance(value, list):
+            words += [labels.get(v) or str(v).replace("_", " ") for v in value]
+        elif value not in (False, None, ""):
+            # Without facts.yaml labels a bare value ("none", "small") is ambiguous: name the fact too.
+            words.append(labels.get(value) or (_ROLE_WORDS.get(value) if key == "high_risk" else None)
+                         or f"{key.replace('_', ' ')}: {str(value).replace('_', ' ')}")
     return ", ".join(words)
 
 
@@ -149,6 +161,7 @@ def status_label(src: Dict[str, Any]) -> Optional[Tuple[str, str]]:
     return {
         "applies": ("green", f"in force since {frm}"),
         "not_yet": ("orange", f"applies from {frm}"),
+        "partly": ("orange", f"partly from {frm}"),
         "depends": ("violet", "date depends on classification"),
         "voluntary": ("gray", "voluntary framework"),
     }.get(st, ("gray", "no date of its own"))
@@ -168,8 +181,11 @@ def chip_label(n: int, src: Dict[str, Any]) -> str:
     return f"{n} · {title} · {score}"
 
 
-def trace_summary(abstained: bool, total_ms: float, n_sources: int, reason: Optional[str] = None) -> str:
+def trace_summary(abstained: bool, total_ms: float, n_sources: int, reason: Optional[str] = None,
+                  intent: Optional[str] = None) -> str:
     secs = f"{total_ms / 1000:.1f} s"
+    if intent == "checklist":
+        return f"Checklist built in {secs}"
     if abstained and reason in ("out_of_scope", "licensed"):
         return f"Declined in {secs} · outside the covered rules"
     if abstained and reason in ("not_available", "clarify"):
@@ -181,6 +197,8 @@ def trace_summary(abstained: bool, total_ms: float, n_sources: int, reason: Opti
 
 def verdict(response: Dict[str, Any]) -> Tuple[str, str]:
     """(badge color, label) for the answer's trust state."""
+    if response.get("checklist"):
+        return "blue", "From the rules table, no model"
     if response.get("insufficient_context"):
         return _ABSTAIN_VERDICT.get(response.get("abstain_reason"), ("orange", "Not in the knowledge base"))
     grounded, score = response.get("grounded"), response.get("faithfulness_score")
@@ -217,3 +235,40 @@ def floor_bars_html(scores: List[float], floor: float, dark: bool) -> str:
 
 def esc(text: str) -> str:
     return html.escape(text or "")
+
+
+# ---------------------------------------------------------------------------
+# Checklist export (sub-project 3)
+# ---------------------------------------------------------------------------
+
+GROUP_TITLES = [("now", "Applies now"), ("coming", "Coming"), ("depends", "Depends on your answers")]
+
+
+def _item_line(it: Dict[str, Any]) -> str:
+    label = status_label(it)
+    dep = f" (depends on: {', '.join(d.replace('_', ' ') for d in it['depends_on'])})" if it.get("depends_on") else ""
+    return f"- [ ] **{it['ref']}** {it['title']}" + (f" — {label[1]}" if label else "") + dep
+
+
+def checklist_markdown(cl: Dict[str, Any], facts: Optional[List[Dict[str, Any]]] = None) -> str:
+    lines = [f"# Compliance checklist (as of {cl['as_of']})", "",
+             f"Profile: {profile_words(cl['profile'], facts) or 'nothing given yet'}", "",
+             "Information from official EU text, not legal advice.", ""]
+    for key, title in GROUP_TITLES:
+        if cl["groups"][key]:
+            lines += [f"## {title}", ""] + [_item_line(it) for it in cl["groups"][key]] + [""]
+    for pr in cl.get("practices") or []:
+        lines += [f"## Recommended practices (voluntary): {pr['framework']}", ""]
+        lines += [f"- {i['ref']}: {i['title']}" for g in pr["groups"] for i in g["items"]] + [""]
+    return "\n".join(lines)
+
+
+def checklist_csv(cl: Dict[str, Any]) -> str:
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["group", "framework", "article", "ref", "title", "status", "applies_from", "depends_on", "note"])
+    for key, title in GROUP_TITLES:
+        for it in cl["groups"][key]:
+            w.writerow([title, it["framework"], it["article"], it["ref"], it["title"], it.get("status") or "",
+                        it.get("applies_from") or "", " ".join(it.get("depends_on") or []), it.get("note") or ""])
+    return out.getvalue()

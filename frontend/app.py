@@ -12,6 +12,7 @@ st.set_page_config(
 pages = st.navigation(
     [
         st.Page("views/ask.py", title="Ask", icon=":material/forum:", default=True),
+        st.Page("views/checklist.py", title="Checklist", icon=":material/checklist:"),
         st.Page("views/evaluation.py", title="Evaluation", icon=":material/monitoring:"),
     ],
     position="top",

@@ -57,3 +57,14 @@
 - feat(eval): `run_regs.py --mode diversified|abstain`, `run_router.py` + 30 labelled requests.
 - fix(chat): gpt-oss `【n】` citations normalised to `[n]` before verification (seen live).
 - fix(ui): evidence drawer marked sibling citations as "no source".
+
+### 2026-10-20 — Sub-project 3: applicability + checklist
+- feat(regs): `facts.yaml` (19 profile facts) drives the profile model, the router schema and the UI form;
+  `obligations.yaml` (99 articles of the AI Act, GDPR, NIS2, DORA, CRA) with three-valued `when` rules and
+  CI-checked verbatim basis quotes; deterministic `build_checklist(profile, as_of)` with Applies now / Coming /
+  Depends groups, deciding questions, "why it applies", Art. 113 notes, voluntary NIST practices.
+- feat(api): `POST /checklist`, `GET /checklist/facts` (no LLM).
+- feat(chat): the `checklist` intent builds the checklist; fact-only follow-ups rebuild it (`previous_intent`).
+- feat(ui): Checklist page (profile form shared with Ask, article drawer, Markdown/CSV export).
+- feat(eval): 12 golden profiles (draft labels), monotonicity and date-flip tests, 6 router follow-ups.
+- fix(regs): router facts need verbatim evidence from the request; headcount → size band; list facts merge.

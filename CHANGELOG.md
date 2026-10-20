@@ -34,3 +34,26 @@
 - feat(ui): top-nav shell, light/dark themes, cold-start wake indicator, live trace with relevance-floor bars,
   citation badges, evidence drawer, Evaluation page from `eval/results/`; markdown images stripped from answers.
 - fix(ci): UI smoke test path for Streamlit 1.66 AppTest.
+
+### 2026-10-20 — Sub-project 1: regulatory corpus (`regs-v1`)
+- feat(corpus): official-source fetch and parsers for the EU AI Act (consolidated 2026-07-27, recitals from the
+  original), GDPR, NIS2, DORA, CRA (EU CELLAR XHTML) and NIST SP 800-53, CSF 2.0 (OSCAL), AI RMF (Playbook JSON);
+  3,830 provisions with stable ASCII ids, amendment tracking and licence notes.
+- feat(regs): applicability registry; every date quotes the provision that sets it, checked in CI.
+- feat(eval): provision-level golden set (46 questions, draft labels), 14 unanswerable questions, lexical / dense /
+  fused retrieval eval and floor calibration. Dense wins (recall@10 0.864, MRR 0.750).
+- Upserted 3,830 records to Pinecone namespace `regs-v1` (with approval).
+
+### 2026-10-20 — Sub-project 2: router + Ask on the regulatory corpus
+- feat(regs): compliance path for requests to `REGS_NAMESPACE`: scope guard before any LLM call (named
+  out-of-scope laws and licensed standards), a strict-schema router (`ask | checklist | gap_check | clarify` plus
+  stated profile facts, fails safe to `ask`), diversified provision retrieval, floor 0.30, per-provision status
+  on an as-of date from the registry, legal prompt, mismatch warning. No web fallback or CRAG on this path.
+- feat(api): request `as_of`, `frameworks`, `profile`; response `as_of`, `intent`, `abstain_reason`, `warnings`,
+  `profile_updates`, per-source `ref`, `framework`, `status`, `applies_from`, `status_note` (JSON and SSE `done`);
+  SSE `route` step; cache key includes the regs inputs.
+- feat(ui): Ask defaults to `regs-v1` with as-of date, framework filter and high-risk class; provision chips
+  with status; regulatory examples. feat(mcp): `ask` defaults to `regs-v1` and takes `as_of`, `frameworks`.
+- feat(eval): `run_regs.py --mode diversified|abstain`, `run_router.py` + 30 labelled requests.
+- fix(chat): gpt-oss `【n】` citations normalised to `[n]` before verification (seen live).
+- fix(ui): evidence drawer marked sibling citations as "no source".

@@ -30,3 +30,20 @@ def test_floor_stats_finds_a_separating_floor_or_reports_overlap():
     assert sep["overlap"] == 0 and 0.25 < sep["suggested_floor"] < 0.42
     over = floor_stats(answerable_best=[0.30, 0.50], unanswerable_top=[0.20, 0.35])
     assert over["overlap"] == 2  # 0.30 <= 0.35 and 0.35 >= 0.30: one each side
+
+
+def test_summarize_reports_each_question_type():
+    from eval.run_regs import summarize
+
+    per = [{"type": "cross", "recall": 0.5, "mrr": 1.0, "ndcg": 0.6}, {"type": "concept", "recall": 1.0, "mrr": 0.5, "ndcg": 1.0}]
+    out = summarize(per)
+    assert out["recall"] == 0.75 and out["by_type"]["cross"] == {"n": 1, "recall": 0.5, "mrr": 1.0, "ndcg": 0.6}
+
+
+def test_abstain_report_counts_both_error_kinds():
+    from eval.run_regs import abstain_report
+
+    decide = lambda q: (q.startswith("no"), "no_match" if q.startswith("no") else None)  # noqa: E731
+    rep = abstain_report(["yes 1", "no 2"], ["no 3", "yes 4"], decide)
+    assert rep["correct_abstain"] == 1 and rep["unanswerable"] == 2 and rep["false_abstain"] == 1
+    assert rep["missed_unanswerable"] == ["yes 4"] and rep["false_abstentions"] == ["no 2"]

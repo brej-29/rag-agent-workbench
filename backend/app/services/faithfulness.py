@@ -81,6 +81,14 @@ class FaithfulnessVerdict:
     rationale: str
 
 
+_LENTICULAR_RE = re.compile(r"【(\d+)(?:†[^】]*)?】")
+
+
+def normalize_citations(answer_text: str) -> str:
+    """Rewrite 【n】 / 【n†L3-L5】 (gpt-oss house style) to [n] so the citation check and UI see them."""
+    return _LENTICULAR_RE.sub(r"[\1]", answer_text)
+
+
 def verify_citations(
     answer_text: str,
     context_sources: List[Dict[str, Any]],

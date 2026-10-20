@@ -23,6 +23,7 @@ from app.services.faithfulness import (
     FaithfulnessVerdict,
     judge_faithfulness,
     judge_faithfulness_with_usage,
+    normalize_citations,
     verify_citations,
 )
 from app.services.llm.groq_llm import get_llm
@@ -727,7 +728,8 @@ def format_response(state: ChatState, _config: RunnableConfig | None = None) -> 
     settings = get_settings()
     timings = _ensure_timings(state)
 
-    answer_text: str = state.get("answer") or ""
+    answer_text: str = normalize_citations(state.get("answer") or "")
+    state["answer"] = answer_text
     retrieved: List[Dict[str, Any]] = state.get("retrieved") or []
     web_results: List[Dict[str, Any]] = state.get("web_results") or []
     is_abstention: bool = bool(state.get("insufficient_context"))

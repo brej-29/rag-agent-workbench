@@ -78,3 +78,8 @@ def test_legacy_namespace_path_unchanged():
     out, _ = _run({**REGS, "namespace": "eval"}, llm, hits=hits)
     assert out.get("intent") is None and out["answer"] == "legacy answer [1]." and llm.invoke.call_count == 1
     assert out["retrieved"][0]["source"] == "wiki"
+
+
+def test_answer_citations_are_normalised_before_verification():
+    out, _ = _run(REGS, _llm(ROUTE % "ask", "Within 72 hours【1】 or【9】."))
+    assert out["answer"] == "Within 72 hours[1] or[9]." and out["unverified_citations"] == [9]

@@ -36,7 +36,8 @@ from app.services.prompts.rag_prompt import (
 from app.services.pinecone_store import search as pinecone_search
 from app.services.prompts.regs_prompt import build_regs_messages
 from app.services.regs.ask import mismatch_warning, retrieve_regs, scope_guard
-from app.services.regs.router import understand_request
+from app.services.regs.checklist import build_checklist, summary_text
+from app.services.regs.router import apply_previous_intent, understand_request
 from app.services.rerank import RERANK_CANDIDATES_MAX, rerank_chunks
 from app.services.tools.tavily_tool import get_tavily_tool, is_tavily_configured
 
@@ -48,8 +49,6 @@ REGS_ABSTENTION = (
     "official text. Try naming the framework or the topic (for example: GDPR breach notification)."
 )
 NOT_YET = {
-    "checklist": "Checklists of obligations for your profile are coming next. Meanwhile, ask about a specific "
-                 "rule (for example: what does the AI Act require of deployers?).",
     "gap_check": "Checking your own policies against the rules is coming soon. Meanwhile, ask what a specific "
                  "rule requires and compare it with your policy.",
     "clarify": "Tell me what you need: what a specific rule requires, whether it applies to your product yet, "
@@ -112,6 +111,8 @@ class ChatState(TypedDict, total=False):
     route: str  # "ask" | "respond" (reply already set, skip retrieval and generation)
     abstain_reason: Optional[str]
     warnings: List[str]
+    previous_intent: Optional[str]  # intent of the previous reply, sent by the client
+    checklist: Optional[Dict[str, Any]]
 
 
 def _ensure_timings(state: ChatState) -> Dict[str, float]:
@@ -222,13 +223,22 @@ def route_request(state: ChatState, _config: RunnableConfig | None = None) -> Ch
     profile = state.get("profile") or {}
     decision, usage = understand_request(get_llm(), state["query"], profile)
     _accumulate_token_usage(state, "router", usage)
-    state["intent"] = decision["intent"]
+    intent = apply_previous_intent(decision["intent"], decision["profile_updates"], state.get("previous_intent"),
+                                   state["query"])
+    state["intent"] = intent
     state["profile_updates"] = decision["profile_updates"]
-    # What the user set explicitly wins over what the router read from the message.
-    state["profile"] = {**decision["profile_updates"], **{k: v for k, v in profile.items() if v not in (None, [], "")}}
-    if decision["intent"] != "ask":
-        reason = "clarify" if decision["intent"] == "clarify" else "not_available"
-        return _respond(state, NOT_YET[decision["intent"]], reason)
+    # The message is the latest word: what it states updates the profile the client sent.
+    state["profile"] = {**profile, **decision["profile_updates"]}
+    if intent == "checklist":
+        checklist = build_checklist(state["profile"], date.fromisoformat(state["as_of"]))
+        state["checklist"] = checklist
+        state["answer"] = summary_text(checklist)
+        state["insufficient_context"] = False
+        state["route"] = "respond"
+        return state
+    if intent != "ask":
+        reason = "clarify" if intent == "clarify" else "not_available"
+        return _respond(state, NOT_YET[intent], reason)
     state["route"] = "ask"
     return state
 
@@ -751,7 +761,7 @@ def format_response(state: ChatState, _config: RunnableConfig | None = None) -> 
     timings["faithfulness_ms"] = 0.0
 
     # Layer 2: LLM-judge (gated).  Skip on abstention path — no answer to judge.
-    if settings.RAG_FAITHFULNESS_ENABLED and not is_abstention and answer_text:
+    if settings.RAG_FAITHFULNESS_ENABLED and not is_abstention and answer_text and state.get("route") != "respond":
         context_string = build_context_string(all_sources)
         llm = get_llm()
         t0 = perf_counter()

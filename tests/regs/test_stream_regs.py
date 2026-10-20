@@ -60,8 +60,20 @@ def test_regs_request_fields_reach_the_graph_and_the_cache_key():
 
     req = ChatRequest(query="q", as_of="2027-01-01", frameworks=["GDPR"], profile={"high_risk": "annex_iii"})
     assert _regs_inputs(req) == {"as_of": "2027-01-01", "frameworks": ["GDPR"],
-                                 "profile": {"high_risk": "annex_iii"}}
+                                 "profile": {"high_risk": "annex_iii"}, "previous_intent": None}
     assert _cache_query(req, "eval") == "q"
     later = ChatRequest(query="q", as_of="2028-01-01", frameworks=["GDPR"], profile={"high_risk": "annex_iii"})
     assert _cache_query(req, "regs-v1") != _cache_query(later, "regs-v1")
     assert date.today().isoformat() in _cache_query(ChatRequest(query="q"), "regs-v1")
+
+
+def test_checklist_reaches_the_done_payload():
+    route = ROUTE.replace('"intent": "ask"', '"intent": "checklist"')
+    router_llm = MagicMock()
+    router_llm.invoke.return_value = MagicMock(content=route, usage_metadata=None, response_metadata={})
+    with patch.object(graph, "get_llm", return_value=router_llm), patch.object(graph, "pinecone_search", return_value=[]), \
+            patch("app.services.chat.streaming._record_metrics"):
+        events = [_parse(f) for f in _collect(stream_chat_response(dict(STATE, query="Which rules apply to us?"), {}))]
+    done = events[-1][1]
+    assert done["intent"] == "checklist" and done["checklist"]["counts"]["depends"] > 0
+    assert [d["id"] for e, d in events if e == "step"] == ["route", "generate"]

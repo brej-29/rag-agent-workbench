@@ -144,6 +144,13 @@ class ChatRequest(BaseModel):
         default=None,
         description="Regulatory namespace only: known facts about the product or organisation.",
     )
+    previous_intent: Optional[Literal["ask", "checklist", "gap_check", "clarify"]] = Field(
+        default=None,
+        description=(
+            "Regulatory namespace only: intent of the previous reply (a fact-only follow-up to a checklist "
+            "rebuilds it)."
+        ),
+    )
 
 
 class SourceHit(BaseModel):
@@ -330,4 +337,7 @@ class ChatResponse(BaseModel):
     warnings: List[str] = Field(default_factory=list, description="Caveats the reader should see.")
     profile_updates: Dict[str, Any] = Field(
         default_factory=dict, description="Profile facts the router read from this request (shown, never guessed)."
+    )
+    checklist: Optional[Dict[str, Any]] = Field(
+        default=None, description="Checklist built for the profile (intent 'checklist'); see POST /checklist."
     )

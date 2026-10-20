@@ -46,11 +46,24 @@ def test_out_of_scope_question_abstains_before_any_llm_or_search_call():
     search.assert_not_called()
 
 
-def test_checklist_intent_is_routed_and_explained():
-    out, search = _run({**REGS, "query": "Which rules apply to us?"}, _llm(ROUTE % "checklist"))
-    assert out["intent"] == "checklist" and out["abstain_reason"] == "not_available"
-    assert out["answer"] == graph.NOT_YET["checklist"] and out["insufficient_context"]
+def test_checklist_intent_builds_the_checklist_without_retrieval_or_generation():
+    route = ROUTE.replace('"high_risk": null', '"high_risk": "annex_iii"').replace('"roles": []', '"ai_roles": ["deployer"]')
+    llm = _llm(route % "checklist")
+    out, search = _run({**REGS, "query": "We deploy a CV screener in the EU. What do we need to do?",
+                        "profile": {"eu_established": True}}, llm)
+    assert out["intent"] == "checklist" and not out["insufficient_context"] and out.get("abstain_reason") is None
+    arts = {i["article"] for i in out["checklist"]["groups"]["coming"]}
+    assert "eu-ai-act/art-26" in arts and out["answer"].startswith("For this profile on 2026-10-20")
+    assert llm.invoke.call_count == 1
     search.assert_not_called()
+
+
+def test_fact_only_follow_up_after_a_checklist_rebuilds_it():
+    route = ROUTE.replace('"roles": []', '"ai_roles": ["provider", "deployer"]') % "ask"
+    out, _ = _run({**REGS, "query": "We are also the provider.", "previous_intent": "checklist",
+                   "profile": {"ai_roles": ["deployer"], "high_risk": "annex_iii", "eu_established": True}}, _llm(route))
+    assert out["intent"] == "checklist" and out["profile"]["ai_roles"] == ["provider", "deployer"]
+    assert "eu-ai-act/art-16" in {i["article"] for i in out["checklist"]["groups"]["coming"]}
 
 
 def test_router_profile_updates_drive_the_high_risk_condition():

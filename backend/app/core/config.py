@@ -110,6 +110,23 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Regulatory corpus (compliance path).  Requests to this namespace get provision
+    # citations, applicability dates, the scope guard and the recalibrated floor.
+    REGS_NAMESPACE: str = Field(default="regs-v1", description="Pinecone namespace of the regulatory corpus.")
+    REGS_MIN_SCORE: float = Field(
+        default=0.30,
+        description=(
+            "Relevance floor for the regs namespace (calibrated 2026-10-20: off-topic 0.09-0.29, "
+            "lowest answerable relevant hit 0.412; eval/run_regs.py --mode calibrate)."
+        ),
+    )
+    REGS_CANDIDATES: int = Field(default=30, description="Dense candidates fetched before diversification.")
+    REGS_TOP_K: int = Field(default=6, description="Provisions sent to the model.")
+    REGS_MAX_PER_FRAMEWORK: int = Field(default=3, description="Diversification cap per framework.")
+    REGS_RECITAL_WEIGHT: float = Field(
+        default=0.9, description="Rank weight for recitals (interpretive, not binding)."
+    )
+
     # Web search / Tavily
     TAVILY_API_KEY: Optional[str] = Field(
         default=None,

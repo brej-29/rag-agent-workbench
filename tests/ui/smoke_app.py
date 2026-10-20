@@ -19,3 +19,8 @@ at.switch_page("views/evaluation.py").run()
 assert not at.exception, at.exception
 assert any(h.value == "Retrieval" for h in at.header), [h.value for h in at.header]
 print("Evaluation page OK:", [h.value for h in at.header])
+
+at.switch_page("views/checklist.py").run()
+assert not at.exception, at.exception
+assert at.title and at.title[0].value == "Your checklist", [t.value for t in at.title]
+print("Checklist page OK (API unreachable path)")

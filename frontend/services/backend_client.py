@@ -45,6 +45,20 @@ def namespace_stats(base_url: str, api_key: Optional[str]) -> Dict[str, int]:
         return {}
 
 
+def get_facts(base_url: str, api_key: Optional[str]) -> list:
+    """Profile facts the checklist asks about (questions, allowed values, labels)."""
+    resp = httpx.get(f"{base_url}/checklist/facts", headers=_headers(api_key), timeout=15.0)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def post_checklist(base_url: str, api_key: Optional[str], profile: Dict[str, Any], as_of: str) -> Dict[str, Any]:
+    resp = httpx.post(f"{base_url}/checklist", headers=_headers(api_key),
+                      json={"profile": profile or None, "as_of": as_of}, timeout=30.0)
+    resp.raise_for_status()
+    return resp.json()
+
+
 def parse_sse(lines: Iterable[str]) -> Iterator[Tuple[str, Any]]:
     """Turn /chat/stream lines into ("step", dict) | ("token", str) | ("done", dict).
 

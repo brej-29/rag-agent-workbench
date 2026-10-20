@@ -8,10 +8,10 @@ from typing import Any, Dict, List, Optional
 import httpx
 import streamlit as st
 
-from services.backend_client import namespace_stats, post_upload_text, stream_chat
+from services.backend_client import get_facts, namespace_stats, post_upload_text, stream_chat
 from services.file_convert import DocumentConverter, convert_uploaded_file_to_text
 from services.presenters import (
-    EXAMPLES, FRAMEWORKS, HIGH_RISK, REGS_EXAMPLES, REGS_NAMESPACE, chip_label, cite_markdown, citing_sentences,
+    EXAMPLES, FRAMEWORKS, REGS_EXAMPLES, REGS_NAMESPACE, chip_label, cite_markdown, citing_sentences,
     dates_note, esc, floor_bars_html, profile_words, status_label, step_line, trace_summary, verdict,
 )
 from services.shell import api_key, backend_state, backend_url, is_dark, wake_watcher
@@ -21,6 +21,7 @@ AVATARS = {"user": ":material/person:", "assistant": ":material/fact_check:"}
 s = st.session_state
 s.setdefault("messages", [])
 s.setdefault("uploads", [])
+s.setdefault("profile", {})  # shared with the Checklist page
 
 
 # ---------------------------------------------------------------------------
@@ -76,7 +77,7 @@ def render_answer(msg: Dict[str, Any], idx: int) -> None:
     sources = resp.get("sources") or []
     abstained = bool(resp.get("insufficient_context"))
     total_ms = float((resp.get("timings") or {}).get("total_ms") or 0.0)
-    with st.status(trace_summary(abstained, total_ms, len(sources), resp.get("abstain_reason")),
+    with st.status(trace_summary(abstained, total_ms, len(sources), resp.get("abstain_reason"), resp.get("intent")),
                    state="complete", expanded=False):
         render_trace(steps)
     st.markdown(cite_markdown(msg["content"], len(sources)))
@@ -96,9 +97,11 @@ def render_answer(msg: Dict[str, Any], idx: int) -> None:
             meta.insert(0, f"as of {resp['as_of']}")
             meta.append("not legal advice")
         st.caption(" · ".join(meta))
-    noted = profile_words(resp.get("profile_updates") or {})
+    noted = profile_words(resp.get("profile_updates") or {}, _facts(backend_url(), api_key()))
     if noted:
         st.caption(f":material/person_check: Noted from your question: {noted}")
+    if resp.get("checklist"):
+        st.page_link("views/checklist.py", label="Open the full checklist", icon=":material/checklist:")
 
     if sources:
         floor = _floor(steps)
@@ -116,6 +119,15 @@ def render_answer(msg: Dict[str, Any], idx: int) -> None:
 @st.cache_data(ttl=60, show_spinner=False)
 def _namespaces(url: str, key: Optional[str]) -> Dict[str, int]:
     return namespace_stats(url, key)
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _facts(url: str, key: Optional[str]) -> Optional[List[Dict[str, Any]]]:
+    """facts.yaml labels for wording the profile; None (plain wording) when the API has no checklist."""
+    try:
+        return get_facts(url, key)
+    except httpx.HTTPError:
+        return None
 
 
 @st.dialog("Add a document")
@@ -193,11 +205,11 @@ def regs_controls() -> Dict[str, Any]:
     as_of = st.date_input("Answer as of", value=date.today(), min_value=date(2016, 1, 1),
                           max_value=date(2035, 12, 31), help="Each cited rule shows whether it applies on this date.")
     frameworks = st.multiselect("Frameworks", FRAMEWORKS, placeholder="All covered frameworks")
-    high_risk = HIGH_RISK[st.selectbox("High-risk AI class", list(HIGH_RISK),
-                                       help="Sets which AI Act dates apply to high-risk obligations.")]
+    st.caption(f"Profile: {profile_words(s.profile, _facts(backend_url(), api_key())) or 'nothing yet'}")
+    st.page_link("views/checklist.py", label="Edit your profile", icon=":material/tune:")
     st.caption("Answers come from official EU and NIST text only. Not legal advice.")
     return {"as_of": as_of.isoformat(), "frameworks": frameworks or None,
-            "profile": {"high_risk": high_risk} if high_risk else None, "use_web_fallback": False}
+            "profile": s.profile or None, "use_web_fallback": False}
 
 
 # ---------------------------------------------------------------------------
@@ -211,6 +223,9 @@ def run_turn(question: str, settings: Dict[str, Any]) -> None:
         st.markdown(question)
 
     payload = {"query": question, "max_web_results": 5, "chat_history": history, **settings}
+    if settings["namespace"] == REGS_NAMESPACE:
+        payload["previous_intent"] = next((m["response"].get("intent") for m in reversed(s.messages)
+                                           if m["role"] == "assistant"), None)
     steps: List[Dict[str, Any]] = []
     text, done, error = "", None, None
     with st.chat_message("assistant", avatar=AVATARS["assistant"]):
@@ -241,6 +256,7 @@ def run_turn(question: str, settings: Dict[str, Any]) -> None:
             answer_box.error(error or "The stream ended without an answer. Try again.", icon=":material/error:")
             s.messages.pop()
             return
+    s.profile.update(done.get("profile_updates") or {})
     s.messages.append({"role": "assistant", "content": str(done.get("answer") or text),
                        "response": done, "steps": steps})
     st.rerun()

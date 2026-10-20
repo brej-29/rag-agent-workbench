@@ -59,3 +59,10 @@ def test_previous_checklist_turns_fact_only_messages_into_a_checklist():
     assert apply_previous_intent("ask", {}, "checklist", "Thanks") == "ask"
     assert apply_previous_intent("gap_check", {"size": "large"}, "checklist", "Check our policy") == "gap_check"
     assert apply_previous_intent("ask", {"size": "large"}, None, "We have 300 staff") == "ask"
+
+
+def test_router_prompt_spells_out_value_meanings_and_forbids_inference():
+    from app.services.regs.router import _SYSTEM
+
+    assert "small = small (10-49 staff)" in _SYSTEM
+    assert "Do not infer facts from the use case" in _SYSTEM

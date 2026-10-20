@@ -68,7 +68,7 @@
   group: Where and how big
   label: Size of the organisation
   values: [micro, small, medium, large]
-  labels: {micro: "micro (under 10 staff)", small: "small (under 50)", medium: "medium (under 250)", large: "large (250 or more)"}
+  labels: {micro: "micro (1-9 staff)", small: "small (10-49 staff)", medium: "medium (50-249 staff)", large: "large (250+ staff)"}
   help: EU SME bands (Recommendation 2003/361) by headcount; turnover and balance sheet also count.
   basis: nis2/art-2
 - id: personal_data
@@ -116,7 +116,7 @@
   group: Sector and products
   label: Main NIS2 sector
   values: [cloud, data_centre, cdn, dns_tld, trust_services, electronic_comms, managed_services, online_platform, other_annex, none]
-  labels: {cloud: cloud computing, data_centre: data centre, cdn: content delivery network, dns_tld: DNS or TLD registry, trust_services: trust services, electronic_comms: public electronic communications, managed_services: managed (security) services, online_platform: "online marketplace, search engine or social network", other_annex: another NIS2 Annex I/II sector, none: none of these}
+  labels: {cloud: cloud computing, data_centre: data centre, cdn: content delivery network, dns_tld: DNS or TLD registry, trust_services: trust services, electronic_comms: public electronic communications, managed_services: managed (security) services, online_platform: "online marketplace, search engine or social network", other_annex: another NIS2 Annex I/II sector, none: not in a NIS2 sector}
   help: NIS2 Annex I/II. "Another sector" covers energy, transport, health, water, manufacturing, food, postal, research and others.
   basis: nis2/art-2
 - id: financial_entity

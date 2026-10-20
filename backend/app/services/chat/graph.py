@@ -227,8 +227,10 @@ def route_request(state: ChatState, _config: RunnableConfig | None = None) -> Ch
                                    state["query"])
     state["intent"] = intent
     state["profile_updates"] = decision["profile_updates"]
-    # The message is the latest word: what it states updates the profile the client sent.
-    state["profile"] = {**profile, **decision["profile_updates"]}
+    # The message is the latest word: what it states updates the profile the client sent. List facts
+    # accumulate ("we are also the provider"); removing one is done on the Checklist page.
+    state["profile"] = {**profile, **{k: (list(dict.fromkeys([*(profile.get(k) or []), *v])) if isinstance(v, list) else v)
+                                      for k, v in decision["profile_updates"].items()}}
     if intent == "checklist":
         checklist = build_checklist(state["profile"], date.fromisoformat(state["as_of"]))
         state["checklist"] = checklist

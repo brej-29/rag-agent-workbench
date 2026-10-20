@@ -150,20 +150,27 @@ obligations:
   when: {use: hr_provider}
   basis: eu-ai-act/art-43/par-1
   quote: the provider shall opt for one of the following conformity assessment procedures
+  note: Its own date under Art. 113 is 2 August 2026; the high-risk requirements it builds on (Chapter III, Sections 1-3)
+    apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).
 - article: eu-ai-act/art-47
   when: {use: hr_provider}
   basis: eu-ai-act/art-47/par-1
   quote: The provider shall draw up a written machine readable, physical or electronically signed EU declaration of conformity
+  note: Its own date under Art. 113 is 2 August 2026; the high-risk requirements it builds on (Chapter III, Sections 1-3)
+    apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).
 - article: eu-ai-act/art-48
   when: {use: hr_provider}
   basis: eu-ai-act/art-16
   quote: affix the CE marking to the high-risk AI system or, where that is not possible, on its packaging or its accompanying
     documentation, to indicate conformity with this Regulation, in accordance with Article 48
+  note: Its own date under Art. 113 is 2 August 2026; the high-risk requirements it builds on (Chapter III, Sections 1-3)
+    apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).
 - article: eu-ai-act/art-49
   when: {use: hr_provider}
   basis: eu-ai-act/art-49/par-1
   quote: provider or, where applicable, the authorised representative shall register themselves and their system in
-  note: Deployers that are public authorities also register.
+  note: Deployers that are public authorities also register. Its own date under Art. 113 is 2 August 2026; the high-risk requirements
+    it builds on (Chapter III, Sections 1-3) apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).
 - article: eu-ai-act/art-50
   when:
     any:
@@ -197,10 +204,14 @@ obligations:
   when: {use: hr_provider}
   basis: eu-ai-act/art-72/par-1
   quote: Providers shall establish and document a post-market monitoring
+  note: Its own date under Art. 113 is 2 August 2026; the high-risk requirements it builds on (Chapter III, Sections 1-3)
+    apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).
 - article: eu-ai-act/art-73
   when: {use: hr_provider}
   basis: eu-ai-act/art-73/par-1
   quote: Providers of high-risk AI systems placed on the Union market shall report any serious incident to the
+  note: Its own date under Art. 113 is 2 August 2026; the high-risk requirements it builds on (Chapter III, Sections 1-3)
+    apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).
 - article: eu-ai-act/art-86
   when:
     all:

@@ -331,3 +331,41 @@ override. (6) UI: AppTest smoke for the page, export tests, a live two-turn chat
 **11.5 Stated simplifications.** NIS2 size bands without linked/partner-enterprise calculations; national
 transposition differences not modelled; article-level items whose paragraphs bind narrower addressees carry a
 note. Not legal advice, shown on every view.
+
+## 12. Sub-project 3 results (2026-10-20)
+
+Built: 19 profile facts (`facts.yaml`), a 99-article catalog (`obligations.yaml`: AI Act 32, GDPR 34, DORA 19,
+CRA 10, NIS2 4), a three-valued evaluator, `build_checklist`, `POST /checklist` + `GET /checklist/facts`, the
+`checklist` intent in chat with fact-only follow-ups, and a Checklist page (profile form shared with Ask, article
+drawer, Markdown/CSV export). Every catalog entry quotes, verbatim, the provision that says whom it binds; CI
+rejects any quote not found in its basis. Arts. 9–15 of the AI Act and GDPR Arts. 6, 9, 10 have no addressee of
+their own and cite the provision that puts them on someone (AI Act Art. 16(a); GDPR Art. 24(1)).
+
+Gates (all deterministic, in CI): catalog integrity clean; 12 golden profiles, every listed outcome matches
+(first run; labels and rules share an author, so this checks consistency, and the labels await human review);
+monotonicity (answering an unknown never flips a decided outcome) over all profiles × facts × values; an
+all-unknown profile binds nothing (99 depend; top question "Do you offer products or services in the EU?"
+decides 80); AI Act Art. 26 moves from Coming to Applies now on 2027-12-02 for an Annex III deployer; NIS2 items
+carry the transposition note; UI smoke on all three pages; export tests.
+
+Found live and fixed:
+- **The router invented facts.** gpt-oss-20b filled nearly every fact with guesses (e.g. `sensitive_data:
+  false`), silently removing articles, and returned partial role lists that replaced known roles. Facts now
+  need `evidence` copied from the request (substring-checked, the same rule as basis quotes); headcount maps
+  to the size band arithmetically ("40-person" → small, "about 300 staff" → large); list facts merge as a
+  union. Remaining limit: a fact read from real words is kept (e.g. "rank job applicants" → automated
+  decisions); it is shown under "Noted from your question" and editable on the Checklist page.
+- A bare follow-up ("About 300 employees, based in Germany.") was read as vague; the router now gets "the
+  previous reply was a checklist" as context. Router accuracy on 36 requests (30 original + 6 follow-ups):
+  0.861 and 0.944 on two runs of nearly the same prompt (gpt-oss variance); misses are mostly gap-check
+  requests (not built yet), which fall back to answering.
+- Profile wording borrowed the high-risk label "not high-risk" for NIS2 sector "none"; labels now come from
+  `facts.yaml`.
+- AI Act Arts. 43, 47–49, 72, 73 show 2026-08-02 because consolidated Art. 113(c) defers only Chapter III
+  Sections 1–3; the checklist reports that faithfully and notes that the requirements they build on apply
+  from 2027-12-02 / 2028-08-02.
+
+Live (local API, real Groq): "We are a 40-person company in Germany and we deploy a CV-screening tool…" →
+checklist in 1.5 s (29 apply now, 2 later incl. Art. 26 from 2027-12-02, 42 depend); "We are also the
+provider…, about 300 staff" → rebuilt in 0.6 s with provider duties (Arts. 9–17 from 2027-12-02) added and
+deployer duties kept.

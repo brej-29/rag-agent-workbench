@@ -12,7 +12,7 @@
   <img alt="Vector Store" src="https://img.shields.io/badge/Vector%20Store-Pinecone-3776AB">
   <img alt="Frameworks" src="https://img.shields.io/badge/Frameworks-LangChain%20%7C%20LangGraph-ff9800">
   <img alt="Frontend" src="https://img.shields.io/badge/Frontend-Streamlit-ff4b4b">
-  <img alt="Tests" src="https://img.shields.io/badge/Tests-526%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/Tests-567%20passing-brightgreen">
   <img alt="License" src="https://img.shields.io/badge/License-MIT-black">
 </div>
 
@@ -64,8 +64,14 @@ Measured on 2026-10-20 (details in [the design spec](docs/superpowers/specs/2026
 | Router (ask / checklist / gap check / clarify) | 27 of 30 correct; every miss fell back to answering |
 | Latency, local API | about 2–3 s per answer; declines are instant |
 
-Checklists and gap checks against your own policies are next (see the spec's build order). This is information
-from official text, not legal advice.
+**Checklist.** Describe your organisation (in the chat, or on the Checklist page) and get the articles of the
+AI Act, GDPR, NIS2, DORA and the Cyber Resilience Act that bind you: *applies now*, *coming* (with the date),
+or *depends on* a fact you have not given yet, with the one question that would decide it. 99 articles,
+each rule citing, word for word, the provision that says whom it binds (checked in CI); no model decides or words
+anything in the checklist. Download it as Markdown or CSV, or call `POST /checklist`.
+
+Gap checks against your own policies are next (see the spec's build order). This is information from official
+text, not legal advice.
 
 ---
 

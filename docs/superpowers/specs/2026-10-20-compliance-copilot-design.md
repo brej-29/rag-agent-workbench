@@ -201,3 +201,33 @@ Decisions for sub-project 2 (measured, like the earlier reranker decision):
   (2) a deterministic scope guard for named out-of-scope instruments (CCPA, HIPAA, DPDP, SOX, PCI DSS,
   UK Online Safety Act; ISO/SOC 2 → "bring your licensed copy"), (3) an instrument/jurisdiction mismatch
   check at verification. All three are scored on the unanswerable set.
+
+## 9. Sub-project 2 design: router + Ask (approved 2026-10-20)
+
+Scope: the compliance path for Ask, behind a typed router. Requests to namespace `REGS_NAMESPACE`
+(`regs-v1`) take it; every other namespace runs the existing pipeline unchanged.
+
+1. **Request context.** Optional `as_of` (default today), `frameworks` filter and `profile` (roles, AI system,
+   GPAI model, high-risk class `none|annex_iii|annex_i|unknown`, personal data, EU market, sector).
+2. **Router.** One strict-schema LLM call returns `intent` (`ask | checklist | gap_check | clarify`) and the
+   profile facts the user stated (`profile_updates`, shown back, never guessed; invalid values dropped).
+   Fails safe to `ask`. Only Ask is built here; the other intents get a plain "not available yet" reply.
+   Measured on 30 labelled requests (`eval/regs_router.jsonl`).
+3. **Abstention, three layers.** (1) scope guard before any LLM call: named out-of-scope instruments
+   (CCPA/CPRA, HIPAA, DPDP, SOX, PCI DSS, UK OSA, LGPD, PIPL, PIPEDA) → "not covered, here is what is";
+   licensed standards (ISO/IEC 27001/27002/42001, SOC 2) → "bring your licensed copy"; mixed questions get a
+   warning instead; (2) floor `REGS_MIN_SCORE = 0.30`; (3) mismatch warning at verification when the
+   question names a covered framework that no cited source comes from.
+4. **Retrieval.** Dense; optional Pinecone filter on `framework`; 30 candidates, recitals weighted 0.9,
+   diversified to at most 3 per framework, top 6. Pinecone only ranks ids: provision text comes from the
+   committed corpus, status from the registry. No web fallback, no CRAG re-retrieval on this path.
+5. **Answer.** Each context block is headed by its reference, framework, binding type and status on the
+   as-of date ("in force since …", "applies from … (not yet in force)", "depends on classification",
+   "voluntary framework"); the model is told to state applicability from those headers, never compute it.
+   Responses (JSON and SSE `done`) add `as_of`, `intent`, `abstain_reason`, `warnings`, `profile_updates`
+   and per-source `ref`, `framework`, `status`, `applies_from`, `status_note`.
+6. **UI/MCP (minimal).** Ask defaults to `regs-v1` with as-of date, framework and high-risk controls and
+   status chips; MCP `ask` takes `as_of` and `frameworks`. The full profile panel is sub-project 6.
+7. **Gates.** Diversified retrieval: overall recall/MRR within 0.01 of dense and cross recall not lower;
+   abstention (deterministic, no LLM): 14/14 unanswerable abstain, at most 1/46 false abstain; temporal
+   status tests on real provisions; router accuracy reported; adversarial suite stays green.

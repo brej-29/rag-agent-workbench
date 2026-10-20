@@ -271,3 +271,59 @@ baseline: model variance, not a code change, but it is the case to harden first.
 
 Found and fixed live: gpt-oss sometimes cites as `【1】`, which bypassed the dangling-citation check and the UI
 badges; answers are now normalised to `[n]` before verification.
+
+## 11. Sub-project 3 design: applicability + checklist (approved 2026-10-20)
+
+Job: given a profile and an as-of date, list which articles of the five EU laws bind you, since or from when,
+which ones depend on facts not yet given (with the questions that decide them), plus voluntary NIST practices.
+Deterministic throughout: no LLM decides or words anything in the checklist.
+
+**11.1 Data.**
+- `backend/app/data/regs/facts.yaml`: each profile fact once: `id`, allowed values, the question asked when it
+  is unknown, and the provision that makes it matter. Facts: AI chain role (provider, deployer, importer,
+  distributor); GDPR role (controller, processor); CRA role (manufacturer, importer, distributor of products with
+  digital elements); AI system; GPAI model; GPAI with systemic risk; high-risk class (none, annex_iii, annex_i);
+  AI uses that trigger Art. 50 (chatbot, synthetic content, emotion recognition / biometric categorisation,
+  deepfakes); established in the EU; offers to or monitors people in the EU; size band (micro, small, medium,
+  large; NIS2 Art. 2(1) via Recommendation 2003/361); NIS2 sector (tech-relevant Annex I/II types, other, none);
+  DORA financial entity; processes personal data; special-category or criminal data at scale.
+- `backend/app/data/regs/obligations.yaml`: one entry per duty-bearing article (about 90: AI Act ~30, GDPR ~30,
+  DORA ~20, CRA ~12, NIS2 ~5). Fields: `article` (provision id prefix, e.g. `eu-ai-act/art-26`; the title is read
+  from the corpus, never typed), `when` (condition over facts), `basis` (provision stating whom it binds) with a
+  verbatim `quote`, optional `kind: prohibition`, optional `note` (e.g. narrower addressees of some paragraphs).
+- Recommended practices (voluntary), chosen by rule: NIST CSF 2.0's 22 categories when any cyber law (NIS2, DORA,
+  CRA) is in scope or unknown; NIST AI RMF's subcategories grouped by function when an AI system is built or
+  deployed. SP 800-53 is not listed (reached through crosswalks, sub-project 4).
+
+**11.2 Evaluator.** Conditions use `all`, `any`, `not` and fact comparisons (`fact: value` or a list of values),
+evaluated in three-valued logic (yes / no / unknown). Item outcome: yes → applies; unknown → depends on the
+unanswered facts that could change it; no → not applicable (with the deciding fact). Unknown facts are ranked by
+how many items they would decide; the top three become follow-up questions. Dates come from the registry
+(§6.4) using the profile's high-risk class: in force since, applies from, partly from (paragraph dates differ),
+depends on classification, and the national-law note for NIS2. Groups: Applies now, Coming (by date), Depends
+on your answers, Recommended practices (voluntary); not-applicable items are counted and expandable. Each item
+shows why it applies (the facts that made it true). The checklist is a pure function of (profile, as-of date).
+
+**11.3 Integration.** `services/regs/checklist.py` (load, evaluate, build) and `POST /checklist`
+`{profile, as_of}` → grouped JSON (API key, rate limit). Chat: the `checklist` intent builds the checklist from
+the merged profile; the reply carries a deterministic summary, the `checklist` object and the top questions.
+The UI keeps one session profile, sends it with each request and merges `profile_updates`. Request field
+`previous_intent`: when it is `checklist`, the message states facts (`profile_updates` non-empty) and the
+router did not return `gap_check`, the intent is `checklist` (deterministic override). New Checklist page:
+profile form ("Not sure" defaults) and as-of date; groups of item cards (official title, status, why, paragraphs
+and official link via the evidence drawer); deciding questions as inline controls; Markdown and CSV download
+built in the UI. The profile is shared with Ask. MCP `checklist` tool stays in sub-project 6.
+
+**11.4 Gates.** (1) Catalog integrity in CI: articles exist, quotes verbatim in their basis, facts defined with
+the compared values. (2) About 12 golden profiles (`eval/regs_profiles.jsonl`) with expected applies / depends /
+not-applicable article sets, labelled from the scope articles before the rules are written (draft, for review);
+every profile must match exactly, and each mismatch is investigated as a rule or label bug. (3) Properties:
+answering an unknown never moves an item from applies to depends; every depends item names a deciding fact;
+an all-unknown profile marks nothing as applies beyond universal items. (4) Time: a high-risk deployer's AI Act
+items move from Coming to Applies now on 2027-12-02 (Annex III); NIS2 items carry the national-law note.
+(5) Routing: ~6 fact-only follow-ups added to `eval/regs_router.jsonl`; unit tests for the `previous_intent`
+override. (6) UI: AppTest smoke for the page, export tests, a live two-turn chat check.
+
+**11.5 Stated simplifications.** NIS2 size bands without linked/partner-enterprise calculations; national
+transposition differences not modelled; article-level items whose paragraphs bind narrower addressees carry a
+note. Not legal advice, shown on every view.

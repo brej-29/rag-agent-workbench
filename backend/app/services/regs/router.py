@@ -35,7 +35,7 @@ def _fact_lines(facts: List[dict]) -> str:
     for f in facts:
         kind = "true/false" if f["type"] == "bool" else (
             ("list of: " if f["type"] == "multi" else "one of: ") + ", ".join(f["values"]))
-        lines.append(f"- {f['id']} ({kind}): {f['label']}" + (f" {f['help']}" if f.get("help") else ""))
+        lines.append(f"- {f['id']} ({kind}): {f['label']}" + (f" ({f['help']})" if f.get("help") else ""))
     return "\n".join(lines)
 
 

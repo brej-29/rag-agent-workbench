@@ -29,3 +29,9 @@
 {"query": "Help me with compliance.", "intent": "clarify"}
 {"query": "Are we compliant?", "intent": "clarify"}
 {"query": "What should I do about regulations?", "intent": "clarify"}
+{"query": "We are also the provider of the system.", "previous_intent": "checklist", "intent": "checklist"}
+{"query": "About 300 employees, based in Germany.", "previous_intent": "checklist", "intent": "checklist"}
+{"query": "We don't process any special-category data.", "previous_intent": "checklist", "intent": "checklist"}
+{"query": "Yes, it is used for credit scoring.", "previous_intent": "checklist", "intent": "checklist"}
+{"query": "What does Article 27 require?", "previous_intent": "checklist", "intent": "ask"}
+{"query": "Thanks. When does Article 26 start to apply to us?", "previous_intent": "checklist", "intent": "ask"}

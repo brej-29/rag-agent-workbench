@@ -69,8 +69,9 @@ def test_router_eval_scoring_and_labels():
 
     rows = [json.loads(l) for l in open(Path(__file__).resolve().parents[2] / "eval/regs_router.jsonl", encoding="utf-8")]
     rows = [r for r in rows if not r.get("_meta")]
-    assert len(rows) == 30 and {r["intent"] for r in rows} == set(INTENTS)
-    rep = score(rows[:2], lambda q: "ask" if "Article 26" in q else "checklist")
+    assert len(rows) == 36 and {r["intent"] for r in rows} == set(INTENTS)
+    assert sum(1 for r in rows if r.get("previous_intent") == "checklist") == 6
+    rep = score(rows[:2], lambda r: "ask" if "Article 26" in r["query"] else "checklist")
     assert rep["accuracy"] == 0.5 and rep["misses"][0]["predicted"] == "checklist"
 
 
@@ -90,3 +91,11 @@ def test_router_prompt_spells_out_value_meanings_and_asks_for_evidence():
 
     assert "small = small (10-49 staff)" in _SYSTEM
     assert "evidence" in _SYSTEM and "copied exactly" in _SYSTEM
+
+
+def test_previous_checklist_is_given_to_the_router_as_context():
+    llm = _llm(_route("ask"))
+    understand_request(llm, "About 300 employees.", {}, "checklist")
+    assert "previous reply was a checklist" in llm.invoke.call_args.args[0][-1].content
+    understand_request(llm, "About 300 employees.", {})
+    assert "previous reply" not in llm.invoke.call_args.args[0][-1].content

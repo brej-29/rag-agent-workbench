@@ -221,7 +221,7 @@ def route_request(state: ChatState, _config: RunnableConfig | None = None) -> Ch
         state["warnings"] = [*(state.get("warnings") or []), guard["warning"]]
 
     profile = state.get("profile") or {}
-    decision, usage = understand_request(get_llm(), state["query"], profile)
+    decision, usage = understand_request(get_llm(), state["query"], profile, state.get("previous_intent"))
     _accumulate_token_usage(state, "router", usage)
     intent = apply_previous_intent(decision["intent"], decision["profile_updates"], state.get("previous_intent"),
                                    state["query"])

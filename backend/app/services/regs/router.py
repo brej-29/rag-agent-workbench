@@ -104,10 +104,13 @@ def _stated_facts(items: Any, query: str) -> Dict[str, Any]:
     return out
 
 
-def understand_request(llm: Any, query: str, profile: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, int]]:
+def understand_request(llm: Any, query: str, profile: Dict[str, Any],
+                       previous_intent: Optional[str] = None) -> Tuple[Dict[str, Any], Dict[str, int]]:
     """Return ({intent, profile_updates}, token usage).  Any failure means: just answer the question."""
+    context = ("The previous reply was a checklist that asked about the user's organisation; this message may "
+               "answer those questions.\n" if previous_intent == "checklist" else "")
     messages = [SystemMessage(content=_SYSTEM),
-                HumanMessage(content=f"Known profile: {json.dumps(profile)}\n<request>\n{query}\n</request>")]
+                HumanMessage(content=f"{context}Known profile: {json.dumps(profile)}\n<request>\n{query}\n</request>")]
     try:
         if get_settings().LLM_STRUCTURED_OUTPUT:
             resp = llm.invoke(messages, response_format=_FORMAT)

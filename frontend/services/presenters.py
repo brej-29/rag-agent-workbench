@@ -172,7 +172,32 @@ def dates_note(note: str) -> str:
     return re.sub(r"\bif (annex_iii|annex_i)\b", lambda m: f"for {_ROLE_WORDS[m.group(1)]} systems", note)
 
 
+CROSSWALK_CAVEAT = ("Matches come from published mappings and show related requirements, not equivalence. "
+                    "Community mappings are not endorsed by NIST.")
+
+
+def crosswalk_lines(xw: Optional[Dict[str, Any]]) -> List[Tuple[str, List[Tuple[str, str, str]], int]]:
+    """[(group, [(ref, badge color, caption)], hidden count)] in first-seen group order."""
+    groups: Dict[str, List[Tuple[str, str, str]]] = {}
+    for m in (xw or {}).get("items") or []:
+        notes = [m["source_title"]]
+        if m.get("via"):
+            notes.append("via " + " → ".join(m["via"]))
+        if m.get("note"):
+            notes.append(m["note"])
+        if m["kind"] == "community":
+            notes.append("community mapping, not endorsed by NIST")
+        if m.get("licensed"):
+            notes.append("licensed text, bring your copy")
+        label = m["ref"] + (f" · {m['title']}" if m.get("title") else "")
+        groups.setdefault(m["group"], []).append((label, "green" if m["kind"] == "official" else "gray", " · ".join(notes)))
+    more = (xw or {}).get("more") or {}
+    return [(g, lines, more.get(g, 0)) for g, lines in groups.items()]
+
+
 def chip_label(n: int, src: Dict[str, Any]) -> str:
+    if src.get("via"):
+        return f"{n} · {src['ref']} · via {src['via']['ref']}"
     label = status_label(src)
     if src.get("ref") and label:
         return f"{n} · {src['ref']} · {label[1]}"

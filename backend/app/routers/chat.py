@@ -62,6 +62,8 @@ def _build_chat_response(state: Dict) -> ChatResponse:
             status=src.get("status"),
             applies_from=src.get("applies_from"),
             status_note=src.get("status_note"),
+            crosswalk=src.get("crosswalk"),
+            via=src.get("via"),
         )
         for src in sources_raw
     ]

@@ -187,6 +187,10 @@ class SourceHit(BaseModel):
     )
     applies_from: Optional[str] = Field(None, description="Date the provision applies from (ISO), when dated.")
     status_note: Optional[str] = Field(None, description="Conditions on the date, e.g. Annex III vs Annex I.")
+    crosswalk: Optional[Dict[str, Any]] = Field(
+        None, description="Matching requirements in other frameworks from published mappings (spec §13)."
+    )
+    via: Optional[Dict[str, str]] = Field(None, description="Set when the source was added through a crosswalk link.")
 
 
 class ChatTimings(BaseModel):

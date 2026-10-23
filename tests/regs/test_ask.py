@@ -99,3 +99,17 @@ def test_retrieve_regs_maps_ids_to_provisions_with_status_and_filters():
     assert [s["ref"] for s in sources] == ["GDPR Art. 33(1)", "AI Act Recital 12"] and top == 0.61
     assert sources[0]["status"] == "applies" and sources[0]["score"] == 0.61
     assert sources[1]["rank_score"] == pytest.approx(0.54)
+
+
+def test_retrieved_sources_carry_their_crosswalk(monkeypatch):
+    from app.services.regs import crosswalk as xw
+    monkeypatch.setattr(xw, "related", lambda pid, **kw: {"items": [{"id": "x", "group": "NIST CSF 2.0"}], "more": {}})
+
+    class S:
+        REGS_NAMESPACE, REGS_CANDIDATES, REGS_TOP_K, REGS_MAX_PER_FRAMEWORK, REGS_RECITAL_WEIGHT = "regs-v1", 30, 6, 3, 0.9
+        REGS_CROSSWALK_MODE = "off"
+
+    corpus = {"gdpr/art-33/par-1": {**GDPR33, "ref": "GDPR Art. 33(1)", "title": "", "text": "t", "framework": "GDPR", "source_url": "u"}}
+    sources, _ = ask.retrieve_regs("q", None, date(2026, 10, 24), None, S,
+                                   lambda **kw: [{"_id": "gdpr/art-33/par-1", "_score": 0.6}], corpus, REG)
+    assert sources[0]["crosswalk"]["items"][0]["group"] == "NIST CSF 2.0"

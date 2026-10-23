@@ -161,4 +161,9 @@ def retrieve_regs(query: str, frameworks: Optional[List[str]], as_of: date, cond
             "rank_score": score * (settings.REGS_RECITAL_WEIGHT if p.get("kind") == "recital" else 1.0),
             "status": st["status"], "applies_from": st["applies_from"], "status_note": st["note"],
         })
-    return diversify(cands, settings.REGS_TOP_K, settings.REGS_MAX_PER_FRAMEWORK), top
+    from app.services.regs import crosswalk  # late import: crosswalk reads the corpus through this module
+
+    chosen = diversify(cands, settings.REGS_TOP_K, settings.REGS_MAX_PER_FRAMEWORK)
+    for s in chosen:
+        s["crosswalk"] = crosswalk.related(s["doc_id"])
+    return chosen, top

@@ -111,3 +111,14 @@ def test_implementing_regulation_items_follow_the_entity_type():
     assert {"nis2-ir/art-2", "nis2-ir/art-3", "nis2-ir/art-7"} <= set(now)
     assert any(p["id"] == "nis2-ir/anx-1/pt-5.1" for p in now["nis2-ir/art-2"]["paragraphs"])  # include: annex
     assert now["nis2-ir/art-2"]["status"] == "applies" and now["nis2-ir/art-2"]["applies_from"] == "2024-11-07"
+
+
+def test_items_carry_crosswalk_and_practices_narrow_to_linked_csf():
+    cl = build_checklist(PROFILES["eu_cloud_large"]["profile"], date(2026, 10, 24))
+    art21 = next(i for i in cl["groups"]["now"] if i["article"] == "nis2/art-21")
+    groups = {m["group"] for m in art21["crosswalk"]["items"]}
+    assert "NIS2 Implementing Regulation 2024/2690" in groups
+    csf = next(p for p in cl["practices"] if p["framework"] == "NIST CSF 2.0")
+    assert csf["narrowed"] and all(i["id"].startswith("nist-csf/") and "-" in i["id"] for g in csf["groups"] for i in g["items"])
+    gdpr32 = next(i for g in ("now", "coming") for i in cl["groups"][g] if i["article"] == "gdpr/art-32")
+    assert gdpr32["crosswalk"]["items"] == []

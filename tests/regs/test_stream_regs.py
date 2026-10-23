@@ -40,6 +40,7 @@ def test_regs_stream_emits_route_step_and_regs_fields():
     src = done["sources"][0]
     assert (src["ref"], src["framework"], src["status"], src["applies_from"]) == (
         "GDPR Art. 33(1)", "GDPR", "applies", "2018-05-25")
+    assert "crosswalk" in src
 
 
 def test_scope_guard_reply_streams_without_retrieval_or_generation():

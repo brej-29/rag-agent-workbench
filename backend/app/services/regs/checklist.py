@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 import yaml
 
 from app.services.regs import DATA_DIR
+from app.services.regs import crosswalk
 from app.services.regs.ask import regs_corpus, status_for
 from app.services.regs.facts import load_facts, normalize_profile
 from app.services.regs.registry import Registry, _norm
@@ -113,20 +114,28 @@ def article_status(paras: List[dict], registry: Registry, as_of: date, condition
     return {"status": dated[0]["status"], "applies_from": None, "note": note}
 
 
-def _practices(profile: dict, catalog: dict, index: Dict[str, List[dict]]) -> List[dict]:
+def _practices(profile: dict, catalog: dict, index: Dict[str, List[dict]], binding: List[dict]) -> List[dict]:
+    """Voluntary practices; narrowed to what published crosswalks link to the binding items, when they do."""
+    corpus, _ = regs_corpus()
+    binding_ids = [p["id"] for it in binding for p in it["paragraphs"]]
     out = []
     for pr in catalog.get("practices", []):
         value, why = evaluate(pr["when"], profile, catalog["defs"])
         if value is not True:
             continue
+        linked = crosswalk.linked_ids(binding_ids, pr["prefix"] + "/")
+        if linked:
+            picked = [corpus[i] for i in linked if i in corpus]
+            reason = "Linked to your applicable items by published mappings (official and community)."
+        else:
+            picked = [p for key, paras in index.items() if key.startswith(pr["prefix"] + "/")
+                      for p in paras if p["kind"] in pr["kinds"]]
+            reason = pr["reason"]
         groups: Dict[str, List[dict]] = {}
-        for key, paras in index.items():
-            if key.startswith(pr["prefix"] + "/"):
-                for p in paras:
-                    if p["kind"] in pr["kinds"]:
-                        groups.setdefault(p["path"][0], []).append(
-                            {"id": p["id"], "ref": p["ref"], "title": p["title"] if p["kind"] == "category" else p["text"]})
-        out.append({"framework": pr["framework"], "reason": pr["reason"], "why": why,
+        for p in picked:
+            groups.setdefault(p["path"][0], []).append(
+                {"id": p["id"], "ref": p["ref"], "title": p["title"] if p["kind"] == "category" else p["text"]})
+        out.append({"framework": pr["framework"], "reason": reason, "why": why, "narrowed": bool(linked),
                     "groups": [{"name": n, "items": items} for n, items in groups.items()]})
     return out
 
@@ -156,7 +165,8 @@ def build_checklist(profile: Dict[str, Any], as_of: date, with_text: bool = Fals
                     why={k: v for k, v in why.items() if v is not None},
                     depends_on=sorted(k for k, v in why.items() if v is None),
                     paragraphs=[{"id": p["id"], "ref": p["ref"], **({"text": p["text"]} if with_text else {})}
-                                for p in paras])
+                                for p in paras],
+                    crosswalk=crosswalk.related_many([p["id"] for p in paras], per_group=4))
         if value is None:
             waiting.update(item["depends_on"])
             groups["depends"].append(item)
@@ -168,7 +178,7 @@ def build_checklist(profile: Dict[str, Any], as_of: date, with_text: bool = Fals
     questions = [{"fact": f, "label": facts[f]["label"], "type": facts[f]["type"],
                   "values": facts[f].get("values", []), "decides": n} for f, n in waiting.most_common(3)]
     return {"as_of": as_of.isoformat(), "profile": prof, "groups": groups, "not_applicable": not_applicable,
-            "questions": questions, "practices": _practices(prof, catalog, index),
+            "questions": questions, "practices": _practices(prof, catalog, index, groups["now"] + groups["coming"]),
             "counts": {**{k: len(v) for k, v in groups.items()}, "not_applicable": len(not_applicable)}}
 
 

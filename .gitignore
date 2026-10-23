@@ -216,3 +216,6 @@ __marimo__/
 
 # Corpus build cache (official downloads; rebuilt by python -m corpus.build)
 corpus/raw/
+
+# Community crosswalk links (fetched locally, no reuse licence; see crosswalk_sources.yaml)
+backend/app/data/regs/crosswalks.community.jsonl

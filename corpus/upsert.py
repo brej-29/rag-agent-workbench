@@ -2,6 +2,7 @@
 
 python -m corpus.upsert          dry run: counts, estimated embedding tokens and storage
 python -m corpus.upsert --yes    write to Pinecone namespace regs-v1 (needs explicit approval)
+python -m corpus.upsert --only nis2-ir/ [--yes]   only records whose id starts with the prefix (new sources)
 """
 import argparse
 import json
@@ -25,6 +26,10 @@ def to_record(p: dict) -> dict:
     return rec
 
 
+def select(provisions: list, prefix) -> list:
+    return [p for p in provisions if not prefix or p["id"].startswith(prefix)]
+
+
 def estimate(provisions: list) -> dict:
     recs = [to_record(p) for p in provisions]
     chars = sum(len(r["content"]) for r in recs)
@@ -38,8 +43,9 @@ def main() -> int:
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--yes", action="store_true", help="actually upsert (requires approval)")
+    ap.add_argument("--only", help="only records whose id starts with this prefix, e.g. nis2-ir/")
     args = ap.parse_args()
-    provisions = load_provisions()
+    provisions = select(load_provisions(), args.only)
     print(json.dumps({"namespace": NAMESPACE, **estimate(provisions)}, indent=2))
     if not args.yes:
         print("Dry run only. Re-run with --yes after approval to upsert.")

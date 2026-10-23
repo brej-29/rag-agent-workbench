@@ -23,6 +23,8 @@ D = date(2026, 10, 20)
     ("nis2/art-23/par-1", None, "applies", "2024-10-18"),
     ("dora/art-19/par-1", None, "applies", "2025-01-17"),
     ("nist-csf/GV.OC-01", None, "voluntary", None),
+    ("nis2-ir/art-2/par-1", None, "applies", "2024-11-07"),
+    ("nis2-ir/anx-1/pt-5.1", None, "applies", "2024-11-07"),
     ("eu-ai-act/rct-1", None, "no_date", None),
 ])
 def test_status_on_2026_10_20(pid, condition, status, applies_from):

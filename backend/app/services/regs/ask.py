@@ -15,7 +15,7 @@ COVERED = ["EU AI Act", "GDPR", "NIS2", "DORA", "Cyber Resilience Act", "NIST SP
 _FRAMEWORK_ALIASES: Dict[str, List[str]] = {
     "EU AI Act": [r"\bai act\b", r"artificial intelligence act", r"2024/1689"],
     "GDPR": [r"\bgdpr\b", r"general data protection regulation", r"2016/679"],
-    "NIS2": [r"\bnis ?2\b", r"2022/2555"],
+    "NIS2": [r"\bnis ?2\b", r"2022/2555", r"2024/2690"],
     "DORA": [r"\bdora\b", r"digital operational resilience", r"2022/2554"],
     "Cyber Resilience Act": [r"cyber resilience act", r"\bcra\b", r"2024/2847"],
     "NIST SP 800-53": [r"800-53"],

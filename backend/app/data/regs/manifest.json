@@ -36,6 +36,15 @@
     "licence": "\u00a9 European Union, https://eur-lex.europa.eu. Reuse authorised under Commission Decision 2011/833/EU"
   },
   {
+    "key": "nis2-ir",
+    "url": "http://publications.europa.eu/resource/celex/32024R2690",
+    "file": "nis2-ir.xhtml",
+    "sha256": "1d10f42c31a2b3c6b929b4696a04093ee1d84a298c0c0437a22f8718a9ffb3cd",
+    "bytes": 418553,
+    "retrieved": "2026-10-24",
+    "licence": "\u00a9 European Union, https://eur-lex.europa.eu. Reuse authorised under Commission Decision 2011/833/EU"
+  },
+  {
     "key": "dora",
     "url": "http://publications.europa.eu/resource/celex/32022R2554",
     "file": "dora.xhtml",

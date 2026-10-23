@@ -39,6 +39,7 @@ SOURCES = [
         role="recitals"),
     _eu("gdpr", "gdpr", "GDPR", "GDPR", "Regulation (EU) 2016/679", "32016R0679"),
     _eu("nis2", "nis2", "NIS2", "NIS2", "Directive (EU) 2022/2555", "32022L2555", binding="directive"),
+    _eu("nis2-ir", "nis2-ir", "NIS2 IR", "NIS2", "Commission Implementing Regulation (EU) 2024/2690", "32024R2690"),
     _eu("dora", "dora", "DORA", "DORA", "Regulation (EU) 2022/2554", "32022R2554"),
     _eu("cra", "cra", "CRA", "Cyber Resilience Act", "Regulation (EU) 2024/2847", "32024R2847"),
     _nist("nist-800-53", "SP 800-53", "NIST SP 800-53", "NIST SP 800-53 Rev. 5",

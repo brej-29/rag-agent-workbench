@@ -79,6 +79,20 @@
   basis: nis2/art-41/par-1
   note: "recital: guides interpretation, no date of its own"
 
+# ------------------------------------------------------ NIS2 Implementing Regulation (EU) 2024/2690
+- id: nis2-ir
+  match: {prefix: nis2-ir, kinds: [article, article_paragraph, annex, annex_point]}
+  dates: [{from: 2024-11-07}]
+  basis: nis2-ir/art-16
+  quote: "This Regulation shall enter into force on the twentieth day following that of its publication in the Official Journal of the European Union"
+  note: "published in the Official Journal (L series) on 18.10.2024, so in force from 7 November 2024; directly applicable"
+
+- id: nis2-ir-recitals
+  match: {prefix: nis2-ir, kinds: [recital]}
+  dates: [{}]
+  basis: nis2-ir/art-16
+  note: "recital: guides interpretation, no date of its own"
+
 # ---------------------------------------------------------------- DORA
 - id: dora
   match: {prefix: dora, kinds: [article, article_paragraph]}

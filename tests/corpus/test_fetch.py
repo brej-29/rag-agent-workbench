@@ -36,4 +36,5 @@ def test_sources_are_official_and_licensed():
                                  "https://raw.githubusercontent.com/usnistgov/oscal-content/",
                                  "https://airc.nist.gov/docs/"))
         assert s.licence
-    assert {s.prefix for s in SOURCES} == {"eu-ai-act", "gdpr", "nis2", "dora", "cra", "nist-800-53", "nist-csf", "nist-ai-rmf"}
+    assert {s.prefix for s in SOURCES} == {"eu-ai-act", "gdpr", "nis2", "nis2-ir", "dora", "cra", "nist-800-53", "nist-csf",
+                                           "nist-ai-rmf"}

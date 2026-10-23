@@ -122,3 +122,31 @@ def test_quoted_amendment_paragraph_labels_are_ascii():
 <div class="norm"><span class="no-parag">‘5. </span><div class="norm inline-element">For AI systems...</div></div></div>"""
     (rec,) = parse_eu(html, AI)
     assert rec["id"] == "eu-ai-act/art-105/par-5" and rec["id"].isascii()
+
+
+DECIMAL_ANNEX = """<html><body><div id="anx_1">
+<p class="oj-doc-ti">ANNEX</p><p class="oj-doc-ti">Technical and methodological requirements referred to in Article 2</p>
+<p class="oj-ti-grseq-1">1. Policy on the security of network and information systems (Article 21(2), point (a) of Directive (EU) 2022/2555)</p>
+<p class="oj-ti-grseq-1">1.1. Policy on the security of network and information systems</p>
+<table><tr><td>1.1.1. For the purpose of Article 21(2), point (a), the policy shall set out the approach.</td></tr></table>
+<table><tr><td>1.1.2. The policy shall be reviewed at planned intervals.</td></tr></table>
+<p class="oj-ti-grseq-1">1.2. Roles, responsibilities and authorities</p>
+<table><tr><td>1.2.1. Roles shall be assigned.</td></tr></table>
+<p class="oj-ti-grseq-1">11. Access control (Article 21(2), points (i) and (j), of Directive (EU) 2022/2555)</p>
+<p class="oj-ti-grseq-1">11.1. Access control policy</p>
+<table><tr><td>11.1.1. An access control policy shall be established.</td></tr></table>
+</div></body></html>"""
+
+
+def test_decimal_numbered_annex_becomes_one_record_per_point():
+    from corpus.sources import Source
+    src = Source("nis2-ir", "nis2-ir", "NIS2 IR", "NIS2", "Implementing Regulation (EU) 2024/2690", "u", "eu-xhtml",
+                 "l", "regulation")
+    recs = {r["id"]: r for r in parse_eu(DECIMAL_ANNEX, src)}
+    assert list(recs) == ["nis2-ir/anx-1", "nis2-ir/anx-1/pt-1.1", "nis2-ir/anx-1/pt-1.2", "nis2-ir/anx-1/pt-11.1"]
+    p = recs["nis2-ir/anx-1/pt-1.1"]
+    assert p["kind"] == "annex_point" and p["ref"] == "NIS2 IR Annex, point 1.1"
+    assert p["title"] == "Policy on the security of network and information systems"
+    assert p["text"].startswith("1.1.1. For the purpose") and "1.1.2. The policy shall be reviewed" in p["text"]
+    assert "(Article 21(2), point (a)" in p["path"][1]
+    assert "(Article 21(2), points (i) and (j)" in recs["nis2-ir/anx-1/pt-11.1"]["path"][1]

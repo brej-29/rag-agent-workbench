@@ -132,6 +132,9 @@ DECIMAL_ANNEX = """<html><body><div id="anx_1">
 <table><tr><td>1.1.2. The policy shall be reviewed at planned intervals.</td></tr></table>
 <p class="oj-ti-grseq-1">1.2. Roles, responsibilities and authorities</p>
 <table><tr><td>1.2.1. Roles shall be assigned.</td></tr></table>
+<p class="oj-ti-grseq-1">7. Policies and procedures to assess effectiveness (Article 21(2), point (f) of Directive (EU) 2022/2555)</p>
+<table><tr><td>7.1. For the purpose of Article 21(2), point (f), the entities shall establish a policy.</td></tr></table>
+<table><tr><td>7.2. The policy shall take into account results of the risk assessment.</td></tr></table>
 <p class="oj-ti-grseq-1">11. Access control (Article 21(2), points (i) and (j), of Directive (EU) 2022/2555)</p>
 <p class="oj-ti-grseq-1">11.1. Access control policy</p>
 <table><tr><td>11.1.1. An access control policy shall be established.</td></tr></table>
@@ -143,7 +146,12 @@ def test_decimal_numbered_annex_becomes_one_record_per_point():
     src = Source("nis2-ir", "nis2-ir", "NIS2 IR", "NIS2", "Implementing Regulation (EU) 2024/2690", "u", "eu-xhtml",
                  "l", "regulation")
     recs = {r["id"]: r for r in parse_eu(DECIMAL_ANNEX, src)}
-    assert list(recs) == ["nis2-ir/anx-1", "nis2-ir/anx-1/pt-1.1", "nis2-ir/anx-1/pt-1.2", "nis2-ir/anx-1/pt-11.1"]
+    assert list(recs) == ["nis2-ir/anx-1", "nis2-ir/anx-1/pt-1.1", "nis2-ir/anx-1/pt-1.2", "nis2-ir/anx-1/pt-7.1",
+                          "nis2-ir/anx-1/pt-7.2", "nis2-ir/anx-1/pt-11.1"]
+    # Sections whose points have no headings of their own (7., 9. in 2024/2690): each N.M table is a point.
+    p7 = recs["nis2-ir/anx-1/pt-7.2"]
+    assert p7["title"] == "Policies and procedures to assess effectiveness" and p7["text"].startswith("7.2. The policy")
+    assert "(Article 21(2), point (f)" in p7["path"][1]
     p = recs["nis2-ir/anx-1/pt-1.1"]
     assert p["kind"] == "annex_point" and p["ref"] == "NIS2 IR Annex, point 1.1"
     assert p["title"] == "Policy on the security of network and information systems"

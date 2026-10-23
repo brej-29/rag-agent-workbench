@@ -87,6 +87,7 @@ def _article(art: Tag, src: Source, mods: Dict[str, str]) -> List[dict]:
 
 _DEC_SECTION = re.compile(r"^(\d+)\.\s+\S")
 _DEC_POINT = re.compile(r"^(\d+\.\d+)\.\s+(.+)$")
+_DEC_TABLE_POINT = re.compile(r"^(\d+\.\d+)\.\s")
 
 
 def _decimal_points(anx: Tag, src: Source, common: dict, num: str) -> List[dict]:
@@ -106,8 +107,20 @@ def _decimal_points(anx: Tag, src: Source, common: dict, num: str) -> List[dict]
             if _DEC_SECTION.match(text):
                 section, point = text, None
                 continue
+        m = _DEC_TABLE_POINT.match(text) if block.name == "table" else None
+        if m and (point is None or point.get("from_table")):
+            # Sections whose points have no headings (7., 9. in 2024/2690): each "N.M." table is a point.
+            # Headed points' tables open with three levels ("1.1.1.") and never match.
+            title = re.sub(r"^\d+\.\s+|\s*\(Article.*$", "", section or "")
+            point = {**common, "id": f"{src.prefix}/anx-{num}/pt-{m.group(1)}",
+                     "ref": f"{src.short} Annex, point {m.group(1)}", "kind": "annex_point", "title": title,
+                     "text": text, "path": [f"Annex {num}", section, f"{m.group(1)} {title}"], "from_table": True}
+            out.append(point)
+            continue
         if point is not None and text:
             point["text"] = f"{point['text']} {text}".strip()
+    for p in out:
+        p.pop("from_table", None)
     return out
 
 

@@ -31,5 +31,5 @@ def test_implementing_regulation_2024_2690_is_in_the_corpus():
         pytest.skip("corpus not built")
     ids = [p["id"] for p in load_provisions() if p["id"].startswith("nis2-ir/")]
     points = [i for i in ids if i.startswith("nis2-ir/anx-1/pt-")]
-    assert len(points) == 47 and "nis2-ir/anx-1/pt-5.1" in points and "nis2-ir/anx-1/pt-13.3" in points
+    assert len(points) == 53 and "nis2-ir/anx-1/pt-5.1" in points and "nis2-ir/anx-1/pt-13.3" in points
     assert any(i.startswith("nis2-ir/art-16") for i in ids) and any(i.startswith("nis2-ir/art-7") for i in ids)

@@ -61,7 +61,7 @@ DataRole = Literal["controller", "processor"]
 ProductRole = Literal["manufacturer", "importer", "distributor"]
 AiUse = Literal["chatbot", "synthetic_content", "emotion_or_biometric", "deepfake"]
 Nis2Sector = Literal["cloud", "data_centre", "cdn", "dns_tld", "trust_services", "electronic_comms",
-                     "managed_services", "online_platform", "other_annex", "none"]
+                     "managed_services", "online_marketplace", "search_engine", "social_network", "other_annex", "none"]
 
 
 class Profile(BaseModel):

@@ -10,8 +10,8 @@ def test_catalog_has_no_problems():
 
 def test_catalog_covers_the_five_laws():
     arts = [o["article"] for o in load_catalog()["obligations"]]
-    counts = {p: sum(a.startswith(p + "/") for a in arts) for p in ("eu-ai-act", "gdpr", "nis2", "dora", "cra")}
-    assert counts == {"eu-ai-act": 32, "gdpr": 34, "nis2": 4, "dora": 19, "cra": 10}
+    counts = {p: sum(a.startswith(p + "/") for a in arts) for p in ("eu-ai-act", "gdpr", "nis2", "nis2-ir", "dora", "cra")}
+    assert counts == {"eu-ai-act": 32, "gdpr": 34, "nis2": 4, "nis2-ir": 13, "dora": 19, "cra": 10}
 
 
 def test_catalog_problems_catches_each_kind_of_mistake():

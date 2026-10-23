@@ -73,6 +73,7 @@ def catalog_problems(catalog: dict, facts: List[dict], corpus: Dict[str, dict],
         seen.add(a)
         if a not in index:
             problems.append(f"{a}: not in the corpus")
+        problems += [f"{a}: include {key} not in the corpus" for key in ob.get("include", []) if key not in index]
         check(ob["when"], a)
         basis = corpus.get(ob.get("basis", ""))
         if not basis:
@@ -141,7 +142,7 @@ def build_checklist(profile: Dict[str, Any], as_of: date, with_text: bool = Fals
     not_applicable: List[dict] = []
     waiting: Counter = Counter()
     for ob in catalog["obligations"]:
-        paras = index[ob["article"]]
+        paras = index[ob["article"]] + [p for key in ob.get("include", []) for p in index[key]]
         head = paras[0]
         value, why = evaluate(ob["when"], prof, catalog["defs"])
         item = {"article": ob["article"], "ref": _article_ref(head), "title": head.get("title") or "",

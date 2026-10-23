@@ -152,18 +152,41 @@ def retrieve_regs(query: str, frameworks: Optional[List[str]], as_of: date, cond
             continue
         score = float(h.get("_score") or 0.0)
         top = max(top, score)
-        st = status_for(p, registry, as_of, condition)
-        cands.append({
-            "source": p["framework"], "framework": p["framework"], "ref": p["ref"],
-            "title": f"{p['ref']} — {p['title']}" if p.get("title") else p["ref"],
-            "url": p.get("source_url", ""), "score": score, "chunk_text": p["text"], "doc_id": p["id"],
-            "kind": p.get("kind"), "binding": p.get("binding"),
-            "rank_score": score * (settings.REGS_RECITAL_WEIGHT if p.get("kind") == "recital" else 1.0),
-            "status": st["status"], "applies_from": st["applies_from"], "status_note": st["note"],
-        })
+        cands.append(_candidate(p, score, registry, as_of, condition, settings))
     from app.services.regs import crosswalk  # late import: crosswalk reads the corpus through this module
 
+    mode = getattr(settings, "REGS_CROSSWALK_MODE", "off")
     chosen = diversify(cands, settings.REGS_TOP_K, settings.REGS_MAX_PER_FRAMEWORK)
+    if chosen and mode == "boost":
+        # Re-rank: pool candidates that official mappings link to the top hit move up.
+        linked = {m["id"] for m in crosswalk.related(chosen[0]["doc_id"], official_only=True, per_group=99)["items"]}
+        for c in cands:
+            if c["doc_id"] in linked:
+                c["rank_score"] *= settings.REGS_CROSSWALK_BOOST
+        chosen = diversify(cands, settings.REGS_TOP_K, settings.REGS_MAX_PER_FRAMEWORK)
+    elif chosen and mode == "inject":
+        # Add provisions officially linked to the top hits; they ride on the parent's score and are labelled.
+        have, extra = {c["doc_id"] for c in chosen}, []
+        for parent in chosen[:3]:
+            for m in crosswalk.related(parent["doc_id"], hops=1, official_only=True, per_group=2)["items"]:
+                if m["licensed"] or m["id"] in have or m["id"] not in corpus:
+                    continue
+                have.add(m["id"])
+                extra.append({**_candidate(corpus[m["id"]], parent["score"], registry, as_of, condition, settings),
+                              "via": {"ref": parent["ref"], "source": m["source_title"]}})
+        chosen += extra[: settings.REGS_CROSSWALK_INJECT]
     for s in chosen:
         s["crosswalk"] = crosswalk.related(s["doc_id"])
     return chosen, top
+
+
+def _candidate(p: dict, score: float, registry: Registry, as_of: date, condition: Optional[str], settings) -> dict:
+    st = status_for(p, registry, as_of, condition)
+    return {
+        "source": p["framework"], "framework": p["framework"], "ref": p["ref"],
+        "title": f"{p['ref']} — {p['title']}" if p.get("title") else p["ref"],
+        "url": p.get("source_url", ""), "score": score, "chunk_text": p["text"], "doc_id": p["id"],
+        "kind": p.get("kind"), "binding": p.get("binding"),
+        "rank_score": score * (settings.REGS_RECITAL_WEIGHT if p.get("kind") == "recital" else 1.0),
+        "status": st["status"], "applies_from": st["applies_from"], "status_note": st["note"],
+    }

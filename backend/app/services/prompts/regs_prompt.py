@@ -38,6 +38,8 @@ def build_regs_context(sources: List[Dict[str, Any]], as_of: date) -> str:
         st = {"status": s.get("status") or "no_date", "applies_from": s.get("applies_from"), "note": s.get("status_note")}
         header = (f"[{n}] {s.get('title') or s.get('ref')} | {s.get('framework')}, {binding} | "
                   f"status on {as_of.isoformat()}: {status_text(st, as_of)}")
+        if s.get("via"):
+            header += f" | linked to {s['via']['ref']} by {s['via']['source']}"
         blocks.append(header + "\n" + sanitize_chunk_text(s.get("chunk_text") or ""))
     return "\n\n".join(blocks)
 

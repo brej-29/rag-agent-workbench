@@ -113,3 +113,38 @@ def test_retrieved_sources_carry_their_crosswalk(monkeypatch):
     sources, _ = ask.retrieve_regs("q", None, date(2026, 10, 24), None, S,
                                    lambda **kw: [{"_id": "gdpr/art-33/par-1", "_score": 0.6}], corpus, REG)
     assert sources[0]["crosswalk"]["items"][0]["group"] == "NIST CSF 2.0"
+
+
+LINKED = {"items": [{"id": "nist-csf/GV.SC-01", "licensed": False, "kind": "official", "source_title": "NIST CSF 2.0 to SP 800-53"}], "more": {}}
+
+
+def _settings(mode):
+    class S:
+        REGS_NAMESPACE, REGS_CANDIDATES, REGS_TOP_K, REGS_MAX_PER_FRAMEWORK, REGS_RECITAL_WEIGHT = "regs-v1", 30, 2, 3, 0.9
+        REGS_CROSSWALK_MODE, REGS_CROSSWALK_BOOST, REGS_CROSSWALK_INJECT = mode, 1.15, 3
+    return S
+
+
+CORPUS = {"nist-800-53/sr-3": {"id": "nist-800-53/sr-3", "ref": "SP 800-53 SR-3", "title": "", "text": "a", "framework": "NIST SP 800-53", "binding": "voluntary_framework", "source_url": "u"},
+          "nist-csf/GV.SC-01": {"id": "nist-csf/GV.SC-01", "ref": "CSF GV.SC-01", "title": "", "text": "b", "framework": "NIST CSF 2.0", "binding": "voluntary_framework", "source_url": "u"},
+          "gdpr/art-28/par-1": {"id": "gdpr/art-28/par-1", "ref": "GDPR Art. 28(1)", "title": "", "text": "c", "framework": "GDPR", "binding": "regulation", "source_url": "u"}}
+HITS3 = [{"_id": "nist-800-53/sr-3", "_score": 0.6}, {"_id": "gdpr/art-28/par-1", "_score": 0.55}, {"_id": "nist-csf/GV.SC-01", "_score": 0.5}]
+
+
+def test_boost_lifts_pool_candidates_linked_to_the_top_hit(monkeypatch):
+    from app.services.regs import crosswalk as xw
+    monkeypatch.setattr(xw, "related", lambda pid, **kw: LINKED if pid == "nist-800-53/sr-3" else {"items": [], "more": {}})
+    off, _ = ask.retrieve_regs("q", None, date(2026, 10, 24), None, _settings("off"), lambda **kw: HITS3, CORPUS, REG)
+    boost, _ = ask.retrieve_regs("q", None, date(2026, 10, 24), None, _settings("boost"), lambda **kw: HITS3, CORPUS, REG)
+    assert [s["doc_id"] for s in off] == ["nist-800-53/sr-3", "gdpr/art-28/par-1"]
+    assert [s["doc_id"] for s in boost] == ["nist-800-53/sr-3", "nist-csf/GV.SC-01"]
+
+
+def test_inject_adds_linked_provisions_marked_via_with_the_parents_score(monkeypatch):
+    from app.services.regs import crosswalk as xw
+    monkeypatch.setattr(xw, "related", lambda pid, **kw: LINKED if pid == "nist-800-53/sr-3" else {"items": [], "more": {}})
+    hits = HITS3[:2]
+    out, _ = ask.retrieve_regs("q", None, date(2026, 10, 24), None, _settings("inject"), lambda **kw: hits, CORPUS, REG)
+    added = out[-1]
+    assert added["doc_id"] == "nist-csf/GV.SC-01" and added["score"] == 0.6
+    assert added["via"] == {"ref": "SP 800-53 SR-3", "source": "NIST CSF 2.0 to SP 800-53"}

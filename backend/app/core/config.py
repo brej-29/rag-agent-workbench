@@ -126,6 +126,13 @@ class Settings(BaseSettings):
     REGS_RECITAL_WEIGHT: float = Field(
         default=0.9, description="Rank weight for recitals (interpretive, not binding)."
     )
+    REGS_CROSSWALK_MODE: str = Field(
+        default="off",
+        description="off | boost | inject: use official crosswalk links in regs retrieval (kept only if "
+                    "eval/run_regs.py --crosswalk shows it helps).",
+    )
+    REGS_CROSSWALK_BOOST: float = Field(default=1.15, description="boost: rank weight for pool candidates linked to the top hit.")
+    REGS_CROSSWALK_INJECT: int = Field(default=3, description="inject: most linked provisions added.")
 
     # Web search / Tavily
     TAVILY_API_KEY: Optional[str] = Field(

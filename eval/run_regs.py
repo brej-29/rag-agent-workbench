@@ -118,6 +118,8 @@ def main() -> int:
                     default="lexical")
     ap.add_argument("--k", type=int, default=10)
     ap.add_argument("--lexical-weight", type=float, default=1.0, help="RRF weight of the lexical list in fused mode")
+    ap.add_argument("--crosswalk", choices=["off", "boost", "inject"], default="off",
+                    help="diversified mode: crosswalk-aware retrieval variant")
     args = ap.parse_args()
     lexical = BM25.from_provisions(load_provisions())
     dense_search = None
@@ -131,9 +133,9 @@ def main() -> int:
         from datetime import date
 
         from app.services.regs.ask import retrieve_regs
-        ranked_settings = settings.model_copy(update={"REGS_TOP_K": args.k})
+        ranked_settings = settings.model_copy(update={"REGS_TOP_K": args.k, "REGS_CROSSWALK_MODE": args.crosswalk})
         dense_search = lambda q, k: [s["doc_id"] for s in retrieve_regs(q, None, date.today(), None, ranked_settings, search)[0]]
-        args.mode, mode_name = "dense", "diversified"
+        args.mode, mode_name = "dense", "diversified" + ("" if args.crosswalk == "off" else f"-{args.crosswalk}")
     else:
         mode_name = args.mode
     rows = [json.loads(l) for l in (ROOT / "eval" / "regs_golden.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]

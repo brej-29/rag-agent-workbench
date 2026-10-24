@@ -17,8 +17,21 @@ print("Ask page OK:", at.title[0].value if at.title else "(no title)")
 
 at.switch_page("views/evaluation.py").run()
 assert not at.exception, at.exception
-assert any(h.value == "Retrieval" for h in at.header), [h.value for h in at.header]
-print("Evaluation page OK:", [h.value for h in at.header])
+headers = [h.value for h in at.header]
+assert {"Retrieval", "Abstention", "Routing", "Checklist", "Gap check"} <= set(headers), headers
+assert len(at.tabs) == 2, [t.label for t in at.tabs]
+print("Evaluation page OK:", headers)
+
+import tempfile
+
+import services.eval_data as eval_data
+
+saved, eval_data.RESULTS_DIR = eval_data.RESULTS_DIR, Path(tempfile.mkdtemp())  # no snapshots at all
+at.switch_page("views/evaluation.py").run()
+assert not at.exception, at.exception
+assert any("Not published yet" in c.value for c in at.caption)
+eval_data.RESULTS_DIR = saved
+print("Evaluation page OK with no snapshots")
 
 at.switch_page("views/checklist.py").run()
 assert not at.exception, at.exception

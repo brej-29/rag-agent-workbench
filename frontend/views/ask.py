@@ -15,7 +15,7 @@ from services.presenters import (
     copy_clause, crosswalk_compact,
     dates_note, esc, floor_bars_html, profile_words, status_label, step_line, trace_summary, verdict,
 )
-from services.shell import api_key, backend_state, backend_url, facts_or_none, is_dark, wake_watcher
+from services.shell import PROSE_WIDTH, api_key, backend_state, backend_url, facts_or_none, is_dark, note, wake_watcher
 
 DEFAULT_NAMESPACE = REGS_NAMESPACE
 AVATARS = {"user": ":material/person:", "assistant": ":material/fact_check:"}
@@ -299,13 +299,15 @@ if not s.messages:
         st.markdown(
             "Answers quote the EU AI Act, GDPR, NIS2, DORA, the Cyber Resilience Act and NIST frameworks, "
             "cite the exact provision, and say whether each one **applies on your date**. Questions about "
-            "rules not covered here get a plain decline instead of a guess."
+            "rules not covered here get a plain decline instead of a guess.",
+            width=PROSE_WIDTH,
         )
     else:
         st.title("Ask the knowledge base", anchor=False)
         st.markdown(
             "Answers cite the passages they use. When no passage clears the **relevance floor**, "
-            "you get a plain “not in the knowledge base” instead of a guess."
+            "you get a plain “not in the knowledge base” instead of a guess.",
+            width=PROSE_WIDTH,
         )
     if state == "waking":
         wake_watcher()
@@ -331,7 +333,7 @@ question = st.chat_input(
     disabled=not ready or not api_key(),
 )
 if not api_key():
-    st.info("Set API_KEY in the app's secrets to start asking.", icon=":material/key:")
+    note("Set API_KEY in the app's secrets to start asking.", ":material/key:")
 if s.get("example") and not s.messages:
     question = s.example
 if question:

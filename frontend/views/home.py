@@ -11,7 +11,7 @@ import streamlit as st
 from services.backend_client import post_checklist
 from services.eval_data import coverage_rows, headline, load_results
 from services.presenters import profile_words
-from services.shell import api_key, backend_state, backend_url, facts_or_none
+from services.shell import PROSE_WIDTH, api_key, backend_state, backend_url, facts_or_none
 
 s = st.session_state
 s.setdefault("profile", {})
@@ -36,7 +36,8 @@ def _counts(url: str, key: Optional[str], profile: Dict[str, Any], as_of: str) -
 
 
 st.title("Compliance Workbench", anchor=False)
-st.markdown("EU and NIST rules for AI, data and cyber, checked against your profile and your policies.")
+st.markdown("EU and NIST rules for AI, data and cyber, checked against your profile and your policies.",
+            width=PROSE_WIDTH)
 
 words = profile_words(s.profile, facts_or_none()) if s.profile else ""
 with st.container(border=True, horizontal=True, vertical_alignment="center"):
@@ -52,6 +53,7 @@ if s.profile and backend_state() == "ready":
     except httpx.HTTPError:
         counts = None
 
+st.header("What you can do", anchor=False)
 for col, (page, title, icon, text) in zip(st.columns(3), JOBS):
     with col.container(border=True, height="stretch"):
         st.subheader(title, anchor=False)
@@ -65,13 +67,17 @@ st.header("What's covered", anchor=False)
 corpus = results.get("corpus")
 if corpus:
     st.dataframe(pd.DataFrame(coverage_rows(corpus)), hide_index=True, width="stretch", column_config={
-        "Source": st.column_config.LinkColumn("Source", display_text="Official text"),
-        "Provisions": st.column_config.NumberColumn("Provisions", format="%d")})
+        "Instrument": st.column_config.TextColumn("Instrument", width="large"),
+        "Type": st.column_config.TextColumn("Type", width="medium"),
+        "Provisions": st.column_config.NumberColumn("Provisions", format="%d", width="small"),
+        "Source": st.column_config.LinkColumn("Source", display_text="Official text", width="small"),
+        "Retrieved": st.column_config.TextColumn("Retrieved", width="small")})
 else:
     st.caption("Not published yet: run `python eval/publish_results.py`.")
 st.markdown(":material/lock: **ISO/IEC 27001 and 42001** are licensed: load your own copy on the Gap check page. "
             "It stays in your browser session.  \n"
-            ":material/block: **Anything else**, such as HIPAA or CCPA, is declined rather than guessed.")
+            ":material/block: **Anything else**, such as HIPAA or CCPA, is declined rather than guessed.",
+            width=PROSE_WIDTH)
 
 st.header("How it's measured", anchor=False)
 numbers = headline(results)
@@ -85,4 +91,4 @@ else:
 
 st.divider()
 st.caption(f"Information from official EU and NIST text, not legal advice. The same jobs are available to Claude "
-           f"and other MCP clients at `{backend_url()}/mcp`.")
+           f"and other MCP clients at `{backend_url()}/mcp`.", width=PROSE_WIDTH)

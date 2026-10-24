@@ -69,7 +69,7 @@ MODE_LABELS = {"lexical": "Lexical (BM25)", "dense": "Dense", "fused": "Fused (R
                "diversified": "Diversified (production)", "diversified-boost": "+ crosswalk boost",
                "diversified-inject": "+ crosswalk inject"}
 _TYPES = {"concept": "About a topic", "cross": "Across two frameworks", "reference": "Naming a provision"}
-_ROUTES = ["ask", "checklist", "gap_check", "clarify"]
+_JOBS = {"ask": "Ask", "checklist": "Checklist", "gap_check": "Gap check", "clarify": "Clarify"}  # route -> page name
 _BINDING = {"regulation": "Binding regulation", "directive": "Binding directive (through national law)",
             "voluntary_framework": "Voluntary framework"}
 
@@ -82,20 +82,36 @@ def mode_rows(modes: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 def type_rows(retrieval: Dict[str, Any]) -> List[Dict[str, Any]]:
     k = retrieval["k"]
-    return [{"Questions": _TYPES.get(t, t), "n": v["n"], f"Recall@{k}": round(v["recall"], 3),
+    return [{"Question type": _TYPES.get(t, t), "Questions": v["n"], f"Recall@{k}": round(v["recall"], 3),
              "MRR": round(v["mrr"], 3), f"nDCG@{k}": round(v["ndcg"], 3)}
             for t, v in retrieval["aggregate"]["by_type"].items()]
 
 
+def job_name(route: str) -> str:
+    return _JOBS.get(route, route)
+
+
 def confusion_rows(confusion: Dict[str, int]) -> List[Dict[str, Any]]:
-    """{'gap_check->ask': 2} -> one row per request type, one column per job it was routed to."""
+    """{'gap_check->ask': 2} -> one row per request type, one column per job it was routed to, in page names."""
     seen = {part for key in confusion for part in key.split("->")}
-    labels = [r for r in _ROUTES if r in seen] + sorted(seen - set(_ROUTES))
-    table = {a: {b: 0 for b in labels} for a in labels}
+    routes = [r for r in _JOBS if r in seen] + sorted(seen - set(_JOBS))
+    table = {a: {b: 0 for b in routes} for a in routes}
     for key, n in confusion.items():
         a, b = key.split("->")
         table[a][b] = n
-    return [{"Request": a, **table[a]} for a in labels]
+    return [{"Request": job_name(a), **{job_name(b): table[a][b] for b in routes}} for a in routes]
+
+
+_DISAGREEMENT = re.compile(r"^(\w+):(\S+) expected (\w+), got (\w+)$")
+
+
+def disagreement_line(text: str) -> str:
+    """'incident:gdpr/art-34/par-1 expected partial, got unverified' as a readable line (Markdown)."""
+    m = _DISAGREEMENT.match(text)
+    if not m:
+        return text
+    name, pid, want, got = m.groups()
+    return f"{name.replace('_', ' ').capitalize()} · `{pid}`: labelled {want}, judged {got}"
 
 
 def _count(x: Any) -> int:

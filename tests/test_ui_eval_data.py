@@ -1,6 +1,7 @@
 """Evaluation page data shaping (pure, no Streamlit)."""
 from frontend.services.eval_data import (ab_deltas, abstention_counts, confusion_rows, coverage_rows, gap_range,
-                                         headline, load_results, mode_rows, span, sweep_rows, type_rows)
+                                         disagreement_line, headline, job_name, load_results, mode_rows, span,
+                                         sweep_rows, type_rows)
 
 
 def test_load_results_reads_committed_snapshots():
@@ -46,13 +47,20 @@ def test_mode_rows_keep_a_fixed_order_and_mark_production():
 
 def test_type_rows_name_question_types_with_counts():
     ret = {"k": 6, "aggregate": {"by_type": {"cross": {"n": 6, "recall": 0.4833, "mrr": 0.74, "ndcg": 0.46}}}}
-    assert type_rows(ret) == [{"Questions": "Across two frameworks", "n": 6, "Recall@6": 0.483, "MRR": 0.74,
-                               "nDCG@6": 0.46}]
+    assert type_rows(ret) == [{"Question type": "Across two frameworks", "Questions": 6, "Recall@6": 0.483,
+                               "MRR": 0.74, "nDCG@6": 0.46}]
 
 
-def test_confusion_rows_are_a_request_by_route_table():
+def test_confusion_rows_are_a_request_by_job_table_in_plain_names():
     rows = confusion_rows({"ask->ask": 17, "gap_check->ask": 2, "gap_check->gap_check": 3})
-    assert rows == [{"Request": "ask", "ask": 17, "gap_check": 0}, {"Request": "gap_check", "ask": 2, "gap_check": 3}]
+    assert rows == [{"Request": "Ask", "Ask": 17, "Gap check": 0}, {"Request": "Gap check", "Ask": 2, "Gap check": 3}]
+    assert job_name("clarify") == "Clarify" and job_name("other") == "other"
+
+
+def test_disagreement_line_reads_as_a_sentence():
+    assert disagreement_line("incident_injection:gdpr/art-34/par-1 expected partial, got unverified") == (
+        "Incident injection · `gdpr/art-34/par-1`: labelled partial, judged unverified")
+    assert disagreement_line("free text") == "free text"
 
 
 def test_gap_range_spans_every_run_and_falls_back_to_the_latest():

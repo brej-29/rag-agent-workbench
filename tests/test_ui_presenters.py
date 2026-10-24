@@ -93,3 +93,11 @@ def test_answer_markdown_images_are_stripped():
 
 def test_skipped_generation_has_no_trace_line():
     assert step_line({"id": "generate", "status": "skipped", "ms": None, "detail": {}}) == ""
+
+
+def test_citing_sentences_keep_a_marker_written_after_the_full_stop():
+    answer = ("- The controller must notify within 72 hours unless the breach is unlikely to pose a risk. [1]\n"
+              "- The notification must contain the nature of the breach. [2]")
+    assert citing_sentences(answer, 1) == [
+        "- The controller must notify within 72 hours unless the breach is unlikely to pose a risk. [1]"]
+    assert citing_sentences(answer, 2) == ["- The notification must contain the nature of the breach. [2]"]

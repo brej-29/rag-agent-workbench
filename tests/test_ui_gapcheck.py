@@ -3,7 +3,7 @@ import io
 
 from frontend.services.backend_client import iter_sse
 from frontend.services.presenters import (POLICY_CHARS, STANDARD_CHARS, copy_clause, crosswalk_lines, gap_csv, gap_markdown,
-                                         status_label, text_limit_error, verdict_label)
+                                         gap_options, status_label, text_limit_error, verdict_label)
 
 RESULTS = [{"selection": "gdpr/art-33", "ref": "GDPR Art. 33", "title": "Notification", "counts": {}, "tokens": 0,
             "duties": [{"provision": "gdpr/art-33/par-1", "ref": "GDPR Art. 33(1)", "verdict": "missing", "claimed": "missing",
@@ -55,3 +55,18 @@ def test_text_limit_error_names_the_length_and_the_limit():
     msg = text_limit_error("policy", 312_000)
     assert "312,000" in msg and "200,000" in msg
     assert "1,000,000" in text_limit_error("standard", 1_000_001)
+
+
+def test_gap_options_offer_every_article_and_preselect_what_binds():
+    cl = {"groups": {
+        "now": [{"article": "gdpr/art-33", "ref": "GDPR Art. 33", "title": "Notification",
+                 "paragraphs": [{"id": "gdpr/art-33/par-1"}]}],
+        "coming": [],
+        "depends": [{"article": "nis2-ir/art-2", "ref": "NIS2 IR Art. 2", "title": "Technical measures",
+                     "paragraphs": [{"id": "nis2-ir/art-2/par-1"}, {"id": "nis2-ir/anx-1/pt-11.1"},
+                                    {"id": "nis2-ir/anx-1/pt-11.2"}]}]}}
+    opts, default = gap_options(cl)
+    assert default == ["gdpr/art-33"]
+    assert opts["gdpr/art-33"] == "GDPR Art. 33 · Notification"
+    assert opts["nis2-ir/art-2"] == "NIS2 IR Art. 2 · Technical measures · depends on your answers"
+    assert opts["nis2-ir/anx-1#11"] == "NIS2 IR Annex, section 11 · depends on your answers"

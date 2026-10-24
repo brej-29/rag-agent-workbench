@@ -12,6 +12,8 @@ from services.backend_client import get_facts, probe_health
 
 # The free host can take a while to boot a sleeping Space; give up after this.
 WAKE_LIMIT_S = 180
+# Prose stays readable (about 75 characters a line) inside the wide layout that tables and columns need.
+PROSE_WIDTH = 720
 
 
 def _config(name: str, default: Optional[str] = None) -> Optional[str]:
@@ -68,6 +70,12 @@ def facts_or_none() -> Optional[list]:
         return _facts(backend_url(), api_key())
     except httpx.HTTPError:
         return None
+
+
+def note(text: str, icon: str) -> None:
+    """A neutral, bordered note in the theme's own ink (Streamlit's info blue is not in this palette)."""
+    with st.container(border=True, width=PROSE_WIDTH):
+        st.markdown(f"{icon} {text}")
 
 
 @st.fragment(run_every=2)

@@ -31,3 +31,13 @@ def test_crosswalk_compact_puts_three_refs_on_one_line_and_keeps_the_rest():
     assert g["line"] == ":green-badge[GV.SC-01] :green-badge[GV.SC-02] :green-badge[GV.SC-03]"
     assert g["notes"] == "CSF to 800-53" and [label for label, _, _ in g["rest"]] == ["GV.SC-04 · t"]
     assert g["hidden"] == 2
+
+
+def test_crosswalk_compact_drops_the_framework_name_the_group_heading_shows():
+    def item(group, ref, kind="official", licensed=False):
+        return {"group": group, "ref": ref, "title": "", "kind": kind, "source_title": "s", "licensed": licensed,
+                "id": "x/" + ref}
+    xw = {"items": [item("ISO/IEC 27001:2022", "ISO/IEC 27001:2022 A.5.20", "community", True),
+                    item("NIST SP 800-53", "SP 800-53 PM-30"), item("NIS2", "NIS2 Art. 21(2)")], "more": {}}
+    assert [g["line"] for g in crosswalk_compact(xw)] == [":gray-badge[A.5.20]", ":green-badge[PM-30]",
+                                                          ":green-badge[Art. 21(2)]"]

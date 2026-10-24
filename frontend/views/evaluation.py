@@ -5,10 +5,10 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from services.eval_data import (abstention_counts, ab_deltas, confusion_rows, gap_range, load_results, mode_rows,
-                                span, sweep_rows, type_rows)
+from services.eval_data import (abstention_counts, ab_deltas, confusion_rows, disagreement_line, gap_range, job_name,
+                                load_results, mode_rows, span, sweep_rows, type_rows)
 from services.presenters import esc
-from services.shell import is_dark
+from services.shell import PROSE_WIDTH, is_dark, note
 
 # Validated with the dataviz palette checker (light: surface #F5F7F4, dark: #11161B).
 # Orange is reserved for thresholds (the relevance floor, production k), never a series.
@@ -26,7 +26,7 @@ def _date(stamp: str) -> str:
 
 st.title("Evaluation", anchor=False)
 st.markdown("Every number here comes from a harness in `eval/`. Labels were set by reading the official "
-            "text or the documents, never by copying what the system returned.")
+            "text or the documents, never by copying what the system returned.", width=PROSE_WIDTH)
 compliance, generic = st.tabs(["Compliance", "Generic pipeline"])
 
 
@@ -35,8 +35,8 @@ def _not_published() -> None:
 
 
 with compliance:
-    st.info("Golden labels (questions, profiles and policies) were drafted by reading the official text and are "
-            "pending human review.", icon=":material/rate_review:")
+    note("Golden labels (questions, profiles and policies) were drafted by reading the official text and are "
+         "pending human review.", ":material/rate_review:")
 
     st.header("Retrieval", anchor=False)
     ret, modes = results.get("regs_retrieval"), results.get("regs_modes")
@@ -47,9 +47,10 @@ with compliance:
                       help=f"Share of the labelled provisions found among the {k} sent to the model")
             st.metric("MRR", f"{agg['mrr']:.3f}", border=True, help="How high the first labelled provision ranks")
             st.metric(f"nDCG@{k}", f"{agg['ndcg']:.3f}", border=True, help="Ranking quality of the whole list")
-        st.dataframe(pd.DataFrame(type_rows(ret)), hide_index=True, width="stretch")
+        st.dataframe(pd.DataFrame(type_rows(ret)), hide_index=True, width="stretch", column_config={
+            c: st.column_config.NumberColumn(c, format="%.3f") for c in (f"Recall@{k}", "MRR", f"nDCG@{k}")})
         st.caption(f"{ret['n']} golden questions · k = {k}. Questions across two frameworks are the weak spot: a "
-                   "provision from each framework has to make the cut.")
+                   "provision from each framework has to make the cut.", width=PROSE_WIDTH)
     else:
         _not_published()
     if modes:
@@ -68,7 +69,8 @@ with compliance:
         st.altair_chart((bars + values).properties(height=34 * len(dm)), width="stretch")
         st.caption("Same questions, same budget of 6 provisions. Diversified keeps at most 3 per framework so a "
                    "cross-framework question gets both sides. Boosting or adding provisions linked by published "
-                   "crosswalks did not raise recall, so crosswalks are shown with each answer, not used to retrieve.")
+                   "crosswalks did not raise recall, so crosswalks are shown with each answer, not used to retrieve.",
+                   width=PROSE_WIDTH)
 
     st.header("Abstention", anchor=False)
     ab = results.get("regs_abstain")
@@ -78,24 +80,25 @@ with compliance:
                       help="Questions about rules not covered here, which should get no answer")
             st.metric("In-scope questions wrongly declined", f"{ab['false_abstain']} / {ab['answerable']}", border=True)
         for q in ab["missed_unanswerable"]:
-            st.markdown(f"- Answered although out of scope: “{esc(str(q))}”")
+            st.markdown(f"- Answered although out of scope: “{esc(str(q))}”", width=PROSE_WIDTH)
         for q in ab["false_abstentions"]:
-            st.markdown(f"- Declined although in scope: “{esc(str(q))}”")
+            st.markdown(f"- Declined although in scope: “{esc(str(q))}”", width=PROSE_WIDTH)
         st.caption("Instruments not covered (HIPAA, CCPA and others) are declined before retrieval. Otherwise, when no "
                    f"provision scores above the relevance floor of {ab['floor']:.2f}, the answer is a fixed refusal "
-                   "and the model is not called.")
+                   "and the model is not called.", width=PROSE_WIDTH)
     else:
         _not_published()
 
     st.header("Routing", anchor=False)
     rt = results.get("router")
     if rt:
-        st.metric("Requests routed to the right job", f"{rt['accuracy']:.0%}", border=True,
+        st.metric("Requests routed to the right job", f"{rt['accuracy']:.0%}", border=True, width="content",
                   help=f"{rt['n']} labelled requests")
         st.dataframe(pd.DataFrame(confusion_rows(rt["confusion"])), hide_index=True, width="stretch")
         st.caption("Rows: what the request asked for. Columns: the job it was sent to.")
         for m in rt["misses"]:
-            st.markdown(f"- “{esc(m['query'])}” went to {m['predicted']} (expected {m['label']})")
+            st.markdown(f"- “{esc(m['query'])}” went to {job_name(m['predicted'])} "
+                        f"(expected {job_name(m['label'])})", width=PROSE_WIDTH)
     else:
         _not_published()
 
@@ -103,7 +106,8 @@ with compliance:
     st.markdown("Deterministic: a rules table over your profile, no model involved. The test suite checks golden "
                 "profiles against the articles they must and must not get, that answering one more fact never "
                 "changes an outcome already decided, and that high-risk duties move from coming to applies on "
-                "their date ([tests/regs/test_checklist.py](https://github.com/brej-29/rag-agent-workbench/blob/main/tests/regs/test_checklist.py)).")
+                "their date ([tests/regs/test_checklist.py](https://github.com/brej-29/rag-agent-workbench/blob/main/tests/regs/test_checklist.py)).",
+                width=PROSE_WIDTH)
 
     st.header("Gap check", anchor=False)
     g = results.get("gapcheck")
@@ -124,17 +128,17 @@ with compliance:
         if g.get("disagreements"):
             with st.expander(f"Where the latest run disagreed with the labels · {len(g['disagreements'])}"):
                 for d in g["disagreements"]:
-                    st.markdown(f"- {esc(d)}")
+                    st.markdown(f"- {disagreement_line(esc(d))}")
         st.caption("Synthetic policies with planted gaps, including one that tells the reviewer to mark everything "
                    "covered. The judge is a live model, so results vary by run; ranges cover every run of the "
-                   "current prompt.")
+                   "current prompt.", width=PROSE_WIDTH)
     else:
         _not_published()
 
 
 with generic:
     st.caption("These measure the generic RAG pipeline on its earlier evaluation corpus, not the compliance "
-               "knowledge base.")
+               "knowledge base.", width=PROSE_WIDTH)
 
     # ---------------------------------------------------------------------------
     # Retrieval

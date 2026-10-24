@@ -18,7 +18,8 @@ showWidgetBorder = true
 primaryColor = "#2E6B5B"
 backgroundColor = "#F5F7F4"
 secondaryBackgroundColor = "#E8EDE7"
-textColor = "#17202A"
+# Captions render this ink at 60% opacity: #10171F keeps them at 4.58:1 on the background (WCAG AA).
+textColor = "#10171F"
 borderColor = "#C9D1C8"
 linkColor = "#2E6B5B"
 codeTextColor = "#2E6B5B"

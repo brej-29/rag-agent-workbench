@@ -80,3 +80,13 @@
   support); matches on Ask sources, checklist items and the evidence drawer; CSF practices narrowed to linked
   subcategories. Optional boost/inject retrieval measured and left off (no gain).
 - feat(corpus): `upsert --only PREFIX`. Dev lock: pypdf (build time only).
+
+### 2026-10-24 — Sub-project 5: gap check + private workspace
+- feat(api): stateless `/workspace/parse`, `/gapcheck/plan`, `/gapcheck`, `/gapcheck/stream` (nothing stored,
+  indexed or logged; tested).
+- feat(regs): gap-check engine: BM25 passages per duty, one strict-schema judge call per article or annex
+  section, every verdict backed by verbatim quotes from law and policy, otherwise "unverified, review"; run budget.
+- feat(regs): your own licensed ISO/IEC 27001 or 42001 copy, parsed into clauses in the session; Ask answers from
+  it and crosswalk ISO matches show its clause text.
+- feat(ui): Gap check page (session workspace, checklist-driven selection, streamed verdicts, Markdown/CSV export).
+- feat(eval): golden gap check with planted gaps and an injection policy (gate: no false "covered").

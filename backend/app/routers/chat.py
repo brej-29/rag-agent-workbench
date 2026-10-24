@@ -107,6 +107,11 @@ def _build_chat_response(state: Dict) -> ChatResponse:
     )
 
 
+def _cacheable(payload: ChatRequest) -> bool:
+    """Your licensed copy and follow-ups are never cached."""
+    return cache_enabled() and not payload.chat_history and not payload.standards
+
+
 def _regs_inputs(payload: ChatRequest) -> Dict:
     """Compliance-path inputs (ignored by the graph outside the regs namespace)."""
     return {
@@ -148,7 +153,7 @@ async def chat(request: Request, payload: ChatRequest) -> ChatResponse:  # noqa:
         payload.use_web_fallback,
     )
 
-    use_cache = cache_enabled() and not payload.chat_history
+    use_cache = _cacheable(payload)
     cached_response: Optional[ChatResponse] = None
     if use_cache:
         cached = get_chat_cached(
@@ -196,6 +201,7 @@ async def chat(request: Request, payload: ChatRequest) -> ChatResponse:  # noqa:
             for msg in (payload.chat_history or [])
         ],
         **_regs_inputs(payload),
+        "standards": [c.model_dump() for c in payload.standards or []],
     }
 
     start_total = perf_counter()
@@ -284,7 +290,7 @@ async def chat_stream(request: Request, payload: ChatRequest) -> StreamingRespon
     )
 
     # Cache check — same rule as /chat: only for requests without history.
-    use_cache = cache_enabled() and not payload.chat_history
+    use_cache = _cacheable(payload)
     cached_response: Optional[ChatResponse] = None
     if use_cache:
         cached = get_chat_cached(
@@ -319,6 +325,7 @@ async def chat_stream(request: Request, payload: ChatRequest) -> StreamingRespon
             for msg in (payload.chat_history or [])
         ],
         **_regs_inputs(payload),
+        "standards": [c.model_dump() for c in payload.standards or []],
     }
 
     async def event_generator() -> AsyncGenerator[str, None]:

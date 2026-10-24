@@ -164,6 +164,7 @@ def status_label(src: Dict[str, Any]) -> Optional[Tuple[str, str]]:
         "partly": ("orange", f"partly from {frm}"),
         "depends": ("violet", "date depends on classification"),
         "voluntary": ("gray", "voluntary framework"),
+        "licensed_copy": ("blue", "your copy"),
     }.get(st, ("gray", "no date of its own"))
 
 
@@ -176,8 +177,10 @@ CROSSWALK_CAVEAT = ("Matches come from published mappings and show related requi
                     "Community mappings are not endorsed by NIST.")
 
 
-def crosswalk_lines(xw: Optional[Dict[str, Any]]) -> List[Tuple[str, List[Tuple[str, str, str]], int]]:
-    """[(group, [(ref, badge color, caption)], hidden count)] in first-seen group order."""
+def crosswalk_lines(xw: Optional[Dict[str, Any]], standards: Optional[Dict[str, Any]] = None
+                    ) -> List[Tuple[str, List[Tuple[str, str, str]], int]]:
+    """[(group, [(ref, badge color, caption)], hidden count)] in first-seen group order. With the user's own
+    licensed copies (`standards`), ISO matches say which clause of their copy they point to."""
     groups: Dict[str, List[Tuple[str, str, str]]] = {}
     for m in (xw or {}).get("items") or []:
         notes = [m["source_title"]]
@@ -188,7 +191,8 @@ def crosswalk_lines(xw: Optional[Dict[str, Any]]) -> List[Tuple[str, List[Tuple[
         if m["kind"] == "community":
             notes.append("community mapping, not endorsed by NIST")
         if m.get("licensed"):
-            notes.append("licensed text, bring your copy")
+            clause = copy_clause(m["id"], standards)
+            notes.append(f"from your copy: {clause['title']}" if clause else "licensed text, bring your copy")
         label = m["ref"] + (f" · {m['title']}" if m.get("title") else "")
         groups.setdefault(m["group"], []).append((label, "green" if m["kind"] == "official" else "gray", " · ".join(notes)))
     more = (xw or {}).get("more") or {}
@@ -296,4 +300,53 @@ def checklist_csv(cl: Dict[str, Any]) -> str:
         for it in cl["groups"][key]:
             w.writerow([title, it["framework"], it["article"], it["ref"], it["title"], it.get("status") or "",
                         it.get("applies_from") or "", " ".join(it.get("depends_on") or []), it.get("note") or ""])
+    return out.getvalue()
+
+
+VERDICT_LABELS = {"covered": ("green", "covered"), "partial": ("orange", "partial"), "missing": ("red", "missing"),
+                  "unverified": ("gray", "unverified, review")}
+_COPY_KEYS = {"iso-27001": "iso-27001", "iso-42001-fdis": "iso-42001"}
+
+
+def verdict_label(verdict: str) -> Tuple[str, str]:
+    return VERDICT_LABELS.get(verdict, ("gray", verdict))
+
+
+def copy_clause(match_id: str, standards: Optional[Dict[str, Any]]) -> Optional[Dict[str, str]]:
+    prefix, _, cid = match_id.partition("/")
+    std = (standards or {}).get(_COPY_KEYS.get(prefix, ""))
+    return ((std or {}).get("clauses") or {}).get(cid)
+
+
+def _duty_line(d: Dict[str, Any]) -> str:
+    label = verdict_label(d["verdict"])[1]
+    if d["verdict"] == "unverified" and d.get("claimed"):
+        label += f" (claimed {d['claimed']}: {d['problem']})"
+    elif d["verdict"] == "unverified":
+        label += f" ({d['problem']})"
+    quotes = [f"law: “{d['law_quote']}”"] if d.get("law_quote") else []
+    if d.get("policy_quote") and d["verdict"] != "unverified":
+        quotes.append(f"policy {d['passage_id']}: “{d['policy_quote']}”")
+    reason = f" {d['reason']}" if d.get("reason") else ""
+    return f"- **{d['ref']}** {label}:{reason}" + (f" ({'; '.join(quotes)})" if quotes else "")
+
+
+def gap_markdown(results: List[Dict[str, Any]], summary: Dict[str, Any], policy_title: str) -> str:
+    lines = [f"# Gap check: {policy_title}", "",
+             " · ".join(f"{summary.get(v, 0)} {verdict_label(v)[1]}" for v in VERDICT_LABELS), "",
+             "Advisory review from published law texts; verdicts come from a model and every quote was checked "
+             "word for word. Information, not legal advice.", ""]
+    for r in results:
+        lines += [f"## {r['ref']} {r['title']}".rstrip(), ""] + [_duty_line(d) for d in r["duties"]] + [""]
+    return "\n".join(lines)
+
+
+def gap_csv(results: List[Dict[str, Any]]) -> str:
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["article", "duty", "verdict", "claimed", "law_quote", "policy_quote", "passage", "reason", "problem"])
+    for r in results:
+        for d in r["duties"]:
+            w.writerow([r["ref"], d["ref"], d["verdict"], d.get("claimed") or "", d.get("law_quote", ""),
+                        d.get("policy_quote", ""), d.get("passage_id", ""), d.get("reason", ""), d.get("problem", "")])
     return out.getvalue()

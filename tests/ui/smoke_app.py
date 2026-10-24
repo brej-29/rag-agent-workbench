@@ -24,3 +24,9 @@ at.switch_page("views/checklist.py").run()
 assert not at.exception, at.exception
 assert at.title and at.title[0].value == "Your checklist", [t.value for t in at.title]
 print("Checklist page OK (API unreachable path)")
+
+
+at.switch_page("views/gapcheck.py").run()
+assert not at.exception, at.exception
+assert at.title and at.title[0].value == "Gap check"
+print("Gap check page OK (API unreachable path)")

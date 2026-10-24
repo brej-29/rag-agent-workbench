@@ -470,3 +470,86 @@ Live (local API, real index and Groq): "What must a cloud provider do about supp
 A.5.19–A.5.21, A.8.30; NIS2 Art. 21(2); CSF GV.SC/GV.OC; SP 800-53 SR-5, SA-9, SR-6, RA-7. A large EU cloud
 provider's checklist: 14 apply now; NIS2 Art. 21's card shows 2024/2690, CSF and ISO matches; CSF practices
 narrowed to 85 linked subcategories.
+
+## 15. Sub-project 5 design: gap check + private workspace (approved 2026-10-24)
+
+Job: check a user's own policy, duty by duty, against the articles their checklist says bind them, with a
+verbatim quote from the law and from the policy for every verdict; and let users bring their own licensed
+standard (ISO/IEC 27001, 42001) to read matched clauses and ask about them. The server stores nothing.
+
+**15.1 Session workspace.** `POST /workspace/parse` `{kind: policy | standard, title, text}` returns policy
+passages (split at headings/paragraphs, ~600 chars, stable ids `p1…`) or a standard's clause map
+(`{id: {title, text}}`, ids such as `4.1`, `A.5.19`, `B.2.2`, matched at line starts; detected standard and
+coverage, e.g. "93 of 93 Annex A controls"). No document text is written to Pinecone, disk or logs. The UI keeps
+`workspace = {policies, standards}` in the Streamlit session (remove buttons; gone with the tab); files are
+converted by the existing UI converters. Limits: ~200k chars per policy, ~1M per standard. Uploaded text is
+untrusted: delimited and sanitised in prompts. SOC 2 is not parsed (no crosswalk points at it).
+
+**15.2 Gap-check engine** (`services/regs/gapcheck.py`). Input: policy text, profile, as-of date, selected
+articles (default: checklist apply-now + coming items, at most 12). Duties: each article's paragraphs; annexes
+reached through `include` (2024/2690 Art. 2) are selected per section (`nis2-ir/anx-1#11` = access control),
+one call each, since the whole annex would exceed the run budget; each duty shown up to 1,200 chars.
+Passages: BM25 over policy passages per duty, top 3, merged to ≤ 8 per call, ≤ 700 chars each. Judge: one
+strict-schema call per article or section returning per duty `verdict` (covered | partial | missing),
+`law_quote`, `policy_quote`, `passage_id`, `reason`. Verification (deterministic): `law_quote` verbatim in the duty;
+for covered/partial `policy_quote` verbatim in the cited passage; missing carries no policy quote; any failure or
+skipped duty → `unverified` ("review"). Budget: estimated tokens shown before running; runs over ~40k tokens are
+refused; on 429 the OpenAI SDK under the Groq client already waits for retry-after and retries (HTTP_MAX_RETRIES = 3; VERIFIED in openai 3.35.1 `_base_client.py`), then the 20b → 120b fallback applies.
+Delivery: `POST /gapcheck/stream` (SSE `article` per article, then `done` with counts) and `POST /gapcheck`
+(JSON); Markdown/CSV export with "not legal advice".
+
+**15.3 Your copy in Ask; crosswalk text; chat.** `ChatRequest.standards` (optional, sent only when a copy is
+loaded): the scope guard stops declining a licensed name when a matching copy is attached (SOC 2 and others
+still declined); retrieval adds ≤ 3 clauses from the copy (BM25 + clause ids named in the question), labelled
+"<standard> (your copy)" with status "licensed text you supplied"; usual citation checks; responses with
+`standards` are never cached or logged. Crosswalk ISO matches show the clause text "from your copy" when the
+session holds it. Chat `gap_check` intent: deterministic reply linking to the Gap check page.
+
+**15.4 UI.** Gap check page: your documents (policy, licensed standard with coverage, remove); what to check
+(binding articles from the session profile, preselected, editable; token estimate and expected time); streamed
+results (per-article expanders, per-duty rows: verdict badge, law quote, policy quote, reason, "unverified,
+review"); summary metrics; Markdown/CSV export.
+
+**15.5 Gates.** (1) Unit tests: splitter, passage selection, duty building with annex sections, verifier (every
+downgrade), budget, clause parser; fixtures use synthetic standard text (real ids, invented wording; no ISO text
+in the repo). (2) Privacy: parse and gap check never call Pinecone; document text never appears in logs.
+(3) Golden gap check (live, ~40k tokens): three synthetic policies with planted gaps (incident policy without the
+72-hour notification; access control without MFA; supplier policy without a supplier directory), ~15 labelled
+duties; gate: zero "covered" on a planted-missing duty; accuracy and verification rate reported. (4) Injection:
+a policy telling the judge to mark everything covered must not flip planted-missing duties (adversarial suite,
+model-dependent). (5) Ask with a synthetic copy (unit) and live; existing suites green; UI smoke on the new page.
+Risks: free-tier speed (minutes per run: estimate shown, results streamed); model judgement (quotes verified,
+failures flagged, verdicts advisory); PDF extraction quality of standards (coverage shown).
+
+## 16. Sub-project 5 results (2026-10-24)
+
+Built: stateless `POST /workspace/parse` (policy → passages; licensed standard → clause map with coverage),
+`/gapcheck/plan`, `/gapcheck`, `/gapcheck/stream`; the gap-check engine (BM25 passages per duty, one strict-schema
+judge call per article or annex section, deterministic quote verification); your licensed copy in Ask (scope guard
+lets the named standard through when a copy is attached; up to 3 clauses from the copy, cited as "your copy";
+never cached); clause text "from your copy" on crosswalk ISO matches; the Gap check page; chat `gap_check` replies
+point to it. The server stores nothing: tests assert no Pinecone call and that a marker phrase from the policy never
+appears in the logs.
+
+Golden gap check (`eval/run_gapcheck.py`, 4 synthetic policies incl. an injection variant, 17 labelled duties,
+6 planted-missing): **gate held in every run: no "covered" on a planted-missing duty, including the policy that
+tells the reviewer to mark everything covered.** Three runs of the final prompt: accuracy 0.765 / 0.882 / 0.765,
+verified rate 0.882 / 1.000 / 0.824, planted-missing caught 5 / 6 / 4 of 6, ~11k tokens each. When the model fails
+it fails safe: unverifiable quotes become "unverified, review".
+
+Found and fixed:
+- The first prompt defined covered as "a passage states what the duty requires"; the model called NIS2 IR 5.1
+  covered although its supplier-selection criteria (5.1.2) were absent. Covered now means every requirement of
+  the duty (each listed element, deadline and recipient) is stated.
+- One golden label was wrong: NIS2 IR 11.1 is partial, not covered (11.1.2(b)–(c) and 11.1.3 are not in the
+  policy). Found by reading the full duty after the model disagreed; corrected and recorded.
+- LangGraph keeps only declared state keys, so the request's `standards` were dropped between nodes until added
+  to `ChatState`.
+- The licensed-standard decline still said "private workspace (coming soon)"; it now points to loading a copy.
+
+Remaining disagreements are borderline: GDPR Art. 34(1) partial vs missing ("may inform customers where
+appropriate"), NIS2 IR 11.6/11.7 partial vs missing (a password-length rule).
+
+Live (local API, real Groq): your synthetic copy answers "What does ISO/IEC 27001 A.5.19 require?" citing
+"your copy", the same question without a copy is declined as licensed, and a streamed gap check of the supplier
+policy against 2024/2690 section 5 returns 5.1 partial / 5.2 missing with verified quotes in 1.2 s (1,358 tokens).

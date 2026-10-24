@@ -9,6 +9,7 @@ from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from app.services.regs import DATA_DIR, load_provisions
 from app.services.regs.registry import Registry
+from app.services.regs.standards import LICENSED_NAMES
 
 COVERED = ["EU AI Act", "GDPR", "NIS2", "DORA", "Cyber Resilience Act", "NIST SP 800-53", "NIST CSF 2.0", "NIST AI RMF"]
 
@@ -54,9 +55,11 @@ def _join(names: List[str]) -> str:
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
-def scope_guard(query: str) -> dict:
-    """Deterministic: does the question name an instrument this corpus cannot answer from?"""
+def scope_guard(query: str, available: Optional[Set[str]] = None) -> dict:
+    """Deterministic: does the question name an instrument this corpus cannot answer from?
+    A licensed standard is answerable when the user attached their own copy (`available`)."""
     out, lic, inside = _found(_OUT_OF_SCOPE, query), _found(_LICENSED, query), named_frameworks(query)
+    lic = [n for n in lic if LICENSED_NAMES.get(n) not in (available or set())]
     names = out + lic
     if not names:
         return {"abstain": False, "kind": None, "names": [], "message": None, "warning": None}
@@ -64,8 +67,8 @@ def scope_guard(query: str) -> dict:
     if lic and not out:
         kind = "licensed"
         msg = (f"{_join(names)} {verb} a licensed standard, so its text is not in the public knowledge base. "
-               "Ask about the frameworks covered here, or add your own licensed copy to a private workspace "
-               "(coming soon).")
+               "Load your own licensed copy on the Gap check page (it stays in your browser session) and ask again, "
+               "or ask about the frameworks covered here.")
     else:
         kind = "out_of_scope"
         msg = (f"{_join(names)} {verb} not covered here, so I can't answer from official text. "
@@ -104,6 +107,8 @@ def status_text(st: dict, as_of: date) -> str:
         return f"applies from {frm} (not yet in force on {as_of.isoformat()})" + (f"; {note}" if note else "")
     if s == "depends":
         return f"depends on classification: {note}"
+    if s == "licensed_copy":
+        return "your licensed copy (dates not tracked here)"
     if s == "voluntary":
         return "voluntary framework (no legal effective date)"
     return f"no date of its own ({note})" if note else "no date of its own"

@@ -78,3 +78,11 @@ def test_checklist_reaches_the_done_payload():
     done = events[-1][1]
     assert done["intent"] == "checklist" and done["checklist"]["counts"]["depends"] > 0
     assert [d["id"] for e, d in events if e == "step"] == ["route", "generate"]
+
+
+def test_requests_with_a_copy_are_never_cached():
+    from app.routers.chat import _cacheable
+    from app.schemas.chat import ChatRequest
+    with patch("app.routers.chat.cache_enabled", return_value=True):
+        assert _cacheable(ChatRequest(query="q"))
+        assert not _cacheable(ChatRequest(query="q", standards=[{"name": "iso-27001", "clauses": {}}]))

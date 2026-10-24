@@ -45,3 +45,7 @@
 {"query": "Who must be notified when a cybersecurity incident happens?", "relevant": ["nist-800-53/ir-6", "nist-csf/RS.CO-02", "nis2/art-23/par-1"], "type": "cross", "frameworks": ["NIST SP 800-53", "NIST CSF 2.0", "NIS2"]}
 {"query": "What are the incident notification deadlines across EU rules?", "relevant": ["gdpr/art-33/par-1", "nis2/art-23/par-4", "cra/art-14/par-2", "eu-ai-act/art-73/par-2", "dora/art-19/par-4"], "type": "cross", "frameworks": ["GDPR", "NIS2", "Cyber Resilience Act", "EU AI Act", "DORA"]}
 {"query": "Which impact assessments are needed before deploying an AI system that processes personal data?", "relevant": ["eu-ai-act/art-27/par-1", "gdpr/art-35/par-1", "eu-ai-act/art-26/par-9"], "type": "cross", "frameworks": ["EU AI Act", "GDPR"]}
+{"query": "What must a cloud provider's supply chain security policy cover under NIS2?", "relevant": ["nis2-ir/anx-1/pt-5.1"], "type": "concept", "frameworks": ["NIS2"]}
+{"query": "Do digital infrastructure providers need a business continuity and disaster recovery plan under NIS2?", "relevant": ["nis2-ir/anx-1/pt-4.1"], "type": "concept", "frameworks": ["NIS2"]}
+{"query": "When is an incident at a cloud computing service provider considered significant?", "relevant": ["nis2-ir/art-7"], "type": "concept", "frameworks": ["NIS2"]}
+{"query": "Is multi-factor authentication required for managed service providers under NIS2?", "relevant": ["nis2-ir/anx-1/pt-11.7"], "type": "concept", "frameworks": ["NIS2"]}

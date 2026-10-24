@@ -49,19 +49,35 @@ def _describe(node: str) -> dict:
     return {"group": group, "ref": f"{group} {node.split('/', 1)[1]}", "title": "", "licensed": True}
 
 
+def _group_of(node: str) -> str:
+    return GROUPS.get(node.split("/", 1)[0], node.split("/", 1)[0])
+
+
 def _walk(starts: List[str], hops: int, official_only: bool) -> List[dict]:
+    """Breadth-first: each node keeps its first (shortest, official-first) path; `support` counts the paths
+    reaching it at that depth. Nodes in a starting item's own instrument are walked through but not returned
+    (siblings reached via a hub such as NIS2 Art. 21(2) are neighbours, not matches)."""
     g, seen, found = graph(), set(starts), []
+    own = {_group_of(s) for s in starts}
     frontier = [(s, [], "official") for s in starts]
     for depth in range(1, hops + 1):
-        nxt = []
+        nxt, this_depth = [], {}
         for node, via, kind in frontier:
             for e in g.get(node, []):
-                if (official_only and e["kind"] != "official") or e["other"] in seen:
+                if official_only and e["kind"] != "official":
+                    continue
+                if e["other"] in this_depth:
+                    this_depth[e["other"]]["support"] += 1
+                    continue
+                if e["other"] in seen:
                     continue
                 seen.add(e["other"])
                 path_kind = "community" if "community" in (kind, e["kind"]) else "official"
-                found.append({"id": e["other"], "kind": path_kind, "source": e["source"], "hops": depth, "via": via,
-                              "note": e.get("note")})
+                hit = {"id": e["other"], "kind": path_kind, "source": e["source"], "hops": depth, "via": via,
+                       "note": e.get("note"), "support": 1}
+                this_depth[e["other"]] = hit
+                if _group_of(e["other"]) not in own:
+                    found.append(hit)
                 if not e["other"].startswith("iso-"):  # licensed ids are leaves
                     nxt.append((e["other"], via + [_describe(e["other"])["ref"]], path_kind))
         frontier = nxt
@@ -70,7 +86,7 @@ def _walk(starts: List[str], hops: int, official_only: bool) -> List[dict]:
 
 def _shape(found: List[dict], per_group: int) -> dict:
     items, more, counts = [], {}, {}
-    for f in sorted(found, key=lambda f: (f["kind"] != "official", f["hops"], f["id"])):
+    for f in sorted(found, key=lambda f: (f["kind"] != "official", f["hops"], -f["support"], f["id"])):
         d = _describe(f["id"])
         n = counts[d["group"]] = counts.get(d["group"], 0) + 1
         if n > per_group:

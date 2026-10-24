@@ -62,3 +62,20 @@ def test_committed_links_reach_iso_from_csf():
     out = xw.related("nist-csf/GV.SC-05", official_only=True)
     assert any(m["group"] == "NIST SP 800-53" for m in out["items"])
     assert any(m["group"] == "ISO/IEC 27001:2022" for m in out["items"])
+
+
+def test_no_siblings_from_the_starting_instrument(monkeypatch):
+    _use(monkeypatch, LINKS + [{"from": "nis2-ir/anx-1/pt-1.1", "to": "nis2/art-21/par-2", "source": "nis2-ir-headings", "kind": "official"}])
+    ids = {m["id"] for m in xw.related("nis2-ir/anx-1/pt-5.1")["items"]}
+    assert "nis2/art-21/par-2" in ids and "nis2-ir/anx-1/pt-1.1" not in ids  # same act, reached through the hub
+
+
+def test_two_hop_matches_reached_by_more_paths_rank_first(monkeypatch):
+    links = [{"from": "nis2-ir/anx-1/pt-5.1", "to": f"nist-csf/{c}", "source": "enisa-nis2", "kind": "official"}
+             for c in ("GV.OC-03", "GV.SC-01", "GV.SC-04")]
+    links += [{"from": "nist-csf/GV.OC-03", "to": "nist-800-53/ac-1", "source": "nist-csf-800-53", "kind": "official"},
+              {"from": "nist-csf/GV.SC-01", "to": "nist-800-53/sr-3", "source": "nist-csf-800-53", "kind": "official"},
+              {"from": "nist-csf/GV.SC-04", "to": "nist-800-53/sr-3", "source": "nist-csf-800-53", "kind": "official"}]
+    _use(monkeypatch, links)
+    sp = [m["id"] for m in xw.related("nis2-ir/anx-1/pt-5.1")["items"] if m["group"] == "NIST SP 800-53"]
+    assert sp == ["nist-800-53/sr-3", "nist-800-53/ac-1"]

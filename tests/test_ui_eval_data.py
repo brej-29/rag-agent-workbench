@@ -1,5 +1,6 @@
 """Evaluation page data shaping (pure, no Streamlit)."""
-from frontend.services.eval_data import abstention_counts, ab_deltas, load_results, sweep_rows
+from frontend.services.eval_data import (ab_deltas, abstention_counts, confusion_rows, coverage_rows, gap_range,
+                                         headline, load_results, mode_rows, span, sweep_rows, type_rows)
 
 
 def test_load_results_reads_committed_snapshots():
@@ -28,3 +29,48 @@ def test_abstention_counts():
             {"answerable": False, "abstained": True}, {"answerable": False, "abstained": False, "error": "429"}]
     assert abstention_counts(rows) == {"answered_ok": 1, "false_abstain": 1, "correct_abstain": 1,
                                        "answered_unanswerable": 0, "errors": 1}
+
+
+
+def test_committed_snapshots_include_the_compliance_evals():
+    assert {"regs_retrieval", "regs_modes", "regs_abstain", "router", "gapcheck", "corpus"} <= set(load_results())
+
+
+def test_mode_rows_keep_a_fixed_order_and_mark_production():
+    rows = mode_rows({"diversified-inject": {"n": 50, "recall": 0.8713, "mrr": 0.8457},
+                      "lexical": {"n": 50, "recall": 0.61, "mrr": 0.44},
+                      "diversified": {"n": 50, "recall": 0.8713, "mrr": 0.8457}})
+    assert [r["mode"] for r in rows] == ["Lexical (BM25)", "Diversified (production)", "+ crosswalk inject"]
+    assert [r["production"] for r in rows] == [False, True, False] and rows[1]["recall"] == 0.871
+
+
+def test_type_rows_name_question_types_with_counts():
+    ret = {"k": 6, "aggregate": {"by_type": {"cross": {"n": 6, "recall": 0.4833, "mrr": 0.74, "ndcg": 0.46}}}}
+    assert type_rows(ret) == [{"Questions": "Across two frameworks", "n": 6, "Recall@6": 0.483, "MRR": 0.74,
+                               "nDCG@6": 0.46}]
+
+
+def test_confusion_rows_are_a_request_by_route_table():
+    rows = confusion_rows({"ask->ask": 17, "gap_check->ask": 2, "gap_check->gap_check": 3})
+    assert rows == [{"Request": "ask", "ask": 17, "gap_check": 0}, {"Request": "gap_check", "ask": 2, "gap_check": 3}]
+
+
+def test_gap_range_spans_every_run_and_falls_back_to_the_latest():
+    gap = {"accuracy": 0.765, "verified_rate": 0.824, "false_covered": [],
+           "runs": [{"accuracy": 0.765, "verified_rate": 0.824, "false_covered": 0},
+                    {"accuracy": 0.882, "verified_rate": 1.0, "false_covered": 0}]}
+    assert gap_range(gap) == {"runs": 2, "accuracy": (0.765, 0.882), "verified_rate": (0.824, 1.0), "false_covered": 0}
+    assert gap_range({k: v for k, v in gap.items() if k != "runs"})["runs"] == 1
+    assert span((0.765, 0.882)) == "0.77–0.88" and span((1.0, 1.0), pct=True) == "100%"
+
+
+def test_headline_skips_missing_snapshots():
+    out = headline({"router": {"n": 36, "accuracy": 0.944, "confusion": {}, "misses": []}})
+    assert out == [{"label": "Requests routed to the right job", "value": "94%", "note": "36 labelled requests"}]
+
+
+def test_coverage_rows_say_binding_or_voluntary():
+    rows = coverage_rows([{"key": "nis2", "name": "NIS2", "binding": "directive", "provisions": 349, "url": "u",
+                           "retrieved": "2026-10-20"}])
+    assert rows == [{"Instrument": "NIS2", "Type": "Binding directive (through national law)", "Provisions": 349,
+                     "Source": "u", "Retrieved": "2026-10-20"}]

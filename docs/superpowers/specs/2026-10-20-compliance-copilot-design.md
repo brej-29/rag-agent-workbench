@@ -588,7 +588,7 @@ with a link to edit it on Checklist (the only editor); (2) three bordered cards,
 sentence and a link each; with a profile set, the Checklist card shows live counts from `/checklist` (no LLM);
 (3) what's covered: one row per instrument (binding or voluntary, provision count, source, retrieved date), plus
 "ISO/IEC 27001 and 42001: load your own copy" and "anything else is declined, not guessed"; (4) how it's
-measured: retrieval recall@6, abstention, router accuracy, gap-check gate and verified rate, each linking to
+measured: retrieval recall@6, abstention, router accuracy, gap-check gate and verified rate, with a link to
 Evaluation; (5) footer: not legal advice; the same jobs over MCP at `/mcp`.
 
 **17.3 Evaluation page.** Tabs: **Compliance** (default) and **Generic pipeline** (today's five sections unchanged,
@@ -618,7 +618,7 @@ accessibility (labelled controls, status never by colour alone, keyboard order),
 screenshots per page in light and dark. Native Streamlit only; a theme file only if the critique calls for one and
 after checking where Streamlit Community Cloud reads it.
 
-**17.6 Gates.** (1) Full suite green (619 before) plus new tests: MCP in-memory client (six tools listed and
+**17.6 Gates.** (1) Full suite green (619 before) plus new tests: MCP in-memory client (five tools listed and
 read-only; `checklist` equals `build_checklist` for a golden profile; bad fact and unknown provision are errors;
 over-budget gap check refused; one progress notification per unit; `ask` passes parsed standards into the graph
 state), `eval_data` shaping, presenters, upload-limit check. (2) AppTest smoke on every page, including Home with no

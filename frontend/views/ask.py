@@ -12,7 +12,7 @@ from services.backend_client import get_facts, namespace_stats, post_upload_text
 from services.file_convert import DocumentConverter, convert_uploaded_file_to_text
 from services.presenters import (
     CROSSWALK_CAVEAT, EXAMPLES, FRAMEWORKS, REGS_EXAMPLES, REGS_NAMESPACE, chip_label, cite_markdown, citing_sentences,
-    crosswalk_lines,
+    copy_clause, crosswalk_lines,
     dates_note, esc, floor_bars_html, profile_words, status_label, step_line, trace_summary, verdict,
 )
 from services.shell import api_key, backend_state, backend_url, is_dark, wake_watcher
@@ -23,6 +23,7 @@ s = st.session_state
 s.setdefault("messages", [])
 s.setdefault("uploads", [])
 s.setdefault("profile", {})  # shared with the Checklist page
+s.setdefault("workspace", {"policies": {}, "standards": {}})  # session only (Gap check page)
 
 
 # ---------------------------------------------------------------------------
@@ -56,7 +57,8 @@ def evidence_drawer(n: int, src: Dict[str, Any], answer: str, floor: Optional[fl
         st.html(f'<div style="white-space:pre-wrap;line-height:1.6">{esc(src.get("chunk_text") or "")}</div>')
     if src.get("doc_id"):
         st.caption(f"Document `{src['doc_id']}`")
-    groups = crosswalk_lines(src.get("crosswalk"))
+    standards = s.workspace["standards"]
+    groups = crosswalk_lines(src.get("crosswalk"), standards)
     if groups:
         st.markdown("**Matching requirements**")
         for group, lines, hidden in groups:
@@ -66,6 +68,11 @@ def evidence_drawer(n: int, src: Dict[str, Any], answer: str, floor: Optional[fl
                 st.caption(note)
             if hidden:
                 st.caption(f"and {hidden} more")
+        for m in (src.get("crosswalk") or {}).get("items") or []:
+            clause = copy_clause(m["id"], standards) if m.get("licensed") else None
+            if clause:
+                with st.expander(f"Your copy: {m['ref']} {clause['title']}"):
+                    st.write(clause["text"])
         st.caption(CROSSWALK_CAVEAT)
     elif src.get("ref"):
         st.caption("No published crosswalk for this provision.")
@@ -116,6 +123,8 @@ def render_answer(msg: Dict[str, Any], idx: int) -> None:
         st.caption(f":material/person_check: Noted from your question: {noted}")
     if resp.get("checklist"):
         st.page_link("views/checklist.py", label="Open the full checklist", icon=":material/checklist:")
+    if resp.get("intent") == "gap_check":
+        st.page_link("views/gapcheck.py", label="Open the Gap check page", icon=":material/rule:")
 
     if sources:
         floor = _floor(steps)
@@ -223,7 +232,8 @@ def regs_controls() -> Dict[str, Any]:
     st.page_link("views/checklist.py", label="Edit your profile", icon=":material/tune:")
     st.caption("Answers come from official EU and NIST text only. Not legal advice.")
     return {"as_of": as_of.isoformat(), "frameworks": frameworks or None,
-            "profile": s.profile or None, "use_web_fallback": False}
+            "profile": s.profile or None, "use_web_fallback": False,
+            "standards": [{"name": k, "clauses": v["clauses"]} for k, v in s.workspace["standards"].items()] or None}
 
 
 # ---------------------------------------------------------------------------

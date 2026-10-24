@@ -112,3 +112,42 @@ def post_upload_text(
         resp = client.post(f"{base_url.rstrip('/')}/documents/upload-text", json=payload, headers=_headers(api_key))
         resp.raise_for_status()
         return resp.json()
+
+
+def iter_sse(lines: Iterable[str]) -> Iterator[Tuple[str, Any]]:
+    """Every SSE event as (event, data); raises RuntimeError on an `error` event."""
+    event: Optional[str] = None
+    for line in lines:
+        if not line:
+            event = None
+        elif line.startswith("event:"):
+            event = line.split(":", 1)[1].strip()
+        elif line.startswith("data:") and event:
+            raw = line.split(":", 1)[1].strip()
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                data = raw
+            if event == "error":
+                raise RuntimeError(data.get("message", raw) if isinstance(data, dict) else raw)
+            yield event, data
+
+
+def parse_document(base_url: str, api_key: Optional[str], kind: str, title: str, text: str) -> Dict[str, Any]:
+    resp = httpx.post(f"{base_url}/workspace/parse", headers=_headers(api_key),
+                      json={"kind": kind, "title": title, "text": text}, timeout=60.0)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def gapcheck_plan(base_url: str, api_key: Optional[str], body: Dict[str, Any]) -> Dict[str, Any]:
+    resp = httpx.post(f"{base_url}/gapcheck/plan", headers=_headers(api_key), json=body, timeout=60.0)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def stream_gapcheck(base_url: str, api_key: Optional[str], body: Dict[str, Any]) -> Iterator[Tuple[str, Any]]:
+    with httpx.stream("POST", f"{base_url}/gapcheck/stream", headers=_headers(api_key), json=body,
+                      timeout=httpx.Timeout(30.0, read=600.0)) as resp:
+        resp.raise_for_status()
+        yield from iter_sse(resp.iter_lines())

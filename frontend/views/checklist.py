@@ -92,7 +92,7 @@ def item_card(item: Dict[str, Any], facts: List[Dict[str, Any]], as_of: str) -> 
             st.caption(f"Applies because: {profile_words(item['why'], facts)}")
         if item.get("note"):
             st.caption(item["note"])
-        groups = crosswalk_lines(item.get("crosswalk"))
+        groups = crosswalk_lines(item.get("crosswalk"), s.get("workspace", {}).get("standards"))
         if groups:
             with st.expander(f"Matches in other frameworks · {sum(len(l) + h for _, l, h in groups)}"):
                 for group, lines, hidden in groups:

@@ -26,12 +26,14 @@ defs:
       - {not: {financial_entity: true}}
       - any:
           - {nis2_sector: [dns_tld, trust_services, electronic_comms]}
-          - all: [{nis2_sector: [cloud, data_centre, cdn, managed_services, online_platform, other_annex]}, {size: [medium, large]}]
+          - all: [{nis2_sector: [cloud, data_centre, cdn, managed_services, online_marketplace, search_engine, social_network, other_annex]}, {size: [medium, large]}]
   dora_entity: {financial_entity: true}
   cra_manufacturer: {all: [{product_roles: manufacturer}, {eu_market: true}]}
   cra_importer: {all: [{product_roles: importer}, {eu_market: true}]}
   cra_distributor: {all: [{product_roles: distributor}, {eu_market: true}]}
   cra_operator: {any: [{use: cra_manufacturer}, {use: cra_importer}, {use: cra_distributor}]}
+  # Implementing Regulation (EU) 2024/2690 Art. 1: the digital-infrastructure and digital-provider entity types.
+  nis2_ir_entity: {all: [{use: nis2_entity}, {nis2_sector: [dns_tld, cloud, data_centre, cdn, managed_services, online_marketplace, search_engine, social_network, trust_services]}]}
 
 obligations:
 - article: eu-ai-act/art-4
@@ -441,7 +443,7 @@ obligations:
   when:
     all:
     - {use: nis2_entity}
-    - nis2_sector: [dns_tld, cloud, data_centre, cdn, managed_services, online_platform]
+    - nis2_sector: [dns_tld, cloud, data_centre, cdn, managed_services, online_marketplace, search_engine, social_network]
   basis: nis2/art-27/par-2
   quote: Member States shall require entities referred to in paragraph 1 to submit the following information to the competent
     authorities
@@ -573,6 +575,64 @@ obligations:
   when: {use: cra_manufacturer}
   basis: cra/art-32/par-1
   quote: manufacturer shall perform a conformity assessment of the
+
+# ---------------------------------------------------------------- Implementing Regulation (EU) 2024/2690
+- article: nis2-ir/art-2
+  when: {use: nis2_ir_entity}
+  include: [nis2-ir/anx-1]
+  basis: nis2-ir/art-1
+  quote: "This Regulation, with regard to DNS service providers, TLD name registries, cloud computing service providers, data centre service providers, content delivery network providers, managed service providers, managed security service providers"
+  note: The Annex sets out the measures point by point; each section names the NIS2 Art. 21(2) point it implements.
+- article: nis2-ir/art-3
+  when: {use: nis2_ir_entity}
+  basis: nis2-ir/art-3/par-1
+  quote: "An incident shall be considered to be significant for the purposes of Article 23(3) of Directive (EU) 2022/2555 with regard to the relevant entities"
+- article: nis2-ir/art-4
+  when: {use: nis2_ir_entity}
+  basis: nis2-ir/art-4
+  quote: "Incidents that individually are not considered a significant incident within the meaning of Article 3, shall be considered collectively as one significant incident"
+- article: nis2-ir/art-5
+  when: {all: [{use: nis2_ir_entity}, {nis2_sector: dns_tld}]}
+  basis: nis2-ir/art-5
+  quote: "With regard to DNS service providers, an incident shall be considered significant"
+  note: Only if you are a DNS service provider.
+- article: nis2-ir/art-6
+  when: {all: [{use: nis2_ir_entity}, {nis2_sector: dns_tld}]}
+  basis: nis2-ir/art-6
+  quote: "With regard to TLD name registries, an incident shall be considered significant"
+  note: Only if you are a TLD name registry.
+- article: nis2-ir/art-7
+  when: {all: [{use: nis2_ir_entity}, {nis2_sector: cloud}]}
+  basis: nis2-ir/art-7
+  quote: "With regard to cloud computing service providers, an incident shall be considered significant"
+- article: nis2-ir/art-8
+  when: {all: [{use: nis2_ir_entity}, {nis2_sector: data_centre}]}
+  basis: nis2-ir/art-8
+  quote: "With regard to data centre service providers, an incident shall be considered significant"
+- article: nis2-ir/art-9
+  when: {all: [{use: nis2_ir_entity}, {nis2_sector: cdn}]}
+  basis: nis2-ir/art-9
+  quote: "With regard to content delivery network providers, an incident shall be considered significant"
+- article: nis2-ir/art-10
+  when: {all: [{use: nis2_ir_entity}, {nis2_sector: managed_services}]}
+  basis: nis2-ir/art-10
+  quote: "With regard to managed service providers and managed security service providers, an incident shall be considered significant"
+- article: nis2-ir/art-11
+  when: {all: [{use: nis2_ir_entity}, {nis2_sector: online_marketplace}]}
+  basis: nis2-ir/art-11
+  quote: "With regard to providers of online marketplaces, an incident shall be considered significant"
+- article: nis2-ir/art-12
+  when: {all: [{use: nis2_ir_entity}, {nis2_sector: search_engine}]}
+  basis: nis2-ir/art-12
+  quote: "With regard to providers of online search engines, an incident shall be considered significant"
+- article: nis2-ir/art-13
+  when: {all: [{use: nis2_ir_entity}, {nis2_sector: social_network}]}
+  basis: nis2-ir/art-13
+  quote: "With regard to providers of social networking services platforms, an incident shall be considered significant"
+- article: nis2-ir/art-14
+  when: {all: [{use: nis2_ir_entity}, {nis2_sector: trust_services}]}
+  basis: nis2-ir/art-14
+  quote: "With regard to trust service providers, an incident shall be considered significant"
 
 # Recommended practices (voluntary): shown when `when` is true; never mixed with legal obligations.
 practices:

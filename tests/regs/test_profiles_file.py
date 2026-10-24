@@ -11,7 +11,7 @@ PROFILES = [r for r in ROWS if not r.get("_meta")]
 
 def test_golden_profiles_are_valid_and_point_at_real_articles():
     index = article_index()
-    assert len(PROFILES) == 12 and len({r["name"] for r in PROFILES}) == 12
+    assert len(PROFILES) == 13 and len({r["name"] for r in PROFILES}) == 13
     for r in PROFILES:
         Profile(**r["profile"])
         listed = r["binds"] + r["depends"] + r["not"]

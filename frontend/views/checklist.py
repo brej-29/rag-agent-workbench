@@ -9,7 +9,8 @@ import streamlit as st
 
 from services.backend_client import get_facts, post_checklist
 from services.presenters import (
-    GROUP_TITLES, checklist_csv, checklist_markdown, dates_note, esc, profile_words, status_label,
+    CROSSWALK_CAVEAT, GROUP_TITLES, checklist_csv, checklist_markdown, crosswalk_lines, dates_note, esc, profile_words,
+    status_label,
 )
 from services.shell import api_key, backend_state, backend_url, wake_watcher
 
@@ -91,6 +92,16 @@ def item_card(item: Dict[str, Any], facts: List[Dict[str, Any]], as_of: str) -> 
             st.caption(f"Applies because: {profile_words(item['why'], facts)}")
         if item.get("note"):
             st.caption(item["note"])
+        groups = crosswalk_lines(item.get("crosswalk"))
+        if groups:
+            with st.expander(f"Matches in other frameworks · {sum(len(l) + h for _, l, h in groups)}"):
+                for group, lines, hidden in groups:
+                    st.markdown(f"**{group}**")
+                    for label, color, note in lines:
+                        st.markdown(f":{color}-badge[{esc(label)}] {esc(note)}")
+                    if hidden:
+                        st.caption(f"and {hidden} more")
+                st.caption(CROSSWALK_CAVEAT)
 
 
 st.title("Your checklist", anchor=False)
@@ -148,7 +159,8 @@ with right:
             for item in cl["groups"][key]:
                 item_card(item, facts, as_of)
     for pr in cl["practices"]:
-        with st.expander(f"Recommended practices (voluntary): {pr['framework']}"):
+        tail = " · linked to your items" if pr.get("narrowed") else ""
+        with st.expander(f"Recommended practices (voluntary): {pr['framework']}{tail}"):
             st.caption(pr["reason"])
             for g in pr["groups"]:
                 st.markdown(f"**{g['name']}**")

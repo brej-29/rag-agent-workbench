@@ -12,7 +12,7 @@
   <img alt="Vector Store" src="https://img.shields.io/badge/Vector%20Store-Pinecone-3776AB">
   <img alt="Frameworks" src="https://img.shields.io/badge/Frameworks-LangChain%20%7C%20LangGraph-ff9800">
   <img alt="Frontend" src="https://img.shields.io/badge/Frontend-Streamlit-ff4b4b">
-  <img alt="Tests" src="https://img.shields.io/badge/Tests-567%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/Tests-597%20passing-brightgreen">
   <img alt="License" src="https://img.shields.io/badge/License-MIT-black">
 </div>
 
@@ -69,6 +69,14 @@ AI Act, GDPR, NIS2, DORA and the Cyber Resilience Act that bind you: *applies no
 or *depends on* a fact you have not given yet, with the one question that would decide it. 99 articles,
 each rule citing, word for word, the provision that says whom it binds (checked in CI); no model decides or words
 anything in the checklist. Download it as Markdown or CSV, or call `POST /checklist`.
+
+**Crosswalks.** Every cited provision and checklist item lists its matching requirements in other frameworks,
+taken only from published mappings: NIST's CSF 2.0 ↔ SP 800-53 and SP 800-53 ↔ ISO/IEC 27001 tables, ENISA's
+NIS2 mapping, and the NIS2 Implementing Regulation's own headings. Each match shows its source and the path it
+came through, e.g. NIS2 Art. 21(2)(d) → Implementing Regulation 2024/2690 point 5.1 → CSF GV.SC → SP 800-53 SR-5.
+Community mappings (ISO 27001, ISO/IEC FDIS 42001) are labelled and fetched locally, never redistributed; ISO
+entries are identifiers only. Mappings show related requirements, not equivalence, and the AI Act, GDPR, DORA
+and CRA have no published crosswalk yet, which the app says rather than guessing.
 
 Gap checks against your own policies are next (see the spec's build order). This is information from official
 text, not legal advice.

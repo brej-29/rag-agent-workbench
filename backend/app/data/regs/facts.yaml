@@ -115,8 +115,8 @@
   type: choice
   group: Sector and products
   label: Main NIS2 sector
-  values: [cloud, data_centre, cdn, dns_tld, trust_services, electronic_comms, managed_services, online_platform, other_annex, none]
-  labels: {cloud: cloud computing, data_centre: data centre, cdn: content delivery network, dns_tld: DNS or TLD registry, trust_services: trust services, electronic_comms: public electronic communications, managed_services: managed (security) services, online_platform: "online marketplace, search engine or social network", other_annex: another NIS2 Annex I/II sector, none: not in a NIS2 sector}
+  values: [cloud, data_centre, cdn, dns_tld, trust_services, electronic_comms, managed_services, online_marketplace, search_engine, social_network, other_annex, none]
+  labels: {cloud: cloud computing, data_centre: data centre, cdn: content delivery network, dns_tld: DNS or TLD registry, trust_services: trust services, electronic_comms: public electronic communications, managed_services: managed (security) services, online_marketplace: online marketplace, search_engine: online search engine, social_network: social networking platform, other_annex: another NIS2 Annex I/II sector, none: not in a NIS2 sector}
   help: NIS2 Annex I/II. "Another sector" covers energy, transport, health, water, manufacturing, food, postal, research and others.
   basis: nis2/art-2
 - id: financial_entity

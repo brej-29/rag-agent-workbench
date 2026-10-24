@@ -8,3 +8,6 @@
 # (no pytest-asyncio).  Only pytest itself is needed beyond the runtime lock.
 
 pytest
+
+# corpus/crosswalks.py reads one community PDF crosswalk (build time only, never in the API image)
+pypdf

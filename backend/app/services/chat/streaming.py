@@ -182,7 +182,8 @@ def _build_done_payload(state: Dict, total_ms: float, *, cached: bool = False) -
 
 def _regs_source_fields(s: Dict) -> Dict:
     return {"ref": str(s.get("ref") or ""), "framework": str(s.get("framework") or ""), "status": s.get("status"),
-            "applies_from": s.get("applies_from"), "status_note": s.get("status_note")}
+            "applies_from": s.get("applies_from"), "status_note": s.get("status_note"),
+            "crosswalk": s.get("crosswalk"), "via": s.get("via")}
 
 
 def regs_response_fields(state: Dict) -> Dict:

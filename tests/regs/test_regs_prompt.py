@@ -20,3 +20,9 @@ def test_context_headers_carry_reference_and_status_and_are_delimited():
 def test_system_prompt_rules():
     for rule in ("only the numbered provisions", "status", "never cite", "voluntary", "not legal advice", "untrusted"):
         assert rule in REGS_SYSTEM_PROMPT.lower()
+
+
+def test_via_sources_name_their_link_in_the_header():
+    src = [{**SRC[0], "via": {"ref": "SP 800-53 SR-3", "source": "NIST CSF 2.0 to SP 800-53 Rev. 5.2.0"}}]
+    user = build_regs_messages([], "q", src, date(2026, 10, 24))[-1].content
+    assert "| linked to SP 800-53 SR-3 by NIST CSF 2.0 to SP 800-53 Rev. 5.2.0" in user

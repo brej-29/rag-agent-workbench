@@ -68,3 +68,15 @@
 - feat(ui): Checklist page (profile form shared with Ask, article drawer, Markdown/CSV export).
 - feat(eval): 12 golden profiles (draft labels), monotonicity and date-flip tests, 6 router follow-ups.
 - fix(regs): router facts need verbatim evidence from the request; headcount → size band; list facts merge.
+
+### 2026-10-24 — Sub-project 4: crosswalks
+- feat(corpus): Implementing Regulation (EU) 2024/2690 (53 annex points, in force 2024-11-07), upserted to
+  `regs-v1` with approval; parser handles numeric annex ids and heading-less table points.
+- feat(regs): 13 checklist items for 2024/2690; NIS2 sector split into marketplace / search engine / social network.
+- feat(corpus): crosswalk build (`python -m corpus.crosswalks fetch|build`): 1,798 official id-to-id links
+  (NIST CSF↔800-53, NIST 800-53↔ISO 27001, ENISA NIS2, 2024/2690 headings) committed; community links (Razilio,
+  Pauloweit, Microsoft 42001) fetched and built locally only; manifest with SHA-256 and reuse notes.
+- feat(regs): crosswalk lookups (official-first shortest paths, same-act siblings excluded, ranked by path
+  support); matches on Ask sources, checklist items and the evidence drawer; CSF practices narrowed to linked
+  subcategories. Optional boost/inject retrieval measured and left off (no gain).
+- feat(corpus): `upsert --only PREFIX`. Dev lock: pypdf (build time only).

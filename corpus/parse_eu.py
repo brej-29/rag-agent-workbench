@@ -85,6 +85,45 @@ def _article(art: Tag, src: Source, mods: Dict[str, str]) -> List[dict]:
     return out
 
 
+_DEC_SECTION = re.compile(r"^(\d+)\.\s+\S")
+_DEC_POINT = re.compile(r"^(\d+\.\d+)\.\s+(.+)$")
+_DEC_TABLE_POINT = re.compile(r"^(\d+\.\d+)\.\s")
+
+
+def _decimal_points(anx: Tag, src: Source, common: dict, num: str) -> List[dict]:
+    """Annexes numbered 1. / 1.1. / 1.1.1. in plain headings and tables (e.g. Implementing Regulation
+    2024/2690): one record per second-level point, its sub-points as text, its section heading in the path."""
+    out, section, point = [], None, None
+    for block in anx.find_all(["p", "table"], recursive=False):
+        text = _text(block)
+        if block.name == "p" and "oj-ti-grseq-1" in (block.get("class") or []):
+            m = _DEC_POINT.match(text)
+            if m:
+                point = {**common, "id": f"{src.prefix}/anx-{num}/pt-{m.group(1)}",
+                         "ref": f"{src.short} Annex, point {m.group(1)}", "kind": "annex_point",
+                         "title": m.group(2), "text": "", "path": [f"Annex {num}", section, f"{m.group(1)} {m.group(2)}"]}
+                out.append(point)
+                continue
+            if _DEC_SECTION.match(text):
+                section, point = text, None
+                continue
+        m = _DEC_TABLE_POINT.match(text) if block.name == "table" else None
+        if m and (point is None or point.get("from_table")):
+            # Sections whose points have no headings (7., 9. in 2024/2690): each "N.M." table is a point.
+            # Headed points' tables open with three levels ("1.1.1.") and never match.
+            title = re.sub(r"^\d+\.\s+|\s*\(Article.*$", "", section or "")
+            point = {**common, "id": f"{src.prefix}/anx-{num}/pt-{m.group(1)}",
+                     "ref": f"{src.short} Annex, point {m.group(1)}", "kind": "annex_point", "title": title,
+                     "text": text, "path": [f"Annex {num}", section, f"{m.group(1)} {title}"], "from_table": True}
+            out.append(point)
+            continue
+        if point is not None and text:
+            point["text"] = f"{point['text']} {text}".strip()
+    for p in out:
+        p.pop("from_table", None)
+    return out
+
+
 def _annex(anx: Tag, src: Source) -> List[dict]:
     num = anx["id"].split("_", 1)[1]
     common = {**_base(src), "chapter": None, "section": None, "article": None, "paragraph": None,
@@ -93,6 +132,12 @@ def _annex(anx: Tag, src: Source) -> List[dict]:
     title = " ".join(h for h in heads if not h.upper().startswith("ANNEX"))
     out = [{**common, "id": f"{src.prefix}/anx-{num}", "ref": f"{src.short} Annex {num}", "kind": "annex",
             "title": title, "text": _text(anx)}]
+    decimal = _decimal_points(anx, src, common, num)
+    if decimal:
+        sections = [_text(p) for p in anx.find_all("p", class_="oj-ti-grseq-1", recursive=False)
+                    if _DEC_SECTION.match(_text(p)) and not _DEC_POINT.match(_text(p))]
+        out[0]["text"] = " ".join(heads + sections)
+        return out + decimal
     # Top-level numbered points: tables (OJ markup), grid containers or plain divs (consolidated markup).
     # Points restart in each section ("Section A", "Section B"), so the section is part of the id.
     section = None
@@ -134,7 +179,7 @@ def parse_eu(html: str, source: Source) -> List[dict]:
     if source.role == "text":
         for art in soup.find_all("div", id=re.compile(r"^art_\d+[a-z]?$")):
             out += _article(art, source, mods)
-        for anx in soup.find_all("div", id=re.compile(r"^anx_[IVXLC]+[a-z]?$")):
+        for anx in soup.find_all("div", id=re.compile(r"^anx_(?:[IVXLC]+|\d+)[a-z]?$")):
             out += _annex(anx, source)
     for rct in soup.find_all("div", id=re.compile(r"^rct_\d+$")):
         out.append(_recital(rct, source))

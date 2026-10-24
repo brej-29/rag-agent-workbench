@@ -11,7 +11,8 @@ import streamlit as st
 from services.backend_client import get_facts, namespace_stats, post_upload_text, stream_chat
 from services.file_convert import DocumentConverter, convert_uploaded_file_to_text
 from services.presenters import (
-    EXAMPLES, FRAMEWORKS, REGS_EXAMPLES, REGS_NAMESPACE, chip_label, cite_markdown, citing_sentences,
+    CROSSWALK_CAVEAT, EXAMPLES, FRAMEWORKS, REGS_EXAMPLES, REGS_NAMESPACE, chip_label, cite_markdown, citing_sentences,
+    crosswalk_lines,
     dates_note, esc, floor_bars_html, profile_words, status_label, step_line, trace_summary, verdict,
 )
 from services.shell import api_key, backend_state, backend_url, is_dark, wake_watcher
@@ -55,6 +56,19 @@ def evidence_drawer(n: int, src: Dict[str, Any], answer: str, floor: Optional[fl
         st.html(f'<div style="white-space:pre-wrap;line-height:1.6">{esc(src.get("chunk_text") or "")}</div>')
     if src.get("doc_id"):
         st.caption(f"Document `{src['doc_id']}`")
+    groups = crosswalk_lines(src.get("crosswalk"))
+    if groups:
+        st.markdown("**Matching requirements**")
+        for group, lines, hidden in groups:
+            st.caption(group)
+            for label, color, note in lines:
+                st.badge(label, color=color)
+                st.caption(note)
+            if hidden:
+                st.caption(f"and {hidden} more")
+        st.caption(CROSSWALK_CAVEAT)
+    elif src.get("ref"):
+        st.caption("No published crosswalk for this provision.")
 
 
 def render_trace(steps: List[Dict[str, Any]]) -> None:

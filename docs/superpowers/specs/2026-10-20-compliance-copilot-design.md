@@ -31,7 +31,7 @@ papers and Wikipedia does none of these.
 | EU legal texts are reusable with attribution (Commission Decision 2011/833/EU) | VERIFIED (decision text); EUR-Lex notice wording to confirm | eur-lex.europa.eu/eli/dec/2011/833/oj |
 | ISO text may not be copied or redistributed without permission, including OBP previews | VERIFIED | iso.org/copyright.html; ISO OBP terms |
 | SOC 2 Trust Services Criteria: free download, separate copyright terms; translations used "with permission" | UNVERIFIED terms; treat as licensed | aicpa-cima.com download page |
-| NIST AI Resource Center hosts an AI RMF ↔ ISO/IEC 42001 crosswalk (community-contributed) | UNVERIFIED (secondary sources) | to confirm on airc.nist.gov |
+| NIST AI Resource Center hosts an AI RMF ↔ ISO/IEC 42001 crosswalk (community-contributed) | VERIFIED 2026-10-24: submitted by Microsoft, maps to ISO/IEC **FDIS** 42001, PDF; see §13.1 | airc.nist.gov/airmf-resources/crosswalks/ |
 | AI Act official XHTML via CELLAR content negotiation: 113 `art_N`, 180 `rct_N`, 13 `anx_N` elements | VERIFIED | publications.europa.eu/resource/celex/32024R1689 (Accept: application/xhtml+xml) |
 | EUR-Lex HTML returns 202 with empty body to scripted clients | VERIFIED | curl, 2026-10-19 |
 | AI Act Art. 113 base dates: in force 20 days after publication; applies 2 Aug 2026; Ch. I–II 2 Feb 2025; Ch. III s.4, Ch. V, VII, XII, Art. 78 2 Aug 2025 (not Art. 101); Art. 6(1) 2 Aug 2027 | VERIFIED (official text) | CELEX 32024R1689 |
@@ -369,3 +369,104 @@ Live (local API, real Groq): "We are a 40-person company in Germany and we deplo
 checklist in 1.5 s (29 apply now, 2 later incl. Art. 26 from 2027-12-02, 42 depend); "We are also the
 provider…, about 300 staff" → rebuilt in 0.6 s with provider duties (Arts. 9–17 from 2027-12-02) added and
 deployer duties kept.
+
+## 13. Sub-project 4 design: crosswalks (approved 2026-10-24)
+
+Job: show, for any cited provision or checklist item, the matching requirements in other frameworks from
+published mappings, with their source and path; use official links to help cross-framework retrieval if it
+measurably helps; add Implementing Regulation (EU) 2024/2690 so NIS2 links reach real provisions.
+
+**13.1 Verified sources (read 2026-10-24).**
+
+| Fact | Status | Source |
+|---|---|---|
+| CSF 2.0 → SP 800-53 Rev 5.2.0 mapping: developer NIST, Final, v1.0.0, posted 2025-11-17, "Comprehensive: No", xlsx (38,766 bytes) | VERIFIED | csrc.nist.gov/projects/olir/informative-reference-catalog/details?referenceId=186 |
+| SP 800-53 Rev 5 (focal 5.1.1) → ISO/IEC 27001:2022 mapping: developer NIST, Final, posted 2023-11-13, xlsx (155,745 bytes); "Organizations should not assume security requirement and control equivalency based solely on the mapping tables" | VERIFIED | OLIR referenceId=155 |
+| ISO/IEC 27001:2022 ↔ CSF 2.0 community mappings: Razilio (private sector, ref 154) and J. Pauloweit (individual, ref 218, "Comprehensive: Yes"); no reuse licence stated | VERIFIED | OLIR referenceId=154, 218; razil.io post; github.com/JoergPauloweit/ISO27001-NIST-Mapping |
+| "NIST does not conduct correctness testing on non-NIST submitted mappings"; listing "does not imply NIST endorsement" | VERIFIED | nist.gov/cyberframework/informative-references |
+| AI RMF crosswalks on AIRC are PDFs, mostly community-submitted; ISO/IEC 42001 one by Microsoft (FDIS); INCITS 23894/42005 ones map at function/category level; the only EU one (NIST, 2023) maps the *proposed* AI Act; "Inclusion of a crosswalk below does not imply NIST endorsement" | VERIFIED | airc.nist.gov/airmf-resources/crosswalks/ |
+| ENISA NIS2 Technical Implementation Guidance (26 Jun 2025) with mapping table v1.2 (xlsx, 21.08.2025): Implementing Regulation 2024/2690 annex points → ISO 27001:2022, NIST CSF 2.0, ETSI EN 319 401, CEN/TS 18026 and national frameworks; "not legally binding" | VERIFIED | enisa.europa.eu/publications/NIS2-technical-implementation-guidance |
+| "Reproduction of ENISA material published on this website is authorized, provided the source is acknowledged" | VERIFIED | enisa.europa.eu/about-enisa/legal-notice (§1.2) |
+| Each 2024/2690 annex section heading cites its NIS2 point, e.g. "5. Supply chain security (Article 21(2), point (d), of Directive (EU) 2022/2555)" | VERIFIED | CELEX 32024R2690 via CELLAR |
+| Downloaded files match the hashes listed in OLIR | Corrected 2026-10-24: OLIR's "SHA3-256" values match the files' **SHA-256**. VERIFIED for the NIST 800-53↔ISO 27001 file (ref 155); UNVERIFIED for refs 186, 154, 218 (files differ from the listing, likely re-uploaded). Our SHA-256 of every file is in the manifest | OLIR detail pages; computed |
+| No published crosswalk exists for the final AI Act, GDPR, DORA or CRA from these publishers | VERIFIED for NIST OLIR/AIRC and ENISA listings above; not a claim about all publishers | as above |
+
+**13.2 Data.** Manifest `backend/app/data/regs/crosswalk_sources.yaml` (id, title, publisher, kind official |
+community, URL, OLIR id, SHA-256, retrieved, reuse note, granularity, caveat). Link records `{from, to, source,
+kind}` hold ids only, never text. Corpus ids are normalised (`AC-02(01)` → `nist-800-53/ac-2.1`, `Govern 1.1` →
+`nist-ai-rmf/govern-1.1`); ISO ids stay identifiers (`iso-27001/A.5.34`, numeric cells such as `4.0999…`
+normalised to `4.1`). Official links (NIST ×2, ENISA, 2024/2690 headings) build into a committed
+`crosswalks.jsonl`; community links (Razilio, Pauloweit, Microsoft 42001) are fetched by `corpus/crosswalks.py`
+into the gitignored raw folder and built into a gitignored `crosswalks.community.jsonl` used only when present.
+Shown with every match: NIST's equivalence caveat; "community mapping, not endorsed by NIST"; "maps ISO/IEC FDIS
+42001"; ISO entries as identifiers with "licensed text, bring your copy".
+
+**13.3 Implementing Regulation (EU) 2024/2690.** Fetched and parsed like the other EU acts; articles as
+paragraphs, annex as one provision per second-level point (sub-points inside), matching ENISA's granularity.
+Framework "NIS2", instrument "Implementing Regulation (EU) 2024/2690", short "NIS2 IR", binding regulation. Date
+from its entry-into-force clause (20 days after OJ publication; date and quote checked in CI). Checklist: Art. 2
+(annex requirements) for all covered entity types; Arts. 3–14 (significant-incident criteria) per entity type, on
+`nis2_sector` + NIS2 scope. Pinecone upsert of the new records asked for before it runs. Eval: ~4 golden
+questions on the new text, one more golden profile.
+
+**13.4 Use.** `services/regs/crosswalk.py`: undirected graph; `related(id, hops=2)` returns matches with
+framework, ref, title (if in corpus), source, kind and path; article-level lookup unions paragraphs. Attached to
+regs sources in Ask (JSON, SSE `done`, drawer) and to checklist items (official first, capped per framework);
+voluntary NIST practices narrowed to the subcategories linked to applicable items; items without a published
+crosswalk say so. Retrieval on the regs path, two variants measured and kept only if they pass the gate:
+*boost* (re-rank pool candidates linked to the top hit) and *inject* (add linked provisions, official links only,
+parent's score, labelled "via crosswalk" in the prompt header, never clearing the floor alone).
+
+**13.5 Gates.** Parser tests on fixtures in each source's real shape; lookup gate (sampled raw rows exist in the
+index; local, since raw files are not in CI; CI checks the committed official links); integrity (unresolved
+corpus ids counted and listed under a ceiling; no description text stored); 2024/2690 corpus/registry/checklist
+tests; retrieval: cross recall above 0.483 at k = 6 and k = 10 with overall recall/MRR within 0.01; live Ask and
+checklist checks. MCP `crosswalk` tool stays in sub-project 6.
+
+## 14. Sub-project 4 results (2026-10-24)
+
+Built: Implementing Regulation (EU) 2024/2690 in the corpus (110 → 116 records after a parser fix; 53 annex
+points, in force 7 November 2024) and upserted to `regs-v1` with approval (116 records, ~28k embedding tokens);
+13 checklist items for it (Art. 2 with its annex; Arts. 3–4; per-entity Arts. 5–14), with the NIS2 sector fact
+split into marketplace / search engine / social network; the crosswalk pipeline; lookups; matches on Ask
+sources, checklist items and the drawer; CSF practices narrowed to linked subcategories.
+
+Links (official, committed): CSF 2.0→SP 800-53 742; SP 800-53→ISO/IEC 27001 643; ENISA 2024/2690→CSF 277 and
+→ISO 105; 2024/2690 headings→NIS2 Art. 21(2) 53 (total 1,798). Community, local only: Razilio 103, Pauloweit
+93, Microsoft AI RMF→ISO/IEC FDIS 42001 279. Unresolved, listed in `crosswalk_report.json`: RA-4 (withdrawn in
+800-53 5.2.0) and three ENISA CSF ids that do not exist in CSF 2.0 (GV.OC-07, ID.RM-01, PR.AC-02).
+
+Found and fixed during the build:
+- `parse_eu` only recognised Roman-numeral annex ids; 2024/2690's single annex is `anx_1`.
+- Sections 7 and 9 of the 2024/2690 annex put their points straight into tables without headings; the first
+  parse dropped them (47 points instead of 53). Found because ENISA rows 7.1 and 9.1 did not resolve.
+- Live, two-hop matches were noisy: walking up to NIS2 Art. 21(2) and back down returned sibling annex points,
+  and generic "-01" policy controls outranked supply-chain controls on alphabetical ties. Same-instrument
+  matches are no longer returned and two-hop matches rank by the number of paths reaching them; for
+  2024/2690 point 5.1 the 800-53 matches are now SR-5, SA-9, SR-6, RA-7.
+
+Retrieval gate (50 golden questions incl. 4 on 2024/2690; diversified): crosswalk modes do **not** pass and stay
+`off`.
+
+| Variant | k | Recall | MRR | cross recall |
+|---|---|---|---|---|
+| off | 6 | 0.871 | 0.846 | 0.483 |
+| boost (reranks 6/50 queries) | 6 | 0.871 | 0.846 | 0.483 |
+| inject (+16 sources in total), scored on all returned | 6+3 | 0.871 | 0.846 | 0.483 |
+| off, same budget as inject | 9 | 0.911 | 0.848 | 0.483 |
+| off | 10 | 0.911 | 0.848 | 0.483 |
+| off, same budget as inject | 13 | 0.918 | 0.848 | 0.539 |
+
+Why: the golden cross misses pair EU law with NIST or EU law with EU law (AI Act Art. 12 ↔ SP 800-53 AU-2,
+DORA ↔ CSF), where no published mapping exists; NIST↔NIST pairs that are mapped are already retrieved densely.
+Crosswalks therefore serve display, the checklist and practice narrowing, not ranking. (The first run scored
+inject at recall@k, where appended sources can never count; the fair comparison above uses the same number of
+returned sources.)
+
+Abstention on the grown corpus: 13/14 unanswerable declined (same food-law miss), 0/50 false abstains.
+
+Live (local API, real index and Groq): "What must a cloud provider do about supply chain security under NIS2?"
+→ top source NIS2 IR Annex point 5.1 (in force since 2024-11-07), answer cites 5.1.1; its matches: ISO/IEC 27001
+A.5.19–A.5.21, A.8.30; NIS2 Art. 21(2); CSF GV.SC/GV.OC; SP 800-53 SR-5, SA-9, SR-6, RA-7. A large EU cloud
+provider's checklist: 14 apply now; NIS2 Art. 21's card shows 2024/2690, CSF and ISO matches; CSF practices
+narrowed to 85 linked subcategories.

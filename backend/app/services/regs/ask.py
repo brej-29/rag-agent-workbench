@@ -67,8 +67,8 @@ def scope_guard(query: str, available: Optional[Set[str]] = None) -> dict:
     if lic and not out:
         kind = "licensed"
         msg = (f"{_join(names)} {verb} a licensed standard, so its text is not in the public knowledge base. "
-               "Ask about the frameworks covered here, or add your own licensed copy to a private workspace "
-               "(coming soon).")
+               "Load your own licensed copy on the Gap check page (it stays in your browser session) and ask again, "
+               "or ask about the frameworks covered here.")
     else:
         kind = "out_of_scope"
         msg = (f"{_join(names)} {verb} not covered here, so I can't answer from official text. "

@@ -1,12 +1,17 @@
 """MCP server: the workbench exposed to any MCP client with its guardrails intact.
 In-memory client (mcp SDK v2); the graph and Pinecone are faked."""
 import json
+from datetime import date
 from unittest.mock import MagicMock, patch
 
 import anyio
 from mcp.client.client import Client
 
 from app import mcp_server
+from app.schemas.chat import Profile
+from app.services.regs import crosswalk as xw
+from app.services.regs.ask import regs_corpus
+from app.services.regs.checklist import build_checklist, load_catalog
 
 ANSWERED = {
     "answer": "A vector database stores embeddings [1].", "insufficient_context": False,
@@ -96,3 +101,64 @@ def test_ask_rejects_a_malformed_date():
     result, graph = _call("ask", {"question": "q", "as_of": "20 Oct"}, state=REGS)
     assert result.is_error and "YYYY-MM-DD" in result.content[0].text
     graph.invoke.assert_not_called()
+
+
+def _session(fn):
+    async def go():
+        async with Client(mcp_server.mcp) as client:
+            return await fn(client)
+    return anyio.run(go)
+
+
+PROFILE = {"ai_system": True, "ai_roles": ["deployer"], "eu_established": True, "high_risk": "annex_iii"}
+
+
+def test_checklist_tool_matches_the_api_builder():
+    result, _ = _call("checklist", {"profile": PROFILE, "as_of": "2026-10-24"})
+    expected = build_checklist(PROFILE, date(2026, 10, 24))
+    assert result.structured_content["result"] == json.loads(json.dumps(expected))
+
+
+def test_checklist_rejects_unknown_facts_and_values():
+    bad_value, _ = _call("checklist", {"profile": {"size": "huge"}})
+    assert bad_value.is_error and "'micro'" in bad_value.content[0].text
+    unknown, _ = _call("checklist", {"profile": {"sector": "cloud"}})
+    assert unknown.is_error and "sector" in unknown.content[0].text
+
+
+def test_crosswalk_tool_accepts_an_id_or_its_ref():
+    ref = regs_corpus()[0]["nist-csf/GV.SC-01"]["ref"]
+    by_id, _ = _call("crosswalk", {"provision": "nist-csf/GV.SC-01"})
+    by_ref, _ = _call("crosswalk", {"provision": ref.lower()})
+    out = by_id.structured_content["result"]
+    assert out == by_ref.structured_content["result"] and out["provision"] == "nist-csf/GV.SC-01"
+    assert out["items"] and out["items"] == json.loads(json.dumps(xw.related("nist-csf/GV.SC-01")))["items"]
+
+
+def test_crosswalk_tool_rejects_an_unknown_provision():
+    result, _ = _call("crosswalk", {"provision": "GDPR Art. 999"})
+    assert result.is_error and "Unknown provision" in result.content[0].text
+
+
+def _read(uri):
+    return json.loads(_session(lambda c: c.read_resource(uri)).contents[0].text)
+
+
+def test_resources_describe_facts_rules_and_mapping_sources():
+    assert [f["id"] for f in _read("rag://facts")] == list(Profile.model_fields)
+    rules = _read("rag://obligations")
+    assert len(rules["obligations"]) == len(load_catalog()["obligations"]) and "eu_nexus" in rules["defs"]
+    assert {s["kind"] for s in _read("rag://crosswalk-sources")} == {"official", "community"}
+
+
+def test_guardrails_cover_every_job():
+    text = _session(lambda c: c.read_resource("rag://guardrails")).contents[0].text
+    assert "Compliance Workbench" in text and all(w in text for w in ("checklist", "crosswalk", "unverified"))
+
+
+def test_each_job_has_a_prompt():
+    names = {p.name for p in _session(lambda c: c.list_prompts()).prompts}
+    assert {"grounded_answer", "compliance_checklist", "crosswalk_lookup", "policy_gap_check"} <= names
+    got = _session(lambda c: c.get_prompt("compliance_checklist", {"situation": "We deploy a hiring AI in Germany"}))
+    body = got.messages[0].content.text
+    assert "rag://facts" in body and "only the facts" in body and "hiring AI" in body

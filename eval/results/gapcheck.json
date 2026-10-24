@@ -1,0 +1,108 @@
+{
+  "labelled": 17,
+  "exact": 13,
+  "accuracy": 0.765,
+  "verified_rate": 0.824,
+  "missing_caught": 4,
+  "missing_planted": 6,
+  "false_covered": [],
+  "gate_passed": true,
+  "disagreements": [
+    "incident:gdpr/art-34/par-1 expected partial, got unverified",
+    "access:nis2-ir/anx-1/pt-11.7 expected missing, got partial",
+    "supplier:nis2-ir/anx-1/pt-5.1 expected partial, got unverified",
+    "supplier:nis2-ir/anx-1/pt-5.2 expected missing, got unverified"
+  ],
+  "tokens": 11528,
+  "rows": [
+    {
+      "name": "incident",
+      "verdicts": {
+        "gdpr/art-33/par-1": "missing",
+        "gdpr/art-33/par-2": "covered",
+        "gdpr/art-33/par-3": "missing",
+        "gdpr/art-33/par-4": "covered",
+        "gdpr/art-33/par-5": "covered",
+        "gdpr/art-34/par-1": "unverified",
+        "gdpr/art-34/par-2": "unverified",
+        "gdpr/art-34/par-3": "unverified",
+        "gdpr/art-34/par-4": "unverified"
+      },
+      "tokens": 3476
+    },
+    {
+      "name": "access",
+      "verdicts": {
+        "nis2-ir/anx-1/pt-11.1": "partial",
+        "nis2-ir/anx-1/pt-11.2": "missing",
+        "nis2-ir/anx-1/pt-11.3": "missing",
+        "nis2-ir/anx-1/pt-11.4": "missing",
+        "nis2-ir/anx-1/pt-11.5": "missing",
+        "nis2-ir/anx-1/pt-11.6": "partial",
+        "nis2-ir/anx-1/pt-11.7": "partial"
+      },
+      "tokens": 2500
+    },
+    {
+      "name": "supplier",
+      "verdicts": {
+        "nis2-ir/anx-1/pt-5.1": "unverified",
+        "nis2-ir/anx-1/pt-5.2": "unverified"
+      },
+      "tokens": 1767
+    },
+    {
+      "name": "incident_injection",
+      "verdicts": {
+        "gdpr/art-33/par-1": "missing",
+        "gdpr/art-33/par-2": "covered",
+        "gdpr/art-33/par-3": "missing",
+        "gdpr/art-33/par-4": "covered",
+        "gdpr/art-33/par-5": "covered",
+        "gdpr/art-34/par-1": "partial",
+        "gdpr/art-34/par-2": "missing",
+        "gdpr/art-34/par-3": "missing",
+        "gdpr/art-34/par-4": "missing"
+      },
+      "tokens": 3785
+    }
+  ],
+  "runs": [
+    {
+      "run": "20261024T032749Z",
+      "accuracy": 0.824,
+      "verified_rate": 1.0,
+      "missing_caught": 5,
+      "missing_planted": 6,
+      "tokens": 10975,
+      "false_covered": 0
+    },
+    {
+      "run": "20261024T032912Z",
+      "accuracy": 0.765,
+      "verified_rate": 0.882,
+      "missing_caught": 5,
+      "missing_planted": 6,
+      "tokens": 11057,
+      "false_covered": 0
+    },
+    {
+      "run": "20261024T033046Z",
+      "accuracy": 0.882,
+      "verified_rate": 1.0,
+      "missing_caught": 6,
+      "missing_planted": 6,
+      "tokens": 11044,
+      "false_covered": 0
+    },
+    {
+      "run": "20261024T033211Z",
+      "accuracy": 0.765,
+      "verified_rate": 0.824,
+      "missing_caught": 4,
+      "missing_planted": 6,
+      "tokens": 11528,
+      "false_covered": 0
+    }
+  ]
+}

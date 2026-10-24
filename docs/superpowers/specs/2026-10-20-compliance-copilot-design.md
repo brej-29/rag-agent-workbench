@@ -486,14 +486,15 @@ converted by the existing UI converters. Limits: ~200k chars per policy, ~1M per
 untrusted: delimited and sanitised in prompts. SOC 2 is not parsed (no crosswalk points at it).
 
 **15.2 Gap-check engine** (`services/regs/gapcheck.py`). Input: policy text, profile, as-of date, selected
-articles (default: checklist apply-now + coming items, at most 12). Duties: each article's paragraphs; articles
-with `include` (2024/2690 Art. 2) split into one call per annex section; each duty shown up to 1,200 chars.
+articles (default: checklist apply-now + coming items, at most 12). Duties: each article's paragraphs; annexes
+reached through `include` (2024/2690 Art. 2) are selected per section (`nis2-ir/anx-1#11` = access control),
+one call each, since the whole annex would exceed the run budget; each duty shown up to 1,200 chars.
 Passages: BM25 over policy passages per duty, top 3, merged to ≤ 8 per call, ≤ 700 chars each. Judge: one
 strict-schema call per article or section returning per duty `verdict` (covered | partial | missing),
 `law_quote`, `policy_quote`, `passage_id`, `reason`. Verification (deterministic): `law_quote` verbatim in the duty;
 for covered/partial `policy_quote` verbatim in the cited passage; missing carries no policy quote; any failure or
 skipped duty → `unverified` ("review"). Budget: estimated tokens shown before running; runs over ~40k tokens are
-refused; on 429, wait for retry-after and retry a bounded number of times (plus the 20b → 120b fallback).
+refused; on 429 the OpenAI SDK under the Groq client already waits for retry-after and retries (HTTP_MAX_RETRIES = 3; VERIFIED in openai 3.35.1 `_base_client.py`), then the 20b → 120b fallback applies.
 Delivery: `POST /gapcheck/stream` (SSE `article` per article, then `done` with counts) and `POST /gapcheck`
 (JSON); Markdown/CSV export with "not legal advice".
 

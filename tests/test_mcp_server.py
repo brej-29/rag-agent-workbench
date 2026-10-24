@@ -11,7 +11,10 @@ from app import mcp_server
 from app.schemas.chat import Profile
 from app.services.regs import crosswalk as xw
 from app.services.regs.ask import regs_corpus
+from app.services.regs import gapcheck
 from app.services.regs.checklist import build_checklist, load_catalog
+from tests.regs.test_gapcheck import POLICY, _llm
+from tests.regs.test_standards import SYNTH
 
 ANSWERED = {
     "answer": "A vector database stores embeddings [1].", "insufficient_context": False,
@@ -162,3 +165,60 @@ def test_each_job_has_a_prompt():
     got = _session(lambda c: c.get_prompt("compliance_checklist", {"situation": "We deploy a hiring AI in Germany"}))
     body = got.messages[0].content.text
     assert "rag://facts" in body and "only the facts" in body and "hiring AI" in body
+
+
+def _gap(args):
+    llm, seen = _llm('{"duties": []}'), []
+
+    async def on_progress(progress, total, message):
+        seen.append((progress, total, message))
+
+    async def go():
+        async with Client(mcp_server.mcp) as client:
+            return await client.call_tool("gap_check", args, progress_callback=on_progress)
+
+    with patch.object(mcp_server, "get_llm", return_value=llm):
+        return anyio.run(go), seen, llm
+
+
+def test_every_job_is_a_read_only_tool():
+    tools = {t.name: t for t in _session(lambda c: c.list_tools()).tools}
+    assert set(tools) == {"ask", "search_knowledge_base", "checklist", "crosswalk", "gap_check"}
+    assert all(t.annotations.read_only_hint for t in tools.values())
+
+
+def test_gap_check_reports_progress_once_per_article():
+    result, seen, _ = _gap({"policy_text": POLICY, "articles": ["gdpr/art-33", "gdpr/art-34"]})
+    out = result.structured_content["result"]
+    assert [r["selection"] for r in out["results"]] == ["gdpr/art-33", "gdpr/art-34"]
+    assert [(p, t) for p, t, _ in seen] == [(1, 2), (2, 2)] and seen[0][2] == out["results"][0]["ref"]
+    # The fake judge answers nothing, so every duty fails safe to unverified.
+    assert out["summary"]["unverified"] == sum(len(r["duties"]) for r in out["results"]) and out["plan"]["units"]
+
+
+def test_gap_check_refuses_runs_over_budget_before_any_model_call(monkeypatch):
+    monkeypatch.setattr(gapcheck, "MAX_TOKENS", 10)
+    result, seen, llm = _gap({"policy_text": POLICY, "articles": ["gdpr/art-33"]})
+    assert result.is_error and "limit 10" in result.content[0].text
+    llm.invoke.assert_not_called()
+    assert seen == []
+
+
+def test_gap_check_applies_the_api_limits():
+    too_many, _, _ = _gap({"policy_text": POLICY, "articles": [f"gdpr/art-{n}" for n in range(30, 43)]})
+    assert too_many.is_error
+    empty, _, _ = _gap({"policy_text": "", "articles": ["gdpr/art-33"]})
+    assert empty.is_error
+
+
+def test_ask_reads_an_attached_copy_into_the_graph_state():
+    _, graph = _call("ask", {"question": "What does ISO/IEC 27001 A.5.19 require?", "standards": [{"text": SYNTH}]},
+                     state=REGS)
+    copies = graph.invoke.call_args.args[0]["standards"]
+    assert [c["name"] for c in copies] == ["iso-27001"] and "A.5.19" in copies[0]["clauses"]
+
+
+def test_ask_rejects_a_copy_it_cannot_identify():
+    result, graph = _call("ask", {"question": "q", "standards": [{"text": "A plain policy.\n1 Scope"}]}, state=REGS)
+    assert result.is_error and "ISO/IEC 27001" in result.content[0].text
+    graph.invoke.assert_not_called()

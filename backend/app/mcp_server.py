@@ -30,24 +30,29 @@ from __future__ import annotations
 
 from datetime import date
 from functools import lru_cache
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 import anyio
 from mcp.server import MCPServer
+from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp_types import ToolAnnotations
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.core.config import get_settings
 from app.schemas.chat import Profile
+from app.schemas.workspace import GapCheckRequest
 from app.services.chat.graph import get_chat_graph
 from app.services.faithfulness import verify_citations
+from app.services.llm.groq_llm import get_llm
 from app.services.pinecone_store import describe_index_stats
 from app.services.pinecone_store import search as pinecone_search
 from app.services.regs import crosswalk as xw
+from app.services.regs import gapcheck
 from app.services.regs.ask import regs_corpus
 from app.services.regs.checklist import _article_ref, article_index, build_checklist, load_catalog
 from app.services.regs.facts import load_facts
+from app.services.regs.standards import STANDARDS, detect_standard, parse_clauses
 
 GUARDRAILS = """\
 How to read Compliance Workbench results
@@ -165,6 +170,26 @@ def _date(as_of: Optional[str]) -> date:
         raise ToolError("as_of must be a date in YYYY-MM-DD form") from exc
 
 
+class CopyText(BaseModel):
+    text: str = Field(..., min_length=1, max_length=1_000_000, description="Your licensed copy's text.")
+    name: Optional[Literal["iso-27001", "iso-42001"]] = Field(None, description="Override detection.")
+
+
+def _copies(standards: Optional[List[CopyText]]) -> List[Dict[str, Any]]:
+    """Parse attached licensed copies for this call only (spec §17.1); never cached or logged."""
+    out = []
+    for c in standards or []:
+        name = c.name or detect_standard(c.text)
+        if not name:
+            raise ToolError("Could not tell which standard this is. Pass name 'iso-27001' (ISO/IEC 27001) or "
+                            "'iso-42001' (ISO/IEC 42001).")
+        clauses = parse_clauses(c.text, name)
+        if not clauses:
+            raise ToolError(f"No numbered clauses found in this copy of {STANDARDS[name]}.")
+        out.append({"name": name, "clauses": clauses})
+    return out
+
+
 @lru_cache(maxsize=1)
 def _ref_ids() -> Dict[str, str]:
     corpus, _ = regs_corpus()
@@ -177,18 +202,21 @@ def _ref_ids() -> Dict[str, str]:
 @mcp.tool(annotations=_READ_ONLY)
 async def ask(question: str, namespace: Optional[str] = None, top_k: Optional[int] = None,
               use_web_fallback: bool = False, as_of: Optional[str] = None,
-              frameworks: Optional[List[str]] = None) -> GroundedAnswer:
+              frameworks: Optional[List[str]] = None, standards: Optional[List[CopyText]] = None) -> GroundedAnswer:
     """Answer a question about AI, data-protection and cybersecurity rules with provision citations, or abstain.
 
     as_of (YYYY-MM-DD, default today) sets the date each cited provision's status is evaluated on;
-    frameworks limits the search (e.g. ["GDPR", "EU AI Act"]).  Other namespaces: the generic pipeline.
+    frameworks limits the search (e.g. ["GDPR", "EU AI Act"]).  standards: your own licensed ISO/IEC 27001 or
+    42001 text, parsed for this call only, so questions about it are answered from your copy.
+    Other namespaces: the generic pipeline.
     """
     _check(question, top_k)
     _date(as_of)
+    copies = _copies(standards)
     state: Dict[str, Any] = await anyio.to_thread.run_sync(lambda: get_chat_graph().invoke({
         "query": question, "namespace": namespace or get_settings().REGS_NAMESPACE, "top_k": top_k,
         "use_web_fallback": use_web_fallback, "min_score": None, "max_web_results": 5, "chat_history": [],
-        "as_of": as_of, "frameworks": frameworks,
+        "as_of": as_of, "frameworks": frameworks, "standards": copies,
     }))
     sources = list(state.get("retrieved") or []) + list(state.get("web_results") or [])
     answer = str(state.get("answer") or "")
@@ -239,6 +267,34 @@ async def crosswalk(provision: str, hops: int = 2, official_only: bool = False, 
         raise ToolError(f"Unknown provision: {provision!r}. Use an id such as 'gdpr/art-32/par-1' or its exact ref.")
     found = xw.related(pid, hops=hops, official_only=official_only, per_group=per_group)
     return {"provision": pid, "ref": corpus[pid]["ref"] if pid in corpus else pid, **found, "caveat": xw.CAVEAT}
+
+
+@mcp.tool(annotations=_READ_ONLY)
+async def gap_check(policy_text: str, ctx: Context, articles: Optional[List[str]] = None,
+                    profile: Optional[StrictProfile] = None, as_of: Optional[str] = None) -> Dict[str, Any]:
+    """Check a policy, duty by duty, against articles or annex sections, with verbatim quotes for every verdict.
+
+    articles: keys such as 'gdpr/art-33' or 'nis2-ir/anx-1#11'; without them, the articles the profile's
+    checklist says apply now or later. At most 12 per run and about 40,000 tokens; progress is reported per
+    article. 'unverified' means a quote was not found verbatim and needs review. Nothing is stored.
+    """
+    try:
+        req = GapCheckRequest(policy_text=policy_text, articles=articles, profile=profile, as_of=as_of)
+    except ValidationError as exc:
+        raise ToolError(str(exc)) from exc
+    prof = req.profile.model_dump(exclude_none=True) if req.profile else {}
+    try:
+        p = gapcheck.plan(req.policy_text, req.articles, prof, req.as_of or date.today())
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc
+    msg = gapcheck.budget_error(p)
+    if msg:
+        raise ToolError(msg)
+    llm, results, n = get_llm(), [], len(p["units"])
+    for i, unit in enumerate(p["units"], 1):
+        results.append(await anyio.to_thread.run_sync(gapcheck.check_unit, unit, llm))
+        await ctx.report_progress(i, n, unit["ref"])
+    return {"plan": gapcheck.plan_summary(p), "results": results, "summary": gapcheck.summarize(results)}
 
 
 @mcp.tool(annotations=_READ_ONLY)

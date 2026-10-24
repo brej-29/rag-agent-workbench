@@ -8,14 +8,14 @@ from typing import Any, Dict, List, Optional
 import httpx
 import streamlit as st
 
-from services.backend_client import get_facts, namespace_stats, post_upload_text, stream_chat
+from services.backend_client import namespace_stats, post_upload_text, stream_chat
 from services.file_convert import DocumentConverter, convert_uploaded_file_to_text
 from services.presenters import (
     CROSSWALK_CAVEAT, EXAMPLES, FRAMEWORKS, REGS_EXAMPLES, REGS_NAMESPACE, chip_label, cite_markdown, citing_sentences,
     copy_clause, crosswalk_lines,
     dates_note, esc, floor_bars_html, profile_words, status_label, step_line, trace_summary, verdict,
 )
-from services.shell import api_key, backend_state, backend_url, is_dark, wake_watcher
+from services.shell import api_key, backend_state, backend_url, facts_or_none, is_dark, wake_watcher
 
 DEFAULT_NAMESPACE = REGS_NAMESPACE
 AVATARS = {"user": ":material/person:", "assistant": ":material/fact_check:"}
@@ -118,7 +118,7 @@ def render_answer(msg: Dict[str, Any], idx: int) -> None:
             meta.insert(0, f"as of {resp['as_of']}")
             meta.append("not legal advice")
         st.caption(" · ".join(meta))
-    noted = profile_words(resp.get("profile_updates") or {}, _facts(backend_url(), api_key()))
+    noted = profile_words(resp.get("profile_updates") or {}, facts_or_none())
     if noted:
         st.caption(f":material/person_check: Noted from your question: {noted}")
     if resp.get("checklist"):
@@ -142,15 +142,6 @@ def render_answer(msg: Dict[str, Any], idx: int) -> None:
 @st.cache_data(ttl=60, show_spinner=False)
 def _namespaces(url: str, key: Optional[str]) -> Dict[str, int]:
     return namespace_stats(url, key)
-
-
-@st.cache_data(ttl=600, show_spinner=False)
-def _facts(url: str, key: Optional[str]) -> Optional[List[Dict[str, Any]]]:
-    """facts.yaml labels for wording the profile; None (plain wording) when the API has no checklist."""
-    try:
-        return get_facts(url, key)
-    except httpx.HTTPError:
-        return None
 
 
 @st.dialog("Add a document")
@@ -228,7 +219,7 @@ def regs_controls() -> Dict[str, Any]:
     as_of = st.date_input("Answer as of", value=date.today(), min_value=date(2016, 1, 1),
                           max_value=date(2035, 12, 31), help="Each cited rule shows whether it applies on this date.")
     frameworks = st.multiselect("Frameworks", FRAMEWORKS, placeholder="All covered frameworks")
-    st.caption(f"Profile: {profile_words(s.profile, _facts(backend_url(), api_key())) or 'nothing yet'}")
+    st.caption(f"Profile: {profile_words(s.profile, facts_or_none()) or 'nothing yet'}")
     st.page_link("views/checklist.py", label="Edit your profile", icon=":material/tune:")
     st.caption("Answers come from official EU and NIST text only. Not legal advice.")
     return {"as_of": as_of.isoformat(), "frameworks": frameworks or None,

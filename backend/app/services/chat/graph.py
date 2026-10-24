@@ -36,6 +36,7 @@ from app.services.prompts.rag_prompt import (
 from app.services.pinecone_store import search as pinecone_search
 from app.services.prompts.regs_prompt import build_regs_messages
 from app.services.regs.ask import mismatch_warning, retrieve_regs, scope_guard
+from app.services.regs.standards import copy_sources
 from app.services.regs.checklist import build_checklist, summary_text
 from app.services.regs.router import apply_previous_intent, understand_request
 from app.services.rerank import RERANK_CANDIDATES_MAX, rerank_chunks
@@ -49,8 +50,8 @@ REGS_ABSTENTION = (
     "official text. Try naming the framework or the topic (for example: GDPR breach notification)."
 )
 NOT_YET = {
-    "gap_check": "Checking your own policies against the rules is coming soon. Meanwhile, ask what a specific "
-                 "rule requires and compare it with your policy.",
+    "gap_check": "Gap checks run on the Gap check page: load your policy there and choose the articles to check. "
+                 "Each duty gets a verdict with a quote from the law and from your policy.",
     "clarify": "Tell me what you need: what a specific rule requires, whether it applies to your product yet, "
                "or which frameworks cover a topic (for example: incident reporting deadlines).",
 }
@@ -112,6 +113,7 @@ class ChatState(TypedDict, total=False):
     abstain_reason: Optional[str]
     warnings: List[str]
     previous_intent: Optional[str]  # intent of the previous reply, sent by the client
+    standards: List[Dict[str, Any]]  # the user's own licensed copies for this request (never stored)
     checklist: Optional[Dict[str, Any]]
 
 
@@ -182,6 +184,7 @@ def normalize_input(state: ChatState, _config: RunnableConfig | None = None) -> 
         new_state["frameworks"] = list(state.get("frameworks") or []) or None
         new_state["profile"] = dict(state.get("profile") or {})
         new_state["warnings"] = []
+        new_state["standards"] = list(state.get("standards") or [])
 
     logger.info(
         "Chat graph input normalised namespace='%s' top_k=%d min_score=%.3f "
@@ -214,7 +217,7 @@ def route_request(state: ChatState, _config: RunnableConfig | None = None) -> Ch
         state["route"] = "ask"
         return state
 
-    guard = scope_guard(state["query"])
+    guard = scope_guard(state["query"], {s["name"] for s in state.get("standards") or []})
     if guard["abstain"]:
         return _respond(state, guard["message"], guard["kind"])
     if guard["warning"]:
@@ -316,6 +319,7 @@ def retrieve_context(state: ChatState, _config: RunnableConfig | None = None) ->
             state["query"], state.get("frameworks"), date.fromisoformat(state["as_of"]),
             high_risk if high_risk in ("annex_iii", "annex_i") else None, settings, pinecone_search,
         )
+        retrieved += copy_sources(state["query"], state.get("standards"))  # the user's own licensed copy, if any
         timings["retrieve_ms"] = (perf_counter() - start) * 1000.0
         state["retrieved"], state["top_score"], state["timings"] = retrieved, top_score, timings
         logger.info("Regs retrieval hits=%d top_score=%.4f frameworks=%s", len(retrieved), top_score,
@@ -620,7 +624,9 @@ def _prepare_generation_inputs(
         return True, [], []  # reply already set by route_request
 
     if state.get("is_regs"):
-        kept = filter_chunks_by_score(state.get("retrieved") or [], settings.REGS_MIN_SCORE)
+        # Clauses from the user's own copy have no cosine score: they were chosen by id or BM25 within the copy.
+        kept = [s for s in state.get("retrieved") or []
+                if s.get("private") or float(s.get("score") or 0.0) >= settings.REGS_MIN_SCORE]
         state["retrieved"] = kept
         timings["rerank_ms"] = 0.0
         if not kept:

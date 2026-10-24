@@ -102,3 +102,17 @@ def test_legacy_namespace_path_unchanged():
 def test_answer_citations_are_normalised_before_verification():
     out, _ = _run(REGS, _llm(ROUTE % "ask", "Within 72 hours【1】 or【9】."))
     assert out["answer"] == "Within 72 hours[1] or[9]." and out["unverified_citations"] == [9]
+
+
+def test_your_copy_answers_licensed_questions_without_any_dense_hit():
+    copy = [{"name": "iso-27001", "clauses": {"A.5.19": {"title": "Supplier relationships",
+                                                        "text": "Processes shall be defined to manage supplier risks."}}}]
+    llm = _llm(ROUTE % "ask", "Define supplier processes [1].")
+    out, _ = _run({**REGS, "query": "What does ISO/IEC 27001 A.5.19 require?", "standards": copy}, llm, hits=[])
+    assert not out["insufficient_context"] and out["retrieved"][0]["ref"] == "ISO/IEC 27001:2022 A.5.19"
+    assert "licensed standard text you supplied" in llm.invoke.call_args_list[1].args[0][-1].content
+
+
+def test_gap_check_requests_point_to_the_page():
+    out, _ = _run({**REGS, "query": "Check our incident policy against NIS2"}, _llm(ROUTE % "gap_check"))
+    assert out["intent"] == "gap_check" and "Gap check page" in out["answer"]

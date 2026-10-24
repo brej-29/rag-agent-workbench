@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ChatMessage(BaseModel):
@@ -88,6 +88,19 @@ class Profile(BaseModel):
     product_roles: Optional[List[ProductRole]] = None
 
 
+class StandardCopy(BaseModel):
+    """A licensed standard the user supplied, parsed by /workspace/parse; used for one request, never stored."""
+
+    name: Literal["iso-27001", "iso-42001"]
+    clauses: Dict[str, Dict[str, str]] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _size(self):
+        if sum(len(c.get("text", "")) for c in self.clauses.values()) > 1_500_000:
+            raise ValueError("standard copy too large")
+        return self
+
+
 class ChatRequest(BaseModel):
     query: str = Field(..., description="User query to be answered.")
     namespace: Optional[str] = Field(
@@ -150,6 +163,10 @@ class ChatRequest(BaseModel):
             "Regulatory namespace only: intent of the previous reply (a fact-only follow-up to a checklist "
             "rebuilds it)."
         ),
+    )
+    standards: Optional[List[StandardCopy]] = Field(
+        default=None,
+        description="Regulatory namespace only: your own licensed standard copies (used for this request, never stored).",
     )
 
 

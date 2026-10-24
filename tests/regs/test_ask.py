@@ -148,3 +148,9 @@ def test_inject_adds_linked_provisions_marked_via_with_the_parents_score(monkeyp
     added = out[-1]
     assert added["doc_id"] == "nist-csf/GV.SC-01" and added["score"] == 0.6
     assert added["via"] == {"ref": "SP 800-53 SR-3", "source": "NIST CSF 2.0 to SP 800-53"}
+
+
+def test_scope_guard_lets_licensed_names_through_when_a_copy_is_attached():
+    assert not ask.scope_guard("What does ISO/IEC 27001 Annex A 5.19 say?", {"iso-27001"})["abstain"]
+    assert ask.scope_guard("Which SOC 2 criteria cover availability?", {"iso-27001"})["abstain"]
+    assert ask.scope_guard("What does ISO/IEC 42001 require?", {"iso-27001"})["abstain"]

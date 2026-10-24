@@ -12,7 +12,7 @@
   <img alt="Vector Store" src="https://img.shields.io/badge/Vector%20Store-Pinecone-3776AB">
   <img alt="Frameworks" src="https://img.shields.io/badge/Frameworks-LangChain%20%7C%20LangGraph-ff9800">
   <img alt="Frontend" src="https://img.shields.io/badge/Frontend-Streamlit-ff4b4b">
-  <img alt="Tests" src="https://img.shields.io/badge/Tests-597%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/Tests-619%20passing-brightgreen">
   <img alt="License" src="https://img.shields.io/badge/License-MIT-black">
 </div>
 
@@ -78,7 +78,15 @@ Community mappings (ISO 27001, ISO/IEC FDIS 42001) are labelled and fetched loca
 entries are identifiers only. Mappings show related requirements, not equivalence, and the AI Act, GDPR, DORA
 and CRA have no published crosswalk yet, which the app says rather than guessing.
 
-Gap checks against your own policies are next (see the spec's build order). This is information from official
+**Gap check.** Load your own policy (PDF, Word, Markdown or text) and check it against the articles your
+checklist says bind you, or against single 2024/2690 annex sections. Every duty gets *covered*, *partial* or
+*missing* with a quote from the law and from your policy, both checked word for word; anything that can't be
+verified is marked for review instead of guessed. Results stream article by article and export to Markdown or
+CSV. **Your copy of a licensed standard** (ISO/IEC 27001 or 42001) can be loaded too: Ask then answers from it
+and crosswalk matches show its clause text. Documents stay in your browser session; the server stores, indexes and
+logs nothing.
+
+The MCP tools and the remaining UI work are next (see the spec's build order). This is information from official
 text, not legal advice.
 
 ---

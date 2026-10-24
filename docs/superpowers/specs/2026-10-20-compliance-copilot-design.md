@@ -520,3 +520,36 @@ a policy telling the judge to mark everything covered must not flip planted-miss
 model-dependent). (5) Ask with a synthetic copy (unit) and live; existing suites green; UI smoke on the new page.
 Risks: free-tier speed (minutes per run: estimate shown, results streamed); model judgement (quotes verified,
 failures flagged, verdicts advisory); PDF extraction quality of standards (coverage shown).
+
+## 16. Sub-project 5 results (2026-10-24)
+
+Built: stateless `POST /workspace/parse` (policy → passages; licensed standard → clause map with coverage),
+`/gapcheck/plan`, `/gapcheck`, `/gapcheck/stream`; the gap-check engine (BM25 passages per duty, one strict-schema
+judge call per article or annex section, deterministic quote verification); your licensed copy in Ask (scope guard
+lets the named standard through when a copy is attached; up to 3 clauses from the copy, cited as "your copy";
+never cached); clause text "from your copy" on crosswalk ISO matches; the Gap check page; chat `gap_check` replies
+point to it. The server stores nothing: tests assert no Pinecone call and that a marker phrase from the policy never
+appears in the logs.
+
+Golden gap check (`eval/run_gapcheck.py`, 4 synthetic policies incl. an injection variant, 17 labelled duties,
+6 planted-missing): **gate held in every run: no "covered" on a planted-missing duty, including the policy that
+tells the reviewer to mark everything covered.** Three runs of the final prompt: accuracy 0.765 / 0.882 / 0.765,
+verified rate 0.882 / 1.000 / 0.824, planted-missing caught 5 / 6 / 4 of 6, ~11k tokens each. When the model fails
+it fails safe: unverifiable quotes become "unverified, review".
+
+Found and fixed:
+- The first prompt defined covered as "a passage states what the duty requires"; the model called NIS2 IR 5.1
+  covered although its supplier-selection criteria (5.1.2) were absent. Covered now means every requirement of
+  the duty (each listed element, deadline and recipient) is stated.
+- One golden label was wrong: NIS2 IR 11.1 is partial, not covered (11.1.2(b)–(c) and 11.1.3 are not in the
+  policy). Found by reading the full duty after the model disagreed; corrected and recorded.
+- LangGraph keeps only declared state keys, so the request's `standards` were dropped between nodes until added
+  to `ChatState`.
+- The licensed-standard decline still said "private workspace (coming soon)"; it now points to loading a copy.
+
+Remaining disagreements are borderline: GDPR Art. 34(1) partial vs missing ("may inform customers where
+appropriate"), NIS2 IR 11.6/11.7 partial vs missing (a password-length rule).
+
+Live (local API, real Groq): your synthetic copy answers "What does ISO/IEC 27001 A.5.19 require?" citing
+"your copy", the same question without a copy is declined as licensed, and a streamed gap check of the supplier
+policy against 2024/2690 section 5 returns 5.1 partial / 5.2 missing with verified quotes in 1.2 s (1,358 tokens).

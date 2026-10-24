@@ -199,6 +199,19 @@ def crosswalk_lines(xw: Optional[Dict[str, Any]], standards: Optional[Dict[str, 
     return [(g, lines, more.get(g, 0)) for g, lines in groups.items()]
 
 
+def crosswalk_compact(xw: Optional[Dict[str, Any]], standards: Optional[Dict[str, Any]] = None,
+                      inline: int = 3) -> List[Dict[str, Any]]:
+    """Per group: the first `inline` refs as badges on one line, their mapping sources, and the remaining lines."""
+    out = []
+    for group, lines, hidden in crosswalk_lines(xw, standards):
+        top = lines[:inline]
+        out.append({"group": group,
+                    "line": " ".join(f":{color}-badge[{esc(label.split(' · ')[0])}]" for label, color, _ in top),
+                    "notes": " · ".join(dict.fromkeys(note for _, _, note in top)),
+                    "rest": lines[inline:], "hidden": hidden})
+    return out
+
+
 def chip_label(n: int, src: Dict[str, Any]) -> str:
     if src.get("via"):
         return f"{n} · {src['ref']} · via {src['via']['ref']}"
@@ -310,6 +323,21 @@ _COPY_KEYS = {"iso-27001": "iso-27001", "iso-42001-fdis": "iso-42001"}
 
 def verdict_label(verdict: str) -> Tuple[str, str]:
     return VERDICT_LABELS.get(verdict, ("gray", verdict))
+
+
+# Text limits are the API's (backend/app/schemas/workspace.py); file sizes only stop absurd uploads early.
+POLICY_CHARS, STANDARD_CHARS = 200_000, 1_000_000
+UPLOAD_MB = {"policy": 10, "standard": 25}
+
+
+def text_limit_error(kind: str, chars: int) -> Optional[str]:
+    limit = POLICY_CHARS if kind == "policy" else STANDARD_CHARS
+    if chars <= limit:
+        return None
+    if kind == "policy":
+        return (f"This policy has {chars:,} characters of text; the limit is {limit:,}. "
+                "Split it, or load only the part you want checked.")
+    return f"This copy has {chars:,} characters of text; the limit is {limit:,}."
 
 
 def copy_clause(match_id: str, standards: Optional[Dict[str, Any]]) -> Optional[Dict[str, str]]:

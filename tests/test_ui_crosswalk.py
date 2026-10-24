@@ -1,4 +1,4 @@
-from frontend.services.presenters import chip_label, crosswalk_lines
+from frontend.services.presenters import chip_label, crosswalk_compact, crosswalk_lines
 
 XW = {"items": [
     {"id": "nist-csf/GV.SC-01", "group": "NIST CSF 2.0", "ref": "CSF GV.SC-01", "title": "", "licensed": False, "kind": "official",
@@ -21,3 +21,13 @@ def test_crosswalk_lines_group_label_and_caveats():
 def test_via_sources_are_marked_on_chips():
     src = {"ref": "CSF GV.SC-01", "status": "voluntary", "applies_from": None, "via": {"ref": "SP 800-53 SR-3", "source": "s"}}
     assert chip_label(3, src) == "3 · CSF GV.SC-01 · via SP 800-53 SR-3"
+
+
+def test_crosswalk_compact_puts_three_refs_on_one_line_and_keeps_the_rest():
+    xw = {"items": [{"group": "NIST CSF 2.0", "ref": f"GV.SC-0{i}", "title": "t", "kind": "official",
+                     "source_title": "CSF to 800-53", "licensed": False, "id": f"nist-csf/GV.SC-0{i}"}
+                    for i in range(1, 5)], "more": {"NIST CSF 2.0": 2}}
+    [g] = crosswalk_compact(xw)
+    assert g["line"] == ":green-badge[GV.SC-01] :green-badge[GV.SC-02] :green-badge[GV.SC-03]"
+    assert g["notes"] == "CSF to 800-53" and [label for label, _, _ in g["rest"]] == ["GV.SC-04 · t"]
+    assert g["hidden"] == 2

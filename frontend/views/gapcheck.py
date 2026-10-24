@@ -10,7 +10,8 @@ import streamlit as st
 
 from services.backend_client import gapcheck_plan, parse_document, post_checklist, stream_gapcheck
 from services.file_convert import convert_uploaded_file_to_text
-from services.presenters import gap_csv, gap_markdown, verdict_label
+from services.presenters import (POLICY_CHARS, STANDARD_CHARS, UPLOAD_MB, gap_csv, gap_markdown, text_limit_error,
+                                 verdict_label)
 from services.shell import api_key, backend_state, backend_url, wake_watcher
 
 s = st.session_state
@@ -24,6 +25,10 @@ def _load(uploaded, kind: str) -> None:
     try:
         uploaded.seek(0)
         text, _ = convert_uploaded_file_to_text(uploaded)
+        err = text_limit_error(kind, len(text))
+        if err:
+            st.error(err, icon=":material/error:")
+            return
         parsed = parse_document(backend_url(), api_key(), kind, Path(uploaded.name).stem, text)
     except httpx.HTTPStatusError as exc:
         st.error(exc.response.json().get("detail", "The API refused this file."), icon=":material/error:")
@@ -42,7 +47,8 @@ def documents_panel() -> None:
     st.subheader("Your documents", anchor=False)
     st.caption("Kept in this browser session only. The server stores nothing; closing the tab forgets them.")
     with st.form("policy_form", clear_on_submit=True, border=False):
-        pol = st.file_uploader("Add a policy", type=TYPES)
+        pol = st.file_uploader("Add a policy", type=TYPES, max_upload_size=UPLOAD_MB["policy"])
+        st.caption(f"PDF, Word, Markdown, HTML or text · up to {POLICY_CHARS:,} characters of text")
         if st.form_submit_button("Load policy") and pol:
             _load(pol, "policy")
     for title, p in list(s.workspace["policies"].items()):
@@ -52,7 +58,9 @@ def documents_panel() -> None:
                 del s.workspace["policies"][title]
                 st.rerun()
     with st.form("standard_form", clear_on_submit=True, border=False):
-        std = st.file_uploader("Add your licensed copy of ISO/IEC 27001 or 42001", type=TYPES)
+        std = st.file_uploader("Add your licensed copy of ISO/IEC 27001 or 42001", type=TYPES,
+                               max_upload_size=UPLOAD_MB["standard"])
+        st.caption(f"Up to {STANDARD_CHARS:,} characters of text · read for this session only")
         if st.form_submit_button("Load standard") and std:
             _load(std, "standard")
     for key, c in list(s.workspace["standards"].items()):

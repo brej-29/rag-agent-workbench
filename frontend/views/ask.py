@@ -12,7 +12,7 @@ from services.backend_client import namespace_stats, post_upload_text, stream_ch
 from services.file_convert import DocumentConverter, convert_uploaded_file_to_text
 from services.presenters import (
     CROSSWALK_CAVEAT, EXAMPLES, FRAMEWORKS, REGS_EXAMPLES, REGS_NAMESPACE, chip_label, cite_markdown, citing_sentences,
-    copy_clause, crosswalk_lines,
+    copy_clause, crosswalk_compact,
     dates_note, esc, floor_bars_html, profile_words, status_label, step_line, trace_summary, verdict,
 )
 from services.shell import api_key, backend_state, backend_url, facts_or_none, is_dark, wake_watcher
@@ -58,16 +58,18 @@ def evidence_drawer(n: int, src: Dict[str, Any], answer: str, floor: Optional[fl
     if src.get("doc_id"):
         st.caption(f"Document `{src['doc_id']}`")
     standards = s.workspace["standards"]
-    groups = crosswalk_lines(src.get("crosswalk"), standards)
+    groups = crosswalk_compact(src.get("crosswalk"), standards)
     if groups:
         st.markdown("**Matching requirements**")
-        for group, lines, hidden in groups:
-            st.caption(group)
-            for label, color, note in lines:
-                st.badge(label, color=color)
-                st.caption(note)
-            if hidden:
-                st.caption(f"and {hidden} more")
+        for g in groups:
+            st.markdown(f"**{esc(g['group'])}** {g['line']}")
+            st.caption(g["notes"])
+            if g["rest"]:
+                with st.expander(f"{len(g['rest'])} more in {g['group']}"):
+                    for label, color, note in g["rest"]:
+                        st.markdown(f":{color}-badge[{esc(label)}] {esc(note)}")
+            if g["hidden"]:
+                st.caption(f"and {g['hidden']} more in the mapping tables")
         for m in (src.get("crosswalk") or {}).get("items") or []:
             clause = copy_clause(m["id"], standards) if m.get("licensed") else None
             if clause:
@@ -185,29 +187,34 @@ def upload_dialog(namespace: str) -> None:
 
 def sidebar(ready: bool) -> Dict[str, Any]:
     with st.sidebar:
-        st.subheader("Knowledge base", anchor=False)
-        counts = _namespaces(backend_url(), api_key()) if ready else {}
-        options = sorted(counts) or [DEFAULT_NAMESPACE]
-        namespace = st.selectbox(
-            "Namespace", options, index=options.index(DEFAULT_NAMESPACE) if DEFAULT_NAMESPACE in options else 0,
-            format_func=lambda ns: f"{ns} · {counts[ns]} passages" if ns in counts else ns,
-        )
-        if st.button("Add a document", icon=":material/upload_file:", disabled=not ready, width="stretch"):
-            upload_dialog(namespace)
-        for u in reversed(s.uploads):
-            st.caption(f":material/check: {u['title']} → `{u['namespace']}` · {u['at']}")
-
-        if namespace == REGS_NAMESPACE:
-            settings = regs_controls()
-        else:
-            st.subheader("Retrieval", anchor=False)
-            top_k = st.slider("Passages to retrieve", 1, 20, 5)
-            web = st.toggle("Search the web when the knowledge base is weak", value=False)
-            web_threshold = st.slider(
-                "Web search threshold", 0.0, 1.0, 0.25, 0.05, disabled=not web,
-                help="If the best passage scores below this, web results are added (Tavily).",
+        situation = st.container()  # filled below once the namespace is known, but shown first
+        generic = s.get("namespace", DEFAULT_NAMESPACE) != REGS_NAMESPACE
+        with st.expander("Advanced: your own documents (generic pipeline)", expanded=generic,
+                         icon=":material/folder_open:"):
+            st.caption("Index your own files and ask the generic pipeline about them. "
+                       f"The compliance knowledge base is `{REGS_NAMESPACE}`.")
+            counts = _namespaces(backend_url(), api_key()) if ready else {}
+            options = sorted(counts) or [DEFAULT_NAMESPACE]
+            namespace = st.selectbox(
+                "Namespace", options, key="namespace",
+                index=options.index(DEFAULT_NAMESPACE) if DEFAULT_NAMESPACE in options else 0,
+                format_func=lambda ns: f"{ns} · {counts[ns]} passages" if ns in counts else ns,
             )
-            settings = {"top_k": top_k, "use_web_fallback": web, "min_score": web_threshold}
+            if st.button("Add a document", icon=":material/upload_file:", disabled=not ready, width="stretch"):
+                upload_dialog(namespace)
+            for u in reversed(s.uploads):
+                st.caption(f":material/check: {u['title']} → `{u['namespace']}` · {u['at']}")
+            if namespace != REGS_NAMESPACE:
+                top_k = st.slider("Passages to retrieve", 1, 20, 5)
+                web = st.toggle("Search the web when the knowledge base is weak", value=False)
+                web_threshold = st.slider(
+                    "Web search threshold", 0.0, 1.0, 0.25, 0.05, disabled=not web,
+                    help="If the best passage scores below this, web results are added (Tavily).",
+                )
+                settings = {"top_k": top_k, "use_web_fallback": web, "min_score": web_threshold}
+        if namespace == REGS_NAMESPACE:
+            with situation:
+                settings = regs_controls()
         if s.messages and st.button("Clear conversation", icon=":material/delete_sweep:", type="tertiary"):
             s.messages = []
             st.rerun()

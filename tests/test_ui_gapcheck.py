@@ -2,7 +2,8 @@ import csv
 import io
 
 from frontend.services.backend_client import iter_sse
-from frontend.services.presenters import copy_clause, crosswalk_lines, gap_csv, gap_markdown, status_label, verdict_label
+from frontend.services.presenters import (POLICY_CHARS, STANDARD_CHARS, copy_clause, crosswalk_lines, gap_csv, gap_markdown,
+                                         status_label, text_limit_error, verdict_label)
 
 RESULTS = [{"selection": "gdpr/art-33", "ref": "GDPR Art. 33", "title": "Notification", "counts": {}, "tokens": 0,
             "duties": [{"provision": "gdpr/art-33/par-1", "ref": "GDPR Art. 33(1)", "verdict": "missing", "claimed": "missing",
@@ -38,3 +39,19 @@ def test_copy_clause_lookup_and_crosswalk_caption():
 def test_iter_sse_yields_every_event():
     lines = ["event: plan", 'data: {"est_tokens": 9}', "", "event: article", 'data: {"ref": "GDPR Art. 33"}', ""]
     assert list(iter_sse(lines)) == [("plan", {"est_tokens": 9}), ("article", {"ref": "GDPR Art. 33"})]
+
+
+def test_text_limits_match_the_api_schema():
+    from app.schemas.workspace import GapCheckRequest, ParseRequest
+
+    def max_len(model, field):
+        return next(m.max_length for m in model.model_fields[field].metadata if hasattr(m, "max_length"))
+
+    assert POLICY_CHARS == max_len(GapCheckRequest, "policy_text") and STANDARD_CHARS == max_len(ParseRequest, "text")
+
+
+def test_text_limit_error_names_the_length_and_the_limit():
+    assert text_limit_error("policy", 200_000) is None
+    msg = text_limit_error("policy", 312_000)
+    assert "312,000" in msg and "200,000" in msg
+    assert "1,000,000" in text_limit_error("standard", 1_000_001)

@@ -23,9 +23,10 @@ _NO_USAGE = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 _SYSTEM = """You check whether an organisation's own policy covers legal duties.
 
 For each numbered duty decide:
-- covered: a policy passage states what the duty requires
-- partial: a passage addresses the topic but misses part of the requirement (a deadline, a recipient, a required element, the scope)
+- covered: the policy states every requirement in the duty text (each obligation, listed element, deadline and recipient)
+- partial: the policy addresses the duty but leaves out at least one of its requirements
 - missing: no passage addresses the duty
+A duty with several numbered sub-points is covered only if all of them are.
 
 For every duty give law_quote: a short phrase (under 25 words) copied exactly from the duty text.
 For covered or partial also give policy_quote: a short phrase copied exactly from one policy passage, and passage_id: that passage's id (e.g. p3). For missing leave policy_quote and passage_id empty.

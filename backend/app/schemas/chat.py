@@ -1,6 +1,7 @@
+from datetime import date
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ChatMessage(BaseModel):
@@ -47,11 +48,57 @@ class ChatTokenUsage(BaseModel):
             "Per-call-type token breakdown. Keys: 'generation' (main answer LLM), "
             "'judge' (faithfulness check, when RAG_FAITHFULNESS_ENABLED=True), "
             "'crag_rewrite' (CRAG corrective rewrite, when RAG_CRAG_ENABLED=True), "
-            "'contextualize' (history-aware rewrite, when RAG_CONTEXTUALIZE_ENABLED=True). "
+            "'contextualize' (history-aware rewrite, when RAG_CONTEXTUALIZE_ENABLED=True), "
+            "'router' (intent + profile extraction, regs namespace only). "
             "Each value is a dict with prompt_tokens / completion_tokens / total_tokens. "
             "Call types with zero tokens are omitted."
         ),
     )
+
+
+AiRole = Literal["provider", "deployer", "importer", "distributor"]
+DataRole = Literal["controller", "processor"]
+ProductRole = Literal["manufacturer", "importer", "distributor"]
+AiUse = Literal["chatbot", "synthetic_content", "emotion_or_biometric", "deepfake"]
+Nis2Sector = Literal["cloud", "data_centre", "cdn", "dns_tld", "trust_services", "electronic_comms",
+                     "managed_services", "online_marketplace", "search_engine", "social_network", "other_annex", "none"]
+
+
+class Profile(BaseModel):
+    """Facts about the product or organisation (backend/app/data/regs/facts.yaml).  None = not known."""
+
+    ai_system: Optional[bool] = None
+    ai_roles: Optional[List[AiRole]] = None
+    high_risk: Optional[Literal["annex_iii", "annex_i", "none", "unknown"]] = None
+    ai_uses: Optional[List[AiUse]] = None
+    fria_trigger: Optional[bool] = None
+    gpai_model: Optional[bool] = None
+    gpai_systemic_risk: Optional[bool] = None
+    eu_established: Optional[bool] = None
+    eu_market: Optional[bool] = None
+    size: Optional[Literal["micro", "small", "medium", "large"]] = None
+    personal_data: Optional[bool] = None
+    data_roles: Optional[List[DataRole]] = None
+    sensitive_data: Optional[bool] = None
+    large_scale_core: Optional[bool] = None
+    automated_decisions: Optional[bool] = None
+    third_country_transfers: Optional[bool] = None
+    nis2_sector: Optional[Nis2Sector] = None
+    financial_entity: Optional[bool] = None
+    product_roles: Optional[List[ProductRole]] = None
+
+
+class StandardCopy(BaseModel):
+    """A licensed standard the user supplied, parsed by /workspace/parse; used for one request, never stored."""
+
+    name: Literal["iso-27001", "iso-42001"]
+    clauses: Dict[str, Dict[str, str]] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _size(self):
+        if sum(len(c.get("text", "")) for c in self.clauses.values()) > 1_500_000:
+            raise ValueError("standard copy too large")
+        return self
 
 
 class ChatRequest(BaseModel):
@@ -98,6 +145,29 @@ class ChatRequest(BaseModel):
             "Messages with role='user' or 'assistant' are supported."
         ),
     )
+    as_of: Optional[date] = Field(
+        default=None,
+        description="Regulatory namespace only: date to evaluate applicability on (default today).",
+    )
+    frameworks: Optional[List[str]] = Field(
+        default=None,
+        description="Regulatory namespace only: limit retrieval to these frameworks (e.g. GDPR).",
+    )
+    profile: Optional[Profile] = Field(
+        default=None,
+        description="Regulatory namespace only: known facts about the product or organisation.",
+    )
+    previous_intent: Optional[Literal["ask", "checklist", "gap_check", "clarify"]] = Field(
+        default=None,
+        description=(
+            "Regulatory namespace only: intent of the previous reply (a fact-only follow-up to a checklist "
+            "rebuilds it)."
+        ),
+    )
+    standards: Optional[List[StandardCopy]] = Field(
+        default=None,
+        description="Regulatory namespace only: your own licensed standard copies (used for this request, never stored).",
+    )
 
 
 class SourceHit(BaseModel):
@@ -123,6 +193,21 @@ class SourceHit(BaseModel):
         ...,
         description="Text content of the retrieved chunk or web snippet.",
     )
+    doc_id: str = Field(
+        "",
+        description="Knowledge-base document id (empty for web results).",
+    )
+    ref: str = Field("", description="Provision reference, e.g. 'GDPR Art. 33(1)' (regulatory namespace).")
+    framework: str = Field("", description="Framework of the provision (regulatory namespace).")
+    status: Optional[str] = Field(
+        None, description="Applicability on the as-of date: applies | not_yet | depends | voluntary | no_date."
+    )
+    applies_from: Optional[str] = Field(None, description="Date the provision applies from (ISO), when dated.")
+    status_note: Optional[str] = Field(None, description="Conditions on the date, e.g. Annex III vs Annex I.")
+    crosswalk: Optional[Dict[str, Any]] = Field(
+        None, description="Matching requirements in other frameworks from published mappings (spec §13)."
+    )
+    via: Optional[Dict[str, str]] = Field(None, description="Set when the source was added through a crosswalk link.")
 
 
 class ChatTimings(BaseModel):
@@ -234,8 +319,12 @@ class ChatResponse(BaseModel):
         default=None,
         description=(
             "Action taken by the CRAG loop, or None when no correction occurred.  "
-            "Current value: 'rewrite' (query was rewritten via LLM and Pinecone was "
-            "re-queried).  None when RAG_CRAG_ENABLED is False or retrieval was graded good."
+            "'rewrite' (query was rewritten via LLM and Pinecone was re-queried); "
+            "'rewrite_rejected:<empty|refusal|answer|new_facts>' (the rewriter returned "
+            "something other than a search query, so the original retrieval was kept); "
+            "'skipped:instruction_override' (the query reads as an instruction override and "
+            "is never sent to the rewriter).  None when RAG_CRAG_ENABLED is False or "
+            "retrieval was graded good."
         ),
     )
     contextualized_query: Optional[str] = Field(
@@ -257,4 +346,19 @@ class ChatResponse(BaseModel):
             "None on cached responses.  Token counts are ACTUAL values from the Groq "
             "API response.  Cost is an ESTIMATE — see ChatTokenUsage.estimated_cost_usd."
         ),
+    )
+    as_of: Optional[str] = Field(default=None, description="Applicability date used (regulatory namespace).")
+    intent: Optional[str] = Field(
+        default=None, description="Router intent: ask | checklist | gap_check | clarify (regulatory namespace)."
+    )
+    abstain_reason: Optional[str] = Field(
+        default=None,
+        description="Why no answer was generated: out_of_scope | licensed | not_available | clarify | no_match.",
+    )
+    warnings: List[str] = Field(default_factory=list, description="Caveats the reader should see.")
+    profile_updates: Dict[str, Any] = Field(
+        default_factory=dict, description="Profile facts the router read from this request (shown, never guessed)."
+    )
+    checklist: Optional[Dict[str, Any]] = Field(
+        default=None, description="Checklist built for the profile (intent 'checklist'); see POST /checklist."
     )

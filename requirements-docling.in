@@ -1,0 +1,7 @@
+# Optional superset: the Streamlit UI plus docling for high-fidelity PDF/Office
+# conversion (UI upload path, scripts/docling_convert_and_upload.py).  Large (torch).
+# Install INSTEAD of requirements.txt for local use:
+#   uv pip compile --universal --generate-hashes --python-version 3.13 \
+#       requirements-docling.in -o requirements-docling.txt
+-r requirements.in
+docling

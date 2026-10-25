@@ -13,10 +13,10 @@ def is_tavily_configured() -> bool:
 
 
 def get_tavily_tool(max_results: int):
-    """Return a TavilySearchResults tool instance or None if not configured.
+    """Return a Runnable Tavily search (list of result dicts) or None if not configured.
 
-    The underlying LangChain community tool reads the TAVILY_API_KEY environment
-    variable, so we only need to ensure configuration is present and log if not.
+    Wraps tavily-python directly (langchain-community's TavilySearchResults is
+    legacy in LangChain 1.x); as a Runnable it still receives config for tracing.
     """
     if not is_tavily_configured():
         logger.warning(
@@ -25,19 +25,12 @@ def get_tavily_tool(max_results: int):
         )
         return None
 
-    try:
-        from langchain_community.tools.tavily_search import (  # type: ignore[import]
-            TavilySearchResults,
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Failed to import TavilySearchResults tool: %s", exc)
-        return None
+    from langchain_core.runnables import RunnableLambda  # noqa: PLC0415
+    from tavily import TavilyClient  # noqa: PLC0415
 
-    settings = get_settings()
-    logger.info(
-        "Initialising TavilySearchResults tool max_results=%d", max_results
+    client = TavilyClient(api_key=get_settings().TAVILY_API_KEY)
+    logger.info("Initialising Tavily search max_results=%d", max_results)
+    return RunnableLambda(
+        lambda inp: client.search(inp["query"], max_results=max_results).get("results", []),
+        name="tavily_search",
     )
-
-    # The TavilySearchResults tool picks up the API key from the TAVILY_API_KEY
-    # environment variable; we just pass the max_results configuration.
-    return TavilySearchResults(max_results=max_results)

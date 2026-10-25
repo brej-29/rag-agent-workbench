@@ -1,0 +1,69 @@
+# Published mappings used for crosswalks (spec §13). Only id-to-id links are extracted; no mapping text is stored.
+# official: committed (crosswalks.jsonl). community: fetched locally, built into the gitignored
+# crosswalks.community.jsonl, shown only when present.
+- id: nist-csf-800-53
+  title: NIST CSF 2.0 to SP 800-53 Rev. 5.2.0
+  publisher: NIST
+  kind: official
+  url: https://csrc.nist.gov/csrc/media/projects/olir/documents/submissions/Cybersecurity_Framework_v2-0_Concept_Crosswalk_800-53_5_2_0_draft.xlsx
+  file: Cybersecurity_Framework_v2-0_Concept_Crosswalk_800-53_5_2_0_draft.xlsx
+  olir: 186
+  sha256: 5521fa73ace64d8a3014a7b1e971f0f20d32df5ff5e174632723bda09e7e908f
+  reuse: U.S. Government work (17 U.S.C. 105)
+  caveat: Not comprehensive (OLIR). The OLIR-listed SHA3-256 does not match the downloaded file.
+- id: nist-800-53-iso27001
+  title: NIST SP 800-53 Rev. 5 to ISO/IEC 27001:2022
+  publisher: NIST
+  kind: official
+  url: https://csrc.nist.gov/csrc/media/Projects/olir/documents/submissions/sp800-53r5-to-iso-27001-mapping-2022-OLIR-2023-10-12-UPDATED.xlsx
+  file: sp800-53r5-to-iso-27001-mapping-2022-OLIR-2023-10-12-UPDATED.xlsx
+  olir: 155
+  sha256: e631de234a1fac057991773f015c221226940540f5602e1b70a3768eaff5cbd9
+  reuse: U.S. Government work (17 U.S.C. 105); ISO identifiers only
+  caveat: Focal document 800-53 5.1.1. "Organizations should not assume security requirement and control equivalency based solely on the mapping tables."
+- id: enisa-nis2
+  title: ENISA NIS2 Technical Implementation Guidance, mapping table v1.2
+  publisher: ENISA
+  kind: official
+  url: https://www.enisa.europa.eu/sites/default/files/2025-09/ENISA_Technical_Implementation_Guidance_Mapping_table_version_1.2.xlsx
+  file: ENISA_Technical_Implementation_Guidance_Mapping_table_version_1.2.xlsx
+  sha256: b34ce42c46bd643dd3e5bc4aa03c2704fa006fc798946e36753914521d2be59b
+  reuse: "Source: ENISA. Reproduction of ENISA material is authorised provided the source is acknowledged (enisa.europa.eu legal notice)."
+  caveat: Not legally binding (ENISA). Only the ISO/IEC 27001:2022 and NIST CSF 2.0 columns are used.
+- id: nis2-ir-headings
+  title: Implementing Regulation (EU) 2024/2690 annex headings
+  publisher: European Commission
+  kind: official
+  url: http://publications.europa.eu/resource/celex/32024R2690
+  file: (corpus)
+  reuse: Commission Decision 2011/833/EU
+  caveat: Each annex section heading names the NIS2 Art. 21(2) point it implements.
+- id: razil-csf-iso27001
+  title: NIST CSF 2.0 to ISO/IEC 27001:2022 Annex A (Razilio)
+  publisher: Razilio (private sector, OLIR 154)
+  kind: community
+  url: https://irp.cdn-website.com/0bfa7e96/files/uploaded/Cybersecurity_Framework_v2.0_Concept_Crosswalk_Template_v1.0.xlsx
+  file: Cybersecurity_Framework_v2.0_Concept_Crosswalk_Template_v1.0.xlsx
+  olir: 154
+  sha256: 46a309b73c065dacf9c6506b131a8a8353cab5ece2abdb7497f5dccadfd04e71
+  reuse: No licence stated; not redistributed.
+  caveat: Community mapping, not endorsed by NIST.
+- id: pauloweit-iso27001-csf
+  title: ISO/IEC 27001:2022 to NIST CSF 2.0 (J. Pauloweit)
+  publisher: J. Pauloweit (individual, OLIR 218)
+  kind: community
+  url: https://github.com/JoergPauloweit/ISO27001-NIST-Mapping/raw/main/Cybersecurity%20Framework%20v2.0_Concept%20Crosswalk_Template_Version%202_Pauloweit.xlsx
+  file: Cybersecurity_Framework_v2.0_Concept_Crosswalk_Template_Version_2_Pauloweit.xlsx
+  olir: 218
+  sha256: 7ba6a8c3fa5207f84b1a72480fa5bfacc6326ab97bf6e28aab631bd3cf626848
+  reuse: No licence stated; not redistributed.
+  caveat: Community mapping, not endorsed by NIST.
+- id: msft-airmf-iso42001
+  title: NIST AI RMF to ISO/IEC FDIS 42001 (Microsoft)
+  publisher: Microsoft (via NIST AI Resource Center)
+  kind: community
+  url: https://airc.nist.gov/docs/NIST_AI_RMF_to_ISO_IEC_42001_Crosswalk.pdf
+  file: NIST_AI_RMF_to_ISO_IEC_42001_Crosswalk.pdf
+  sha256: 170efdf7be08a988213b54fb8293f3ea67f0627aff6f0541052dfbb0744afed3
+  reuse: No licence stated; not redistributed.
+  caveat: Community mapping, not endorsed by NIST. Maps ISO/IEC FDIS 42001 (pre-publication), not 42001:2023.

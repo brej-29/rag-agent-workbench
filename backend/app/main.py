@@ -1,9 +1,17 @@
-from fastapi import Depends, FastAPI
-from fastapi.responses import ORJSONResponse
+from contextlib import asynccontextmanager
 
-from app.core.auth import require_api_key, validate_api_key_configuration
+from fastapi import Depends, FastAPI
+from mcp.server.transport_security import TransportSecuritySettings
+from starlette.routing import Route
+
+from app.core.auth import (
+    _get_configured_api_key,
+    require_api_key,
+    ApiKeyGate,
+    validate_api_key_configuration,
+)
 from app.core.config import get_settings
-from app.core.errors import PineconeIndexConfigError, setup_exception_handlers
+from app.core.errors import setup_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.core.metrics import setup_metrics
 from app.core.prometheus_metrics import setup_prometheus
@@ -15,7 +23,10 @@ from app.routers.health import router as health_router
 from app.routers.ingest import router as ingest_router
 from app.routers.search import router as search_router
 from app.routers.chat import router as chat_router
+from app.routers.checklist import router as checklist_router
+from app.routers.workspace import router as workspace_router
 from app.routers.metrics import router as metrics_router
+from app.mcp_server import mcp
 from app.services.pinecone_store import init_pinecone
 
 settings = get_settings()
@@ -28,10 +39,22 @@ validate_api_key_configuration()
 # Log runtime port / environment context at import time for easier diagnostics.
 get_port()
 
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Startup: initialise Pinecone.  PineconeIndexConfigError propagates so a
+    misconfigured deployment fails fast instead of serving broken retrieval."""
+    init_pinecone(settings)
+    logger.info("Pinecone initialisation completed")
+    # A mounted sub-app's lifespan never runs, so the MCP session manager is entered here.
+    async with mcp.session_manager.run():
+        yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="RAG Agent Workbench API",
     version=settings.APP_VERSION,
-    default_response_class=ORJSONResponse,
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
@@ -50,19 +73,28 @@ app.include_router(ingest_router, tags=["ingest"], dependencies=[Depends(require
 app.include_router(search_router, tags=["search"], dependencies=[Depends(require_api_key)])
 app.include_router(documents_router, tags=["documents"], dependencies=[Depends(require_api_key)])
 app.include_router(chat_router, tags=["chat"], dependencies=[Depends(require_api_key)])
+app.include_router(checklist_router, tags=["checklist"], dependencies=[Depends(require_api_key)])
+app.include_router(workspace_router, tags=["workspace"], dependencies=[Depends(require_api_key)])
 app.include_router(metrics_router, tags=["metrics"], dependencies=[Depends(require_api_key)])
+
+# MCP (Streamable HTTP) at /mcp, behind the same X-API-Key as the REST API.
+# DNS-rebinding protection (localhost allowlist) applies when no API key is set;
+# with a key, authentication is the control and the hosting proxy owns Host.
+_mcp_security = (
+    TransportSecuritySettings(enable_dns_rebinding_protection=False)
+    if _get_configured_api_key()
+    else TransportSecuritySettings(
+        allowed_hosts=["localhost", "localhost:*", "127.0.0.1", "127.0.0.1:*"],
+        allowed_origins=["http://localhost:*", "http://127.0.0.1:*"],
+    )
+)
+# Exact Route (not Mount): a Mount answers POST /mcp with a 307 to /mcp/, which MCP
+# clients do not follow.  The SDK app routes /mcp itself, so the path is passed through.
+# SSE responses (not single JSON bodies) so gap_check's per-article progress reaches the client.
+app.router.routes.append(Route("/mcp", endpoint=ApiKeyGate(
+    mcp.streamable_http_app(streamable_http_path="/mcp", json_response=False, transport_security=_mcp_security)
+), name="mcp"))
 
 # Register exception handlers
 setup_exception_handlers(app)
 
-
-@app.on_event("startup")
-async def startup_event() -> None:
-    """Application startup hook."""
-    try:
-        init_pinecone(settings)
-        logger.info("Pinecone initialisation completed")
-    except PineconeIndexConfigError:
-        # Let the exception handler and FastAPI/uvicorn deal with the error.
-        # Re-raise to fail fast on misconfiguration.
-        raise

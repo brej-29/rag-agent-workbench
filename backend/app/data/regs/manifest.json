@@ -1,0 +1,92 @@
+[
+  {
+    "key": "eu-ai-act",
+    "url": "http://publications.europa.eu/resource/celex/02024R1689-20260727",
+    "file": "eu-ai-act.xhtml",
+    "sha256": "5e7719f77e8a606b257dc25958ee3222c4383300a5a34270a5b850a2ce8b8715",
+    "bytes": 851286,
+    "retrieved": "2026-10-20",
+    "licence": "\u00a9 European Union, https://eur-lex.europa.eu. Reuse authorised under Commission Decision 2011/833/EU"
+  },
+  {
+    "key": "eu-ai-act-recitals",
+    "url": "http://publications.europa.eu/resource/celex/32024R1689",
+    "file": "eu-ai-act-recitals.xhtml",
+    "sha256": "8f0b656302f9864cc87e040c371f209a9d65ae1a6cecc25ca5eb737e872d721a",
+    "bytes": 1262391,
+    "retrieved": "2026-10-20",
+    "licence": "\u00a9 European Union, https://eur-lex.europa.eu. Reuse authorised under Commission Decision 2011/833/EU"
+  },
+  {
+    "key": "gdpr",
+    "url": "http://publications.europa.eu/resource/celex/32016R0679",
+    "file": "gdpr.xhtml",
+    "sha256": "962539af03738bf552319ff4ce42d69e5f95a576307c4dfed7bf87e81b646b9d",
+    "bytes": 806864,
+    "retrieved": "2026-10-20",
+    "licence": "\u00a9 European Union, https://eur-lex.europa.eu. Reuse authorised under Commission Decision 2011/833/EU"
+  },
+  {
+    "key": "nis2",
+    "url": "http://publications.europa.eu/resource/celex/32022L2555",
+    "file": "nis2.xhtml",
+    "sha256": "6ee66d5c419d9a056fb98d94083cacf9b818803bd6b416435718e0d4919cb589",
+    "bytes": 702913,
+    "retrieved": "2026-10-20",
+    "licence": "\u00a9 European Union, https://eur-lex.europa.eu. Reuse authorised under Commission Decision 2011/833/EU"
+  },
+  {
+    "key": "nis2-ir",
+    "url": "http://publications.europa.eu/resource/celex/32024R2690",
+    "file": "nis2-ir.xhtml",
+    "sha256": "1d10f42c31a2b3c6b929b4696a04093ee1d84a298c0c0437a22f8718a9ffb3cd",
+    "bytes": 418553,
+    "retrieved": "2026-10-24",
+    "licence": "\u00a9 European Union, https://eur-lex.europa.eu. Reuse authorised under Commission Decision 2011/833/EU"
+  },
+  {
+    "key": "dora",
+    "url": "http://publications.europa.eu/resource/celex/32022R2554",
+    "file": "dora.xhtml",
+    "sha256": "cf50d8f023d23b2a56f535aaee0760eba7f1925ef08a9858c5c31d43d414f46b",
+    "bytes": 746866,
+    "retrieved": "2026-10-20",
+    "licence": "\u00a9 European Union, https://eur-lex.europa.eu. Reuse authorised under Commission Decision 2011/833/EU"
+  },
+  {
+    "key": "cra",
+    "url": "http://publications.europa.eu/resource/celex/32024R2847",
+    "file": "cra.xhtml",
+    "sha256": "fe0cca4a0caec50e7cf5a91432b94a19b211f86be8584fdba56372bdcea571ed",
+    "bytes": 710696,
+    "retrieved": "2026-10-20",
+    "licence": "\u00a9 European Union, https://eur-lex.europa.eu. Reuse authorised under Commission Decision 2011/833/EU"
+  },
+  {
+    "key": "nist-800-53",
+    "url": "https://raw.githubusercontent.com/usnistgov/oscal-content/main/nist.gov/SP800-53/rev5/json/NIST_SP-800-53_rev5_catalog.json",
+    "file": "nist-800-53.json",
+    "sha256": "01f37cf90ea99d92242c936cbfbdebcc338eef1f71454e2acac36cc56e9bc062",
+    "bytes": 10442037,
+    "retrieved": "2026-10-20",
+    "licence": "U.S. Government work; not subject to copyright in the United States (17 U.S.C. 105)"
+  },
+  {
+    "key": "nist-csf",
+    "url": "https://raw.githubusercontent.com/usnistgov/oscal-content/main/nist.gov/CSF/v2.0/json/NIST_CSF_v2.0_catalog.json",
+    "file": "nist-csf.json",
+    "sha256": "4836943f21d393f2821df85ada4e6f3c0617243b4ddf44263fe68205400210b4",
+    "bytes": 349827,
+    "retrieved": "2026-10-20",
+    "licence": "U.S. Government work; not subject to copyright in the United States (17 U.S.C. 105)"
+  },
+  {
+    "key": "nist-ai-rmf",
+    "url": "https://airc.nist.gov/docs/playbook.json",
+    "file": "nist-ai-rmf.json",
+    "sha256": "aecbee3d3c8820816d295b11d10fb61324b17c25c2ff39ee95e2aa5654555bba",
+    "bytes": 413720,
+    "retrieved": "2026-10-20",
+    "licence": "U.S. Government work; not subject to copyright in the United States (17 U.S.C. 105)"
+  }
+]

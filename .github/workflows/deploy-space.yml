@@ -1,0 +1,41 @@
+name: Deploy API to Hugging Face Space
+
+# Manual only: syncs backend/ + Dockerfile from this repo into the Space repo
+# (replacing the old hand-copied deploy that drifted and shipped __pycache__).
+# The Space README (with its YAML header) is left as-is.
+# Requires repo secret HF_TOKEN (write access to the Space).
+on:
+  workflow_dispatch:
+
+env:
+  SPACE: BrejBala/rag-agent-workbench-api
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Gate on configured models
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          PINECONE_API_KEY: unused
+          PINECONE_INDEX_NAME: unused
+          PINECONE_HOST: https://unused.invalid
+        run: |
+          pip install --require-hashes -r backend/requirements.txt
+          python scripts/check_models.py
+
+      - name: Sync into Space repo and push
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git clone "https://user:${HF_TOKEN}@huggingface.co/spaces/${SPACE}" space
+          rsync -a --delete --exclude '__pycache__' --exclude '.env*' backend/ space/backend/
+          cp Dockerfile .dockerignore space/
+          cd space
+          git rm -r -q --cached --ignore-unmatch '*__pycache__*'
+          git add -A
+          git -c user.name="github-actions" -c user.email="actions@github.com" \
+            commit -m "Deploy ${GITHUB_SHA::7} from ${GITHUB_REPOSITORY}" || { echo "No changes"; exit 0; }
+          git push

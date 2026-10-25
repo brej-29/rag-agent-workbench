@@ -87,13 +87,11 @@ def _collect_all_vector_ids(index: Any, namespace: str) -> List[str]:
     """Return every vector ID in the given namespace via paginated list()."""
     all_ids: List[str] = []
     for page in index.list(namespace=namespace):
-        # Pinecone SDK: list() yields lists of ID strings
-        if isinstance(page, list):
-            all_ids.extend(page)
-        else:
+        # Pinecone SDK: list() yields pages of IDs (strings before v10, ListItem.id since)
+        if not isinstance(page, list):
             # Older SDK returns an object with .vectors / .ids attribute
-            ids = getattr(page, "ids", None) or getattr(page, "vectors", [])
-            all_ids.extend(ids)
+            page = getattr(page, "ids", None) or getattr(page, "vectors", None) or list(page)
+        all_ids.extend(str(getattr(item, "id", item)) for item in page)
     return all_ids
 
 

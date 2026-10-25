@@ -4,7 +4,7 @@ Token count and estimated cost accounting for Groq LLM calls (T2.7).
 PRICING TABLE
 -------------
 Source: https://console.groq.com/docs/models (Groq pricing page)
-As-of date: 2026-06-25
+As-of date: 2026-10-19
 IMPORTANT: MUST BE MANUALLY UPDATED when provider pricing changes.
             The estimates become stale the moment Groq adjusts prices.
             Check https://console.groq.com/docs/models before relying on
@@ -27,8 +27,11 @@ from typing import Any
 # Format: { model_id: { "input": $/1M tokens, "output": $/1M tokens } }
 # The IDs must match the GROQ_MODEL values operators configure.
 #
-# As-of 2026-06-25. UPDATE THIS TABLE when Groq changes pricing.
+# As-of 2026-10-19 (console.groq.com/docs/models). UPDATE THIS TABLE when Groq changes pricing.
 _GROQ_PRICING_USD_PER_1M: dict[str, dict[str, float]] = {
+    "openai/gpt-oss-20b": {"input": 0.075, "output": 0.30},
+    "openai/gpt-oss-120b": {"input": 0.15, "output": 0.60},
+    # Retired by Groq (kept so historical cost reports still resolve).
     "llama-3.1-8b-instant": {
         "input": 0.05,   # $0.05 / 1M input tokens
         "output": 0.08,  # $0.08 / 1M output tokens
@@ -55,11 +58,11 @@ _GROQ_PRICING_USD_PER_1M: dict[str, dict[str, float]] = {
     },
     # Add new models here when they are added to Groq.
     # Source: https://console.groq.com/docs/models
-    # As-of 2026-06-25. UPDATE DATE WHEN PRICES CHANGE.
+    # As-of 2026-10-19. UPDATE DATE WHEN PRICES CHANGE.
 }
 
 # Sentinel used when cost is unknown (model not in table or zero tokens).
-_PRICING_AS_OF = "2026-06-25"
+_PRICING_AS_OF = "2026-10-19"
 
 
 def estimate_cost_usd(

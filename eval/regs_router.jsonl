@@ -1,0 +1,37 @@
+{"_meta": true, "purpose": "Router intent accuracy (eval/run_router.py).", "label_status": "draft-claude-2026-10-20: pending human review", "intents": {"ask": "what a rule says, means or when it applies", "checklist": "which obligations apply to me", "gap_check": "check my own document against the rules", "clarify": "too vague to act on"}}
+{"query": "What does Article 26 of the AI Act require of deployers?", "intent": "ask"}
+{"query": "Within how many hours must a personal data breach be notified under GDPR?", "intent": "ask"}
+{"query": "When do the AI Act's high-risk obligations start to apply?", "intent": "ask"}
+{"query": "Is emotion recognition in the workplace prohibited?", "intent": "ask"}
+{"query": "What is a general-purpose AI model under the AI Act?", "intent": "ask"}
+{"query": "What does NIST SP 800-53 AC-2 say about account management?", "intent": "ask"}
+{"query": "How does NIS2 define an essential entity?", "intent": "ask"}
+{"query": "What are the DORA rules on ICT third-party risk?", "intent": "ask"}
+{"query": "Does the Cyber Resilience Act cover open-source software?", "intent": "ask"}
+{"query": "What is the difference between a provider and a deployer in the AI Act?", "intent": "ask"}
+{"query": "Which incident reporting deadlines exist across EU rules?", "intent": "ask"}
+{"query": "Explain the GDPR right not to be subject to automated decisions.", "intent": "ask"}
+{"query": "What does the NIST AI RMF say about measuring bias?", "intent": "ask"}
+{"query": "Are fines under the AI Act higher than under GDPR?", "intent": "ask"}
+{"query": "As a deployer of a hiring tool, do we need to keep logs, and for how long?", "intent": "ask"}
+{"query": "We are a fintech in Germany using a credit scoring model. Which obligations apply to us?", "intent": "checklist"}
+{"query": "Give me a compliance checklist for our customer-support chatbot sold in the EU.", "intent": "checklist"}
+{"query": "We build a CV screening product for EU employers. What do we need to do before launch?", "intent": "checklist"}
+{"query": "Which rules apply to a cloud hosting provider with 300 staff in France?", "intent": "checklist"}
+{"query": "List everything our bank must do under DORA.", "intent": "checklist"}
+{"query": "We manufacture smart home cameras. What does the CRA require from us and by when?", "intent": "checklist"}
+{"query": "What are all our obligations as a provider of a general-purpose AI model?", "intent": "checklist"}
+{"query": "Here is our incident response policy. Does it meet NIS2 reporting requirements?", "intent": "gap_check"}
+{"query": "Check our data retention policy against GDPR.", "intent": "gap_check"}
+{"query": "Can you review our AI governance document and tell me what is missing for the AI Act?", "intent": "gap_check"}
+{"query": "Compare our vendor management procedure with DORA's third-party requirements and list the gaps.", "intent": "gap_check"}
+{"query": "I'll paste our access control standard: does it cover SP 800-53 AC-2?", "intent": "gap_check"}
+{"query": "Help me with compliance.", "intent": "clarify"}
+{"query": "Are we compliant?", "intent": "clarify"}
+{"query": "What should I do about regulations?", "intent": "clarify"}
+{"query": "We are also the provider of the system.", "previous_intent": "checklist", "intent": "checklist"}
+{"query": "About 300 employees, based in Germany.", "previous_intent": "checklist", "intent": "checklist"}
+{"query": "We don't process any special-category data.", "previous_intent": "checklist", "intent": "checklist"}
+{"query": "Yes, it is used for credit scoring.", "previous_intent": "checklist", "intent": "checklist"}
+{"query": "What does Article 27 require?", "previous_intent": "checklist", "intent": "ask"}
+{"query": "Thanks. When does Article 26 start to apply to us?", "previous_intent": "checklist", "intent": "ask"}

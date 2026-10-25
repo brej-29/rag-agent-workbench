@@ -1,3 +1,5 @@
+import json
+from datetime import date
 from time import perf_counter
 from typing import AsyncGenerator, Dict, List, Optional
 
@@ -25,7 +27,7 @@ from app.schemas.chat import (
     SourceHit,
 )
 from app.services.chat.graph import get_chat_graph
-from app.services.chat.streaming import stream_chat_response
+from app.services.chat.streaming import regs_response_fields, stream_chat_response
 
 logger = get_logger(__name__)
 
@@ -54,6 +56,14 @@ def _build_chat_response(state: Dict) -> ChatResponse:
             url=str(src.get("url") or ""),
             score=float(src.get("score") or 0.0),
             chunk_text=str(src.get("chunk_text") or ""),
+            doc_id=str(src.get("doc_id") or ""),
+            ref=str(src.get("ref") or ""),
+            framework=str(src.get("framework") or ""),
+            status=src.get("status"),
+            applies_from=src.get("applies_from"),
+            status_note=src.get("status_note"),
+            crosswalk=src.get("crosswalk"),
+            via=src.get("via"),
         )
         for src in sources_raw
     ]
@@ -93,7 +103,32 @@ def _build_chat_response(state: Dict) -> ChatResponse:
         corrective_action=state.get("corrective_action"),
         contextualized_query=state.get("contextualized_query"),
         usage=usage,
+        **regs_response_fields(state),
     )
+
+
+def _cacheable(payload: ChatRequest) -> bool:
+    """Your licensed copy and follow-ups are never cached."""
+    return cache_enabled() and not payload.chat_history and not payload.standards
+
+
+def _regs_inputs(payload: ChatRequest) -> Dict:
+    """Compliance-path inputs (ignored by the graph outside the regs namespace)."""
+    return {
+        "as_of": payload.as_of.isoformat() if payload.as_of else None,
+        "frameworks": payload.frameworks,
+        "profile": payload.profile.model_dump(exclude_none=True) if payload.profile else {},
+        "previous_intent": payload.previous_intent,
+    }
+
+
+def _cache_query(payload: ChatRequest, namespace: str) -> str:
+    """Cache key text: on the regs namespace the answer also depends on the as-of date, filter and profile."""
+    if namespace != get_settings().REGS_NAMESPACE:
+        return payload.query
+    extras = _regs_inputs(payload)
+    extras["as_of"] = extras["as_of"] or date.today().isoformat()
+    return payload.query + "|" + json.dumps(extras, sort_keys=True)
 
 
 @router.post(
@@ -118,12 +153,12 @@ async def chat(request: Request, payload: ChatRequest) -> ChatResponse:  # noqa:
         payload.use_web_fallback,
     )
 
-    use_cache = cache_enabled() and not payload.chat_history
+    use_cache = _cacheable(payload)
     cached_response: Optional[ChatResponse] = None
     if use_cache:
         cached = get_chat_cached(
             namespace=namespace,
-            query=payload.query,
+            query=_cache_query(payload, namespace),
             top_k=payload.top_k,
             min_score=payload.min_score,
             use_web_fallback=payload.use_web_fallback,
@@ -165,6 +200,8 @@ async def chat(request: Request, payload: ChatRequest) -> ChatResponse:  # noqa:
             {"role": msg.role, "content": msg.content}
             for msg in (payload.chat_history or [])
         ],
+        **_regs_inputs(payload),
+        "standards": [c.model_dump() for c in payload.standards or []],
     }
 
     start_total = perf_counter()
@@ -215,7 +252,7 @@ async def chat(request: Request, payload: ChatRequest) -> ChatResponse:  # noqa:
     if use_cache:
         set_chat_cached(
             namespace=namespace,
-            query=payload.query,
+            query=_cache_query(payload, namespace),
             top_k=payload.top_k,
             min_score=payload.min_score,
             use_web_fallback=payload.use_web_fallback,
@@ -253,12 +290,12 @@ async def chat_stream(request: Request, payload: ChatRequest) -> StreamingRespon
     )
 
     # Cache check — same rule as /chat: only for requests without history.
-    use_cache = cache_enabled() and not payload.chat_history
+    use_cache = _cacheable(payload)
     cached_response: Optional[ChatResponse] = None
     if use_cache:
         cached = get_chat_cached(
             namespace=namespace,
-            query=payload.query,
+            query=_cache_query(payload, namespace),
             top_k=payload.top_k,
             min_score=payload.min_score,
             use_web_fallback=payload.use_web_fallback,
@@ -287,6 +324,8 @@ async def chat_stream(request: Request, payload: ChatRequest) -> StreamingRespon
             {"role": msg.role, "content": msg.content}
             for msg in (payload.chat_history or [])
         ],
+        **_regs_inputs(payload),
+        "standards": [c.model_dump() for c in payload.standards or []],
     }
 
     async def event_generator() -> AsyncGenerator[str, None]:

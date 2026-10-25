@@ -6,8 +6,12 @@ from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Load environment variables from a local .env file if present
-load_dotenv()
+# Load environment variables from a local .env file if present.
+# DISABLE_DOTENV=1 skips both .env readers (the test suite sets it so a
+# developer's real keys never leak into tests).
+_DOTENV_ENABLED = os.getenv("DISABLE_DOTENV") != "1"
+if _DOTENV_ENABLED:
+    load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -76,9 +80,59 @@ class Settings(BaseSettings):
         description="Groq OpenAI-compatible base URL",
     )
     GROQ_MODEL: str = Field(
-        default="llama-3.1-8b-instant",
-        description="Default Groq chat model used for /chat",
+        default="openai/gpt-oss-20b",
+        description=(
+            "Primary chat model (any OpenAI-compatible endpoint at GROQ_BASE_URL). "
+            "llama-3.1-8b-instant was shut down by Groq on 2026-08-16."
+        ),
     )
+    LLM_FALLBACK_MODELS: str = Field(
+        default="openai/gpt-oss-120b",
+        description=(
+            "Comma-separated models tried in order when the primary call fails "
+            "(model retired, 404, 429, timeout).  Same endpoint and key.  Empty disables."
+        ),
+    )
+    LLM_STRUCTURED_OUTPUT: bool = Field(
+        default=True,
+        description=(
+            "Send a strict JSON-schema response_format for the faithfulness judge.  "
+            "Supported by Groq gpt-oss; set false for models/providers without "
+            "structured outputs (the judge then relies on prompt + tolerant parsing)."
+        ),
+    )
+    LLM_REASONING_EFFORT: str = Field(
+        default="low",
+        description=(
+            "reasoning_effort sent to reasoning models (gpt-oss: low|medium|high).  "
+            "'low' keeps judge/rewrite latency near non-reasoning models.  Empty = not sent "
+            "(required for non-reasoning models, which reject the parameter)."
+        ),
+    )
+
+    # Regulatory corpus (compliance path).  Requests to this namespace get provision
+    # citations, applicability dates, the scope guard and the recalibrated floor.
+    REGS_NAMESPACE: str = Field(default="regs-v1", description="Pinecone namespace of the regulatory corpus.")
+    REGS_MIN_SCORE: float = Field(
+        default=0.30,
+        description=(
+            "Relevance floor for the regs namespace (calibrated 2026-10-20: off-topic 0.09-0.29, "
+            "lowest answerable relevant hit 0.412; eval/run_regs.py --mode calibrate)."
+        ),
+    )
+    REGS_CANDIDATES: int = Field(default=30, description="Dense candidates fetched before diversification.")
+    REGS_TOP_K: int = Field(default=6, description="Provisions sent to the model.")
+    REGS_MAX_PER_FRAMEWORK: int = Field(default=3, description="Diversification cap per framework.")
+    REGS_RECITAL_WEIGHT: float = Field(
+        default=0.9, description="Rank weight for recitals (interpretive, not binding)."
+    )
+    REGS_CROSSWALK_MODE: str = Field(
+        default="off",
+        description="off | boost | inject: use official crosswalk links in regs retrieval (kept only if "
+                    "eval/run_regs.py --crosswalk shows it helps).",
+    )
+    REGS_CROSSWALK_BOOST: float = Field(default=1.15, description="boost: rank weight for pool candidates linked to the top hit.")
+    REGS_CROSSWALK_INJECT: int = Field(default=3, description="inject: most linked provisions added.")
 
     # Web search / Tavily
     TAVILY_API_KEY: Optional[str] = Field(
@@ -251,7 +305,7 @@ class Settings(BaseSettings):
     )
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=".env" if _DOTENV_ENABLED else None,
         env_file_encoding="utf-8",
         extra="ignore",
     )

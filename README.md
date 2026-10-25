@@ -1,7 +1,8 @@
 <div align="center">
   <h1>🧠 rag-agent-workbench</h1>
-  <p><i>Production-style RAG backend with a 7-node LangGraph pipeline, cosine-gated abstention,
-  corrective retrieval, two-layer faithfulness checking, and honest token streaming.</i></p>
+  <p><i>Compliance Workbench: EU and NIST rules for AI, data and cyber, checked against your profile and
+  your policies. Built on a measured RAG pipeline with cosine-gated abstention, corrective retrieval,
+  faithfulness checks and honest token streaming.</i></p>
 </div>
 
 <br>
@@ -12,7 +13,7 @@
   <img alt="Vector Store" src="https://img.shields.io/badge/Vector%20Store-Pinecone-3776AB">
   <img alt="Frameworks" src="https://img.shields.io/badge/Frameworks-LangChain%20%7C%20LangGraph-ff9800">
   <img alt="Frontend" src="https://img.shields.io/badge/Frontend-Streamlit-ff4b4b">
-  <img alt="Tests" src="https://img.shields.io/badge/Tests-343%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/Tests-654%20passing-brightgreen">
   <img alt="License" src="https://img.shields.io/badge/License-MIT-black">
 </div>
 
@@ -24,7 +25,7 @@ An agentic RAG system built as a deliberate engineering exercise: every design d
 measurement-driven, every limitation is documented, and every feature ships with a test.
 
 **Stack:** FastAPI · LangGraph/LangChain · Pinecone (`llama-text-embed-v2`, 1024-dim) · Groq
-(LLaMA 3.1 8B) · Tavily · Streamlit · Prometheus · Docker
+(`openai/gpt-oss-20b`, fallback `gpt-oss-120b`) · Tavily · Streamlit · Prometheus · Docker
 
 **Standout decisions** (details in [`docs/DESIGN.md`](docs/DESIGN.md)):
 - **Eval-first:** retrieval evaluation harness built before any parameter was tuned; labels
@@ -39,6 +40,55 @@ measurement-driven, every limitation is documented, and every feature ships with
 - **Bounded CRAG:** hard `max_iters=2` loop guard, disabled by default on a saturated corpus.
 - **Honest streaming:** `llm.astream` for real TTFT; cache hits and abstentions are served
   honestly with explicit `done.cached` / `insufficient_context` flags — never fake word-splits.
+
+---
+
+## Ask the rules for AI, data and cyber
+
+The default knowledge base (`regs-v1`) is the official text of the **EU AI Act, GDPR, NIS2, DORA, the Cyber
+Resilience Act, NIST SP 800-53, CSF 2.0 and the AI RMF**: 3,830 provisions, each with a stable reference
+(`GDPR Art. 33(1)`) and, for EU law, the date it applies from. Ask a question and you get:
+
+- an answer that cites the exact provisions it uses;
+- for each provision, whether it **applies on your date** (pick any as-of date; set the high-risk class when the
+  AI Act dates depend on it). Dates come from a registry that quotes the provision setting them, never from the model;
+- a plain decline, with no model call, when the question names rules not covered here (HIPAA, CCPA, PCI DSS…) or a
+  licensed standard whose text is not public (ISO/IEC 27001, 42001, SOC 2);
+- "nothing relevant enough" when no provision clears the relevance floor.
+
+Latest published runs (the Evaluation page shows each one; details in [the design spec](docs/superpowers/specs/2026-10-20-compliance-copilot-design.md)):
+
+| | |
+|---|---|
+| Retrieval, 50 hand-labelled questions, top 6 | recall 0.871, MRR 0.846 (same budget: dense 0.848, fused 0.801, lexical 0.600) |
+| Abstention, no LLM | 13 of 14 out-of-scope questions declined; 0 of 50 answerable questions refused |
+| Router (ask / checklist / gap check / clarify) | 34 of 36 correct; both misses were gap-check requests sent to Ask |
+| Latency, local API | about 2–3 s per answer; declines are instant |
+
+**Checklist.** Describe your organisation (in the chat, or on the Checklist page) and get the articles of the
+AI Act, GDPR, NIS2, DORA and the Cyber Resilience Act that bind you: *applies now*, *coming* (with the date),
+or *depends on* a fact you have not given yet, with the one question that would decide it. 99 articles,
+each rule citing, word for word, the provision that says whom it binds (checked in CI); no model decides or words
+anything in the checklist. Download it as Markdown or CSV, or call `POST /checklist`.
+
+**Crosswalks.** Every cited provision and checklist item lists its matching requirements in other frameworks,
+taken only from published mappings: NIST's CSF 2.0 ↔ SP 800-53 and SP 800-53 ↔ ISO/IEC 27001 tables, ENISA's
+NIS2 mapping, and the NIS2 Implementing Regulation's own headings. Each match shows its source and the path it
+came through, e.g. NIS2 Art. 21(2)(d) → Implementing Regulation 2024/2690 point 5.1 → CSF GV.SC → SP 800-53 SR-5.
+Community mappings (ISO 27001, ISO/IEC FDIS 42001) are labelled and fetched locally, never redistributed; ISO
+entries are identifiers only. Mappings show related requirements, not equivalence, and the AI Act, GDPR, DORA
+and CRA have no published crosswalk yet, which the app says rather than guessing.
+
+**Gap check.** Load your own policy (PDF, Word, Markdown or text) and check it against the articles your
+checklist says bind you, or against single 2024/2690 annex sections. Every duty gets *covered*, *partial* or
+*missing* with a quote from the law and from your policy, both checked word for word; anything that can't be
+verified is marked for review instead of guessed. Results stream article by article and export to Markdown or
+CSV. **Your copy of a licensed standard** (ISO/IEC 27001 or 42001) can be loaded too: Ask then answers from it
+and crosswalk matches show its clause text. Documents stay in your browser session; the server stores, indexes and
+logs nothing.
+
+All four jobs are also MCP tools, so Claude or your IDE can use them (below). This is information from official
+text, not legal advice.
 
 ---
 
@@ -66,7 +116,7 @@ flowchart TD
 
     subgraph External["External Services"]
         PC[("Pinecone\nllama-text-embed-v2\n1024-dim cosine")]
-        GR[("Groq\nLLaMA 3.1 8B")]
+        GR[("Groq\ngpt-oss-20b, 120b fallback")]
         TV[("Tavily\nWeb Search")]
         LS[("LangSmith\nTracing — optional")]
     end
@@ -96,11 +146,105 @@ flowchart TD
 
 ---
 
-## Screenshot
+## Live, evaluation and limits
 
-<img width="1919" height="967" alt="image" src="https://github.com/user-attachments/assets/fe979aa1-b125-415c-9a1d-64a96289af87" />
+| | |
+|---|---|
+| API (HF Space, Docker, CPU Basic) | https://brejbala-rag-agent-workbench-api.hf.space · [`/docs`](https://brejbala-rag-agent-workbench-api.hf.space/docs) |
+| UI (Streamlit Community Cloud) | https://rag-agent-workbench.streamlit.app |
 
-<img width="1918" height="896" alt="image" src="https://github.com/user-attachments/assets/1d40bb2b-f477-4741-8014-0b2c2a7356bf" />
+**Retrieval eval** (`make eval`, 30 hand-labelled queries, `eval` namespace, 2026-10-19):
+
+| Metric | Value | | k sweep | Recall@k | nDCG@k | P@k |
+|---|---|---|---|---|---|---|
+| Recall@10 | 0.9694 | | k=5 (production) | 0.9139 | 0.9030 | 0.36 |
+| MRR | 0.9833 | | k=8 (knee) | 0.9694 | 0.9280 | 0.24 |
+| nDCG@10 | 0.9280 | | k=10 | 0.9806 | 0.9326 | 0.20 |
+
+**Environment variables (names only):** backend `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`,
+`PINECONE_HOST`, `PINECONE_NAMESPACE`, `PINECONE_TEXT_FIELD`, `GROQ_API_KEY`, `GROQ_BASE_URL`,
+`GROQ_MODEL`, `LLM_FALLBACK_MODELS`, `LLM_REASONING_EFFORT`, `TAVILY_API_KEY`, `API_KEY`, `ENV`,
+`ALLOWED_ORIGINS`, `RAG_*` flags; UI `BACKEND_BASE_URL`, `API_KEY`. Full list:
+[`backend/README.md`](backend/README.md).
+
+**Known limits (free tiers):**
+- The HF Space sleeps after 48 h idle. The first request after that waits for a restart
+  (about 10 s measured on 2026-10-19).
+- The Streamlit app sleeps after 12 h without traffic; a visitor clicks "wake up".
+- Pinecone Starter: one region (`us-east-1`), 2 GB, 1M read units a month.
+  Tavily free: 1,000 credits a month.
+- Model retirement: `make check-models` (also run weekly in CI) fails loudly when a configured
+  model is retired or appears on Groq's deprecations page. `LLM_FALLBACK_MODELS` keeps `/chat`
+  answering while you switch.
+
+---
+
+## Use it from any MCP client
+
+The API also serves an **MCP server** (`mcp` SDK 2.3) with every job as a tool. It is read-only and stores
+nothing, so an agent can ask, check and compare but never write to the index:
+
+| Tool | What it does |
+|---|---|
+| `ask(question, as_of?, frameworks?, standards?)` | Cited answer with each provision's status on the date, an explicit `abstained` flag and `abstain_reason`; `standards` takes your own ISO/IEC 27001 or 42001 text for that call only |
+| `checklist(profile, as_of?, with_text?)` | Which EU-law articles bind the profile: now, coming, or depending on a fact not given (rules, no model); unknown facts are rejected |
+| `crosswalk(provision, hops?, official_only?)` | Related requirements in other frameworks from published mappings, by provision id or ref |
+| `gap_check(policy_text, articles? \| profile?, as_of?)` | A policy checked duty by duty with verified quotes; refuses runs over the budget and reports progress per article |
+| `search_knowledge_base(query, namespace?, top_k?)` | Cosine-scored chunks, no LLM |
+
+Resources: `rag://guardrails` (how to read every result), `rag://facts` (profile facts and allowed values),
+`rag://obligations` (the checklist's rules), `rag://crosswalk-sources` (mapping sources and licences),
+`rag://namespaces`. Prompts, one per job: `grounded_answer`, `compliance_checklist`, `crosswalk_lookup`,
+`policy_gap_check`.
+
+**Remote (Streamable HTTP):** `POST https://<api-host>/mcp` with header `X-API-Key`, the same key
+as the REST API. Responses stream (SSE), so `gap_check` progress reaches the client.
+`python scripts/smoke_mcp.py` runs every tool against a local API.
+
+**Local (stdio)**, e.g. in a desktop client's `mcpServers` config (keys come from your `.env`):
+
+```json
+{
+  "mcpServers": {
+    "rag-workbench": {
+      "command": "D:/Project/rag-agent-workbench/.venv/Scripts/python.exe",
+      "args": ["-m", "app.mcp_server"],
+      "env": { "PYTHONPATH": "D:/Project/rag-agent-workbench/backend" }
+    }
+  }
+}
+```
+
+---
+
+## Evaluation beyond retrieval
+
+| Harness | What it measures | Run |
+|---|---|---|
+| Retrieval (`eval/run.py`) | Recall@k, MRR, nDCG@k on 30 hand-labelled queries | `make eval` |
+| Answers (`eval/run_answers.py`) | Claim recall vs reference claims, faithfulness, citation precision against labelled evidence docs, false/correct abstain rates on 30 answerable and 12 unanswerable questions. The judge is a different model from the generator; a calibration CSV yields judge-vs-human κ | `make eval-answers` |
+| Adversarial (`eval/adversarial.py`) | Direct and indirect injection, delimiter forgery, CRAG laundering, exfiltration. Structural defences are checked in CI against a fully compromised fake model; model-dependent ones are measured live | `make eval-adversarial` |
+
+---
+
+## The UI
+
+**Compliance Workbench**, five pages (Streamlit 1.66, light and dark themes):
+
+- **Home:** your profile in plain words, the three jobs, what is covered (instrument, binding or voluntary,
+  provision count, source, retrieval date) and the measured numbers behind it.
+- **Ask:** answers stream in with a live pipeline trace. Each cited provision shows whether it applies on your
+  date and opens an evidence drawer: its score against the **relevance floor**, the sentences that cite it, the
+  passage, and its matches in other frameworks. Your own documents and the generic pipeline sit under "Advanced".
+- **Checklist:** answer what you know; the articles that bind you update as you go, with the questions that
+  would decide the rest. Markdown and CSV export.
+- **Gap check:** load a policy (and, if you have one, your licensed ISO/IEC copy), pick articles, and get verdicts
+  streamed article by article with quotes from both sides.
+- **Evaluation:** the compliance evals first (retrieval by mode at the same budget, abstention, routing, the
+  checklist's tests, the gap-check gate and its range across runs), then the generic pipeline's evals, all read
+  from `eval/results/` (refresh with `python eval/publish_results.py`).
+
+Screenshots predate the 2026-10 redesign and will be refreshed after deploy.
 
 ---
 
@@ -110,19 +254,26 @@ flowchart TD
 
 ```bash
 cd backend
-pip install -r requirements.txt
+pip install --require-hashes -r requirements.txt   # hash-pinned lock, Python 3.11
 cp .env.example .env      # set PINECONE_*, GROQ_API_KEY; API_KEY optional
 uvicorn app.main:app --port 8000
 ```
+
+The backend needs a reachable Pinecone index at startup (it validates the index and exits on
+a bad key or host).
 
 Browse: `http://localhost:8000/health` · `http://localhost:8000/docs`
 
 ### Frontend
 
 ```bash
-pip install -r requirements.txt   # root (Streamlit)
+pip install --require-hashes -r requirements.txt   # root (Streamlit), Python 3.13
 streamlit run frontend/app.py
 ```
+
+High-fidelity PDF/Office conversion in the upload dialog uses docling (torch, several GB).
+It is not in the hosted UI lock; for local use install `requirements-docling.txt` instead.
+Without it, PDFs go through pypdf and Office files show an install hint.
 
 Set `BACKEND_BASE_URL` and (if the backend is protected) `API_KEY` in
 `.streamlit/secrets.toml` or environment variables.
@@ -130,7 +281,8 @@ Set `BACKEND_BASE_URL` and (if the backend is protected) `API_KEY` in
 ### Tests
 
 ```bash
-pytest tests/ -v        # 343 tests, zero network, zero credentials
+pytest tests/ -v        # 411 tests, zero network, zero credentials (never reads .env)
+make check-models       # live: fails if a configured model is retired or deprecated
 ```
 
 ---
@@ -149,7 +301,7 @@ rag-agent-workbench/
 │  └─ requirements.txt   # pinned lock (uv pip compile)
 ├─ frontend/app.py       # Streamlit chatbot UI
 ├─ eval/                 # retrieval harness, golden.jsonl, corpus manifest
-├─ tests/                # 343 tests — unit + integration
+├─ tests/                # 411 tests — unit + integration (+ tests/ui/smoke_app.py)
 ├─ scripts/              # bench_local.py, bench_mocked.py, smoke tests
 └─ docs/
    ├─ DESIGN.md          # ← design decisions + limitations (start here)

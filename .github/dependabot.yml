@@ -22,8 +22,8 @@ updates:
     groups:
       # Batch all minor and patch bumps into a single PR instead of one-per-package.
       # After merging, regenerate backend/requirements.txt:
-      #   uv pip compile --python-version 3.11 backend/requirements.in \
-      #       -o backend/requirements.txt
+      #   uv pip compile --universal --generate-hashes --python-version 3.11 \
+      #       backend/requirements.in -o backend/requirements.txt
       backend-minor-patch:
         update-types:
           - minor
@@ -45,7 +45,8 @@ updates:
       - frontend
     groups:
       # After merging, regenerate requirements.txt:
-      #   uv pip compile requirements.in -o requirements.txt
+      #   uv pip compile --universal --generate-hashes --python-version 3.13 \
+      #       requirements.in -o requirements.txt
       frontend-minor-patch:
         update-types:
           - minor

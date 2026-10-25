@@ -101,3 +101,9 @@ def test_citing_sentences_keep_a_marker_written_after_the_full_stop():
     assert citing_sentences(answer, 1) == [
         "- The controller must notify within 72 hours unless the breach is unlikely to pose a risk. [1]"]
     assert citing_sentences(answer, 2) == ["- The notification must contain the nature of the breach. [2]"]
+
+
+def test_citing_sentences_do_not_split_at_abbreviations():
+    answer = "The notice must list what Art. 33(3) requires, e.g. the nature of the breach. [1] It also says more."
+    assert citing_sentences(answer, 1) == [
+        "The notice must list what Art. 33(3) requires, e.g. the nature of the breach. [1]"]

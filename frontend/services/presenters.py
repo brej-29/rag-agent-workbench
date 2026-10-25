@@ -14,7 +14,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 _CITE_RE = re.compile(r"\[(\d+)\](?!\()")
 _IMAGE_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
-_SENTENCE_END_RE = re.compile(r"[.!?](?:\s*\[\d+\])*(?=\s|$)")
+# A sentence ends at . ! ? (plus any [n] after it) when the next word does not start with a digit or lowercase
+# letter, so "Art. 33(3)" and "e.g. the" stay inside their sentence.
+_SENTENCE_END_RE = re.compile(r"[.!?](?:\s*\[\d+\])*(?=\s*$|\s+[^a-z0-9\s])")
 
 EXAMPLES = [
     "What is retrieval-augmented generation and how does it work?",

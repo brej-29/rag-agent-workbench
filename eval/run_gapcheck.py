@@ -21,8 +21,13 @@ def score(rows: list) -> dict:
 
 
 def main() -> int:
+    import hashlib
+
     from app.services.llm.groq_llm import get_llm
-    from app.services.regs.gapcheck import check_unit, plan
+    from app.services.regs.gapcheck import _FORMAT, _SYSTEM, check_unit, plan
+
+    # Runs are compared only within one prompt version (publish_results groups them by this).
+    prompt_sha = hashlib.sha256((_SYSTEM + json.dumps(_FORMAT, sort_keys=True)).encode()).hexdigest()[:12]
 
     llm, rows = get_llm(), []
     for row in (json.loads(l) for l in (ROOT / "eval/gap_golden.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()):
@@ -33,7 +38,7 @@ def main() -> int:
         row["verdicts"] = {d["provision"]: d["verdict"] for r in results for d in r["duties"]}
         row["tokens"] = sum(r["tokens"] for r in results)
         rows.append(row)
-    rep = score(rows) | {"tokens": sum(r["tokens"] for r in rows)}
+    rep = score(rows) | {"tokens": sum(r["tokens"] for r in rows), "prompt_sha": prompt_sha}
     out = ROOT / "eval/reports" / f"gapcheck_{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}.json"
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(rep | {"rows": [{k: r[k] for k in ("name", "verdicts", "tokens")} for r in rows]}, indent=2),

@@ -90,8 +90,9 @@ _mcp_security = (
 )
 # Exact Route (not Mount): a Mount answers POST /mcp with a 307 to /mcp/, which MCP
 # clients do not follow.  The SDK app routes /mcp itself, so the path is passed through.
+# SSE responses (not single JSON bodies) so gap_check's per-article progress reaches the client.
 app.router.routes.append(Route("/mcp", endpoint=ApiKeyGate(
-    mcp.streamable_http_app(streamable_http_path="/mcp", json_response=True, transport_security=_mcp_security)
+    mcp.streamable_http_app(streamable_http_path="/mcp", json_response=False, transport_security=_mcp_security)
 ), name="mcp"))
 
 # Register exception handlers

@@ -138,6 +138,21 @@ def plan(policy_text: str, selections: Optional[List[str]], profile: Dict[str, A
             "est_minutes": round(est / TOKENS_PER_MINUTE, 1), "too_big": est > MAX_TOKENS}
 
 
+def plan_summary(p: dict) -> dict:
+    """What a run would test and cost, without duty or passage text (API /gapcheck/plan, the MCP tool)."""
+    return {"passages": p["passages"], "est_tokens": p["est_tokens"], "est_minutes": p["est_minutes"],
+            "too_big": p["est_tokens"] > MAX_TOKENS,
+            "units": [{"selection": u["selection"], "ref": u["ref"], "title": u["title"], "duties": len(u["call"]["duties"]),
+                       "passages": len(u["call"]["passages"]), "est_tokens": u["est_tokens"]} for u in p["units"]]}
+
+
+def budget_error(p: dict) -> Optional[str]:
+    if p["est_tokens"] <= MAX_TOKENS:
+        return None
+    return (f"This run needs about {p['est_tokens']:,} tokens; choose fewer articles or sections "
+            f"(limit {MAX_TOKENS:,}).")
+
+
 def verify(judged: List[dict], duties: List[dict], passages: List[dict]) -> List[dict]:
     """Keep a verdict only when its quotes are verbatim; otherwise 'unverified' with the reason."""
     by_duty = {str(j.get("duty", "")).strip().lower(): j for j in judged if isinstance(j, dict)}

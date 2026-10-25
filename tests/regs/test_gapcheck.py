@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from app.services.regs import gapcheck
 from app.services.regs.checklist import article_index
 from app.services.regs.gapcheck import check_unit, plan, resolve, split_passages, summarize, verify
 
@@ -95,3 +96,16 @@ def test_check_unit_strict_schema_neutralised_prompt_and_failure_fallback():
     broken.invoke.side_effect = RuntimeError("down")
     assert check_unit(unit, broken)["counts"]["unverified"] == 5
     assert summarize([out, out])["covered"] == 2
+
+
+def test_budget_error_names_the_estimate_and_the_limit():
+    assert gapcheck.budget_error({"est_tokens": 100}) is None
+    msg = gapcheck.budget_error({"est_tokens": 41000})
+    assert "41,000" in msg and "40,000" in msg
+
+
+def test_plan_summary_drops_duty_and_passage_text():
+    p = plan(POLICY, ["gdpr/art-33"], {}, D)
+    s = gapcheck.plan_summary(p)
+    assert s["units"][0]["selection"] == "gdpr/art-33" and s["units"][0]["duties"] == len(p["units"][0]["call"]["duties"])
+    assert "call" not in s["units"][0] and s["too_big"] is False

@@ -1,0 +1,11 @@
+{
+  "unanswerable": 14,
+  "correct_abstain": 13,
+  "answerable": 50,
+  "false_abstain": 0,
+  "missed_unanswerable": [
+    "What are the labelling rules for allergens on packaged food in the EU?"
+  ],
+  "false_abstentions": [],
+  "floor": 0.3
+}

@@ -12,7 +12,7 @@ from services.presenters import (
     CROSSWALK_CAVEAT, GROUP_TITLES, checklist_csv, checklist_markdown, crosswalk_lines, dates_note, esc, profile_words,
     status_label,
 )
-from services.shell import api_key, backend_state, backend_url, wake_watcher
+from services.shell import PROSE_WIDTH, api_key, backend_state, backend_url, wake_watcher
 
 NOT_SURE, NONE = "Not sure", "none of these"
 s = st.session_state
@@ -25,8 +25,10 @@ def _facts(url: str, key: Optional[str]) -> List[Dict[str, Any]]:
 
 
 def _sync(f: Dict[str, Any], key: str) -> None:
-    """Widget -> session profile, before the rerun computes the checklist."""
+    """Widget -> session profile, before the rerun computes the checklist. A deciding question shows twice (in the
+    form and as a shortcut in "Answer these"), so the other copy takes the same value."""
     raw = s[key]
+    s[("q-" if key.startswith("f-") else "f-") + f["id"]] = raw
     if f["type"] == "bool":
         value = None if raw == NOT_SURE else raw == "Yes"
     elif f["type"] == "choice":
@@ -42,17 +44,20 @@ def _sync(f: Dict[str, Any], key: str) -> None:
 def fact_input(f: Dict[str, Any], key: str) -> None:
     labels, current = f.get("labels") or {}, s.profile.get(f["id"])
     common = {"key": key, "on_change": _sync, "args": (f, key), "help": f.get("help")}
+    # Once a key holds a value (set by the widget or by _sync), the value comes from session state alone.
+    held = key in s
     if f["type"] == "bool":
-        st.radio(f["label"], [NOT_SURE, "Yes", "No"], horizontal=True,
-                 index=0 if current is None else (1 if current else 2), **common)
+        index = 0 if current is None else (1 if current else 2)
+        st.radio(f["label"], [NOT_SURE, "Yes", "No"], horizontal=True, **({} if held else {"index": index}), **common)
     elif f["type"] == "choice":
         options = [NOT_SURE] + f["values"]
-        st.selectbox(f["label"], options, index=options.index(current) if current in options else 0,
-                     format_func=lambda v: labels.get(v, v), **common)
+        index = options.index(current) if current in options else 0
+        st.selectbox(f["label"], options, format_func=lambda v: labels.get(v, v),
+                     **({} if held else {"index": index}), **common)
     else:
         default = [] if current is None else (current or [NONE])
-        st.multiselect(f["label"], f["values"] + [NONE], default=default, placeholder=NOT_SURE,
-                       format_func=lambda v: labels.get(v, v), **common)
+        st.multiselect(f["label"], f["values"] + [NONE], placeholder=NOT_SURE, format_func=lambda v: labels.get(v, v),
+                       **({} if held else {"default": default}), **common)
 
 
 @st.dialog("Article", position="right", width="medium")
@@ -105,9 +110,9 @@ def item_card(item: Dict[str, Any], facts: List[Dict[str, Any]], as_of: str) -> 
 
 
 st.title("Your checklist", anchor=False)
-st.caption("Which articles of the EU AI Act, GDPR, NIS2, DORA and the Cyber Resilience Act bind you, and since or "
-           "from when. Answer what you know; the rest stays “not sure”. Built from a rules table, not a model. "
-           "Not legal advice.")
+st.markdown("Which articles of the EU AI Act, GDPR, NIS2, DORA and the Cyber Resilience Act bind you, and since or "
+            "from when. Answer what you know; the rest stays “not sure”. Built from a rules table, not a model. "
+            "Not legal advice.", width=PROSE_WIDTH)
 state = backend_state()
 if state == "waking":
     wake_watcher()
@@ -130,14 +135,13 @@ except httpx.HTTPError as exc:
     st.error(f"The checklist could not be built: {exc}", icon=":material/error:")
     st.stop()
 
-asked = {q["fact"] for q in cl["questions"]}
 left, right = st.columns([2, 3], gap="large")
 with left:
     st.subheader("Your situation", anchor=False)
     for group in dict.fromkeys(f["group"] for f in facts):
         with st.expander(group, expanded=group == facts[0]["group"]):
             for f in facts:
-                if f["group"] == group and f["id"] not in asked:
+                if f["group"] == group:
                     fact_input(f, f"f-{f['id']}")
 with right:
     c = cl["counts"]

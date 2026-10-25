@@ -22,3 +22,9 @@ def test_mcp_initializes_with_api_key(integration_client):
                                follow_redirects=False)  # real MCP clients do not follow POST redirects
     assert r.status_code == 200, r.text
     assert "rag-agent-workbench" in r.text
+
+
+def test_mcp_answers_as_a_stream_so_progress_can_reach_the_client(integration_client):
+    r = integration_client.post("/mcp", json=INIT, headers={**HEADERS, "X-API-Key": INTEGRATION_API_KEY},
+                                follow_redirects=False)
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream")

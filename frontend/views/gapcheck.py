@@ -3,15 +3,16 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import httpx
 import streamlit as st
 
 from services.backend_client import gapcheck_plan, parse_document, post_checklist, stream_gapcheck
 from services.file_convert import convert_uploaded_file_to_text
-from services.presenters import gap_csv, gap_markdown, verdict_label
-from services.shell import api_key, backend_state, backend_url, wake_watcher
+from services.presenters import (POLICY_CHARS, STANDARD_CHARS, UPLOAD_MB, gap_csv, gap_markdown, gap_options,
+                                 text_limit_error, verdict_label)
+from services.shell import PROSE_WIDTH, api_key, backend_state, backend_url, note, wake_watcher
 
 s = st.session_state
 s.setdefault("workspace", {"policies": {}, "standards": {}})
@@ -24,6 +25,10 @@ def _load(uploaded, kind: str) -> None:
     try:
         uploaded.seek(0)
         text, _ = convert_uploaded_file_to_text(uploaded)
+        err = text_limit_error(kind, len(text))
+        if err:
+            st.error(err, icon=":material/error:")
+            return
         parsed = parse_document(backend_url(), api_key(), kind, Path(uploaded.name).stem, text)
     except httpx.HTTPStatusError as exc:
         st.error(exc.response.json().get("detail", "The API refused this file."), icon=":material/error:")
@@ -42,17 +47,21 @@ def documents_panel() -> None:
     st.subheader("Your documents", anchor=False)
     st.caption("Kept in this browser session only. The server stores nothing; closing the tab forgets them.")
     with st.form("policy_form", clear_on_submit=True, border=False):
-        pol = st.file_uploader("Add a policy", type=TYPES)
+        pol = st.file_uploader("Add a policy", type=TYPES, max_upload_size=UPLOAD_MB["policy"])
+        st.caption(f"Up to {POLICY_CHARS:,} characters of text")
         if st.form_submit_button("Load policy") and pol:
             _load(pol, "policy")
     for title, p in list(s.workspace["policies"].items()):
+        n = p["passages"]
         with st.container(horizontal=True, vertical_alignment="center"):
-            st.markdown(f":material/description: **{title}** · {p['passages']} passages")
+            st.markdown(f":material/description: **{title}** · {n} passage{'' if n == 1 else 's'}")
             if st.button("Remove", key=f"rm-p-{title}", type="tertiary"):
                 del s.workspace["policies"][title]
                 st.rerun()
     with st.form("standard_form", clear_on_submit=True, border=False):
-        std = st.file_uploader("Add your licensed copy of ISO/IEC 27001 or 42001", type=TYPES)
+        std = st.file_uploader("Add your licensed copy of ISO/IEC 27001 or 42001", type=TYPES,
+                               max_upload_size=UPLOAD_MB["standard"])
+        st.caption(f"Up to {STANDARD_CHARS:,} characters of text · read for this session only")
         if st.form_submit_button("Load standard") and std:
             _load(std, "standard")
     for key, c in list(s.workspace["standards"].items()):
@@ -63,17 +72,6 @@ def documents_panel() -> None:
             if st.button("Remove", key=f"rm-s-{key}", type="tertiary"):
                 del s.workspace["standards"][key]
                 st.rerun()
-
-
-def _options(cl: Dict[str, Any]) -> Dict[str, str]:
-    opts = {}
-    for g in ("now", "coming"):
-        for it in cl["groups"][g]:
-            opts[it["article"]] = f"{it['ref']} · {it['title']}"
-            sections = sorted({p["id"].split("pt-")[1].split(".")[0] for p in it["paragraphs"] if "/pt-" in p["id"]}, key=int)
-            for sec in sections:
-                opts[f"{it['paragraphs'][-1]['id'].split('/pt-')[0]}#{sec}"] = f"{it['ref'].split(' Art.')[0]} Annex, section {sec}"
-    return opts
 
 
 def show_result(r: Dict[str, Any]) -> None:
@@ -92,8 +90,9 @@ def show_result(r: Dict[str, Any]) -> None:
 
 
 st.title("Gap check", anchor=False)
-st.caption("Checks your own policy against the articles that bind you, duty by duty. Every verdict quotes the law "
-           "and your policy word for word, or says it could not be verified. Advisory, not legal advice.")
+st.markdown("Checks your own policy against the articles that bind you, duty by duty. Every verdict quotes the law "
+            "and your policy word for word, or says it could not be verified. Advisory, not legal advice.",
+            width=PROSE_WIDTH)
 state = backend_state()
 if state == "waking":
     wake_watcher()
@@ -109,20 +108,28 @@ with left:
 with right:
     st.subheader("What to check", anchor=False)
     if not s.workspace["policies"]:
-        st.info("Load a policy on the left to start.", icon=":material/upload_file:")
+        note("Load a policy on the left to start. It stays in this browser session.", ":material/upload_file:")
         st.stop()
     title = st.selectbox("Policy", list(s.workspace["policies"]))
-    cl = post_checklist(backend_url(), api_key(), s.profile, date.today().isoformat())
-    opts = _options(cl)
-    if not opts:
-        st.warning("Your checklist has no binding articles yet. Fill in your profile on the Checklist page.")
-        st.page_link("views/checklist.py", label="Open the checklist", icon=":material/checklist:")
+    try:
+        cl = post_checklist(backend_url(), api_key(), s.profile, date.today().isoformat())
+    except httpx.HTTPError as exc:
+        st.error(f"The list of articles could not be loaded: {exc}", icon=":material/error:")
         st.stop()
-    picked = st.multiselect("Articles and annex sections", list(opts), default=[k for k in opts if "#" not in k][:6],
-                            format_func=opts.get, max_selections=12)
+    opts, default = gap_options(cl)
+    if not default:
+        note("Nothing is preselected because your profile does not yet show which articles bind you. Choose "
+             "articles below, or set up your profile to preselect them.", ":material/info:")
+        st.page_link("views/checklist.py", label="Set up your profile", icon=":material/tune:")
+    picked = st.multiselect("Articles and annex sections", list(opts), default=default, format_func=opts.get,
+                            max_selections=12, placeholder="Choose up to 12")
     body = {"policy_text": s.workspace["policies"][title]["text"], "articles": picked, "profile": s.profile or None}
     if picked:
-        plan = gapcheck_plan(backend_url(), api_key(), body)
+        try:
+            plan = gapcheck_plan(backend_url(), api_key(), body)
+        except httpx.HTTPError as exc:
+            st.error(f"Could not estimate this run: {exc}", icon=":material/error:")
+            st.stop()
         st.caption(f"{sum(u['duties'] for u in plan['units'])} duties · about {plan['est_tokens']:,} tokens · "
                    f"roughly {max(plan['est_minutes'], 0.2)} min on the free model tier")
         if plan["too_big"]:

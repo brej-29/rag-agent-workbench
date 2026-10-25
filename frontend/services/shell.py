@@ -5,12 +5,15 @@ import os
 import time
 from typing import Optional
 
+import httpx
 import streamlit as st
 
-from services.backend_client import probe_health
+from services.backend_client import get_facts, probe_health
 
 # The free host can take a while to boot a sleeping Space; give up after this.
 WAKE_LIMIT_S = 180
+# Prose stays readable (about 75 characters a line) inside the wide layout that tables and columns need.
+PROSE_WIDTH = 720
 
 
 def _config(name: str, default: Optional[str] = None) -> Optional[str]:
@@ -51,6 +54,28 @@ def backend_state() -> str:
             s.setdefault("backend_since", time.time())
         s.backend_state, s.backend_latency = state, latency
     return s.backend_state
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _facts(url: str, key: Optional[str]) -> list:
+    return get_facts(url, key)
+
+
+def facts_or_none() -> Optional[list]:
+    """facts.yaml labels for wording a profile; None (plain wording) when the API is not ready or has no checklist.
+    Failures are not cached, so labels appear once a sleeping API wakes."""
+    if backend_state() != "ready":
+        return None
+    try:
+        return _facts(backend_url(), api_key())
+    except httpx.HTTPError:
+        return None
+
+
+def note(text: str, icon: str) -> None:
+    """A neutral, bordered note in the theme's own ink (Streamlit's info blue is not in this palette)."""
+    with st.container(border=True, width=PROSE_WIDTH):
+        st.markdown(f"{icon} {text}")
 
 
 @st.fragment(run_every=2)

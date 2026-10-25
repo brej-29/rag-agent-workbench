@@ -553,3 +553,113 @@ appropriate"), NIS2 IR 11.6/11.7 partial vs missing (a password-length rule).
 Live (local API, real Groq): your synthetic copy answers "What does ISO/IEC 27001 A.5.19 require?" citing
 "your copy", the same question without a copy is declined as licensed, and a streamed gap check of the supplier
 policy against 2024/2690 section 5 returns 5.1 partial / 5.2 missing with verified quotes in 1.2 s (1,358 tokens).
+
+## 17. Sub-project 6 design: UI + MCP (approved 2026-10-24)
+
+Job: make every job usable from an MCP client, and turn the UI into a product a first-time visitor understands:
+a name, a home page, an Evaluation page about the compliance evals, and a critique-and-polish pass on every page.
+The repo and the Space keep their names. The roadmap's feedback loop (§5) is deferred: not in this scope.
+
+**17.1 MCP server** (`app/mcp_server.py`; all tools read-only, nothing stored or cached).
+- `ask` gains `standards: [{text, name?}]`: clauses are read server-side with `detect_standard` / `parse_clauses`
+  (the `/workspace/parse` code) and passed into the graph for that call only; the MCP path never uses the
+  response cache; limits as `ParseRequest` (1,000,000 chars per copy).
+- `checklist(profile, as_of?, with_text=false)` wraps `build_checklist`; the profile is validated by the API's
+  `Profile` model, and a bad fact value is a ToolError listing the allowed values.
+- `crosswalk(provision, hops=2, official_only=false, per_group=4)` wraps `crosswalk.related`; `provision` is a
+  provision id or its exact ref (case-insensitive); unknown → ToolError.
+- `gap_check(policy_text, articles?, profile?, as_of?)`: one call. Plan first with `gapcheck.plan`; a run over
+  budget (12 units, 40,000 estimated tokens) is refused with the API's message; then one `check_unit` per unit,
+  `ctx.report_progress(i, n, ref)` after each (VERIFIED: `Context.report_progress(progress, total, message)` in
+  mcp 2.3.0 `server/mcpserver/context.py`); returns plan summary, results and summary. Verification and
+  "unverified" marking unchanged. Limits as `GapCheckRequest` (200,000 chars, ≤ 12 articles).
+- Resources: `rag://facts` (the profile facts with allowed values and labels), `rag://obligations` (catalog:
+  id, framework, article, title, when it applies), `rag://crosswalk-sources` (source, publisher, licence,
+  official/community); `rag://guardrails` gains checklist, crosswalk and gap-check sections (statuses, verdicts,
+  "unverified" = a quote was not found verbatim).
+- Prompts, one per job: `grounded_answer` (kept), `compliance_checklist` (read `rag://facts`, use only facts the
+  user stated, call `checklist`), `crosswalk_lookup`, `policy_gap_check`.
+- Display text says "Compliance Workbench"; the server id stays `rag-agent-workbench` so client configs keep working.
+
+**17.2 Identity and Home.** Page title and Home heading "Compliance Workbench", subtitle "EU and NIST rules for AI,
+data and cyber, checked against your profile and your policies". Navigation: Home (default), Ask, Checklist, Gap
+check, Evaluation; API status badge kept. Home (`views/home.py`): (1) your profile in words, or "Not set yet",
+with a link to edit it on Checklist (the only editor); (2) three bordered cards, Ask / Checklist / Gap check, one
+sentence and a link each; with a profile set, the Checklist card shows live counts from `/checklist` (no LLM);
+(3) what's covered: one row per instrument (binding or voluntary, provision count, source, retrieved date), plus
+"ISO/IEC 27001 and 42001: load your own copy" and "anything else is declined, not guessed"; (4) how it's
+measured: retrieval recall@6, abstention, router accuracy, gap-check gate and verified rate, with a link to
+Evaluation; (5) footer: not legal advice; the same jobs over MCP at `/mcp`.
+
+**17.3 Evaluation page.** Tabs: **Compliance** (default) and **Generic pipeline** (today's five sections unchanged,
+noted as measuring the earlier generic corpus). Compliance: banner "golden labels are drafts pending human review";
+(1) retrieval: recall@6, MRR, nDCG of the latest diversified run, a by-type table with n (cross-framework is the weak
+spot and is said so), one bar chart of recall@6 by mode (lexical, dense, fused, diversified, +boost, +inject);
+(2) abstention: out-of-scope declined, false abstentions, floor, misses verbatim; (3) router: accuracy, confusion
+table, misses verbatim; (4) checklist: deterministic, tested against golden profiles, monotonicity and date flip,
+link to the test file (no number to go stale); (5) gap check: the gate first (false "covered" = 0), then accuracy,
+verified rate, planted gaps caught, tokens, the range across all published runs, disagreements.
+Data: `eval/publish_results.py` gains kinds `regs_retrieval` (latest diversified run at k = 6), `regs_modes` (latest
+k = 6 run per mode, recall and MRR), `regs_abstain`, `router`, `gapcheck` (latest full report plus every run's
+headline numbers) and `corpus` (per instrument: binding, provision count, source URL, retrieved date, from the
+corpus and manifest). Shaping is pure functions in `services/eval_data.py`. A missing snapshot shows "Not published
+yet: run python eval/publish_results.py"; the frontend reads nothing outside `eval/results/`.
+
+**17.4 Rough edges.** (a) Drawer crosswalk matches: one line per group, top 3 inline, "and N more" opens the rest;
+caveat and your-copy clause text kept. (b) Upload limits: the real limits are characters of text (200,000 per
+policy, 1,000,000 per standard copy); uploaders set `max_upload_size` (VERIFIED: per-widget parameter, in MB, in
+Streamlit 1.66.0 `st.file_uploader`) and state the text limit; over-long converted text gets a message with its
+length and the limit before anything is sent. (c) Ask: the generic knowledge-base upload and namespace choice move
+into an "Advanced: your own documents (generic pipeline)" expander.
+
+**17.5 Polish pass.** With the `impeccable` skill, critique then fix every page: hierarchy, copy (sentence case,
+buttons that say what they do), empty and error states (API asleep, no profile, no policy, snapshot missing),
+accessibility (labelled controls, status never by colour alone, keyboard order), dark mode. Before/after
+screenshots per page in light and dark. Native Streamlit only; a theme file only if the critique calls for one and
+after checking where Streamlit Community Cloud reads it.
+
+**17.6 Gates.** (1) Full suite green (619 before) plus new tests: MCP in-memory client (five tools listed and
+read-only; `checklist` equals `build_checklist` for a golden profile; bad fact and unknown provision are errors;
+over-budget gap check refused; one progress notification per unit; `ask` passes parsed standards into the graph
+state), `eval_data` shaping, presenters, upload-limit check. (2) AppTest smoke on every page, including Home with no
+profile and Evaluation with a snapshot missing. (3) Live, local API over Streamable HTTP at `/mcp`: `checklist`,
+`crosswalk`, a one-article `gap_check` with progress, `ask` with a synthetic standard copy (free Groq tier, a few
+thousand tokens; no Pinecone writes). (4) Screenshots reviewed. (5) Docs: results here, CHANGELOG, README (name, MCP
+section, badge), memory; local merge into `revive/2026-10`, no push, branches kept.
+
+## 18. Sub-project 6 results (2026-10-25)
+
+Built: MCP tools `checklist`, `crosswalk`, `gap_check` (API budget, progress per article) and `ask` with your
+licensed copy; resources `rag://facts`, `rag://obligations`, `rag://crosswalk-sources`; a prompt per job; unknown
+profile facts rejected (`StrictProfile`). The UI is "Compliance Workbench" with a Home page; the Evaluation page leads
+with the compliance evals; drawer matches are compact; uploads state their real text limits; the generic pipeline
+sits under "Advanced". 654 tests (619 before).
+
+Evaluation data: lexical, dense and fused retrieval were re-run on the 50 golden questions at k = 6 so the mode
+chart compares one budget and one question set: lexical 0.600, dense 0.848, fused 0.801, diversified 0.871
+(crosswalk boost and inject also 0.871). Gap-check reports now carry a prompt hash; three runs of the current prompt:
+**gate held in all three (no "covered" on a planted gap)**, accuracy 0.824 / 0.824 / 0.765, verified rate 0.941 /
+0.882 / 0.824, planted gaps caught 5 / 6 / 5 of 6, about 11k tokens each. The remaining disagreements are the
+borderline duties noted in §16 (GDPR Art. 34(1); NIS2 IR 11.6/11.7) plus supplier 5.1/5.2 marked unverified once.
+
+Live (local API over Streamable HTTP, `scripts/smoke_mcp.py`): five tools listed; `checklist` for an Annex III
+deployer in the EU returns 3 now, 2 coming, 81 depending; `crosswalk` for CSF GV.SC-01 returns 9 matches; a
+one-section `gap_check` reports progress `1/1 NIS2 IR Annex, section 5` and returns verdicts; `ask` about A.5.19
+with a synthetic copy cites two clauses from it.
+
+Found and fixed:
+- `/mcp` answered with single JSON bodies (`json_response=True`), so progress notifications never reached HTTP
+  clients although the in-memory tests saw them. It now streams (SSE); an integration test checks the content type.
+- Critique (impeccable, single context; 29/40): "Cited for" in the drawer showed the next sentence when the model
+  wrote `[n]` after the full stop, and cut sentences at "Art. 33(3)"; Gap check dead-ended without a profile (now
+  every catalogue article is selectable, binding ones preselected); Checklist controls moved between the form and
+  the "narrow it down" box while answering (now the form is stable and the shortcuts stay in sync); prose ran
+  140–160 characters a line; light-mode captions were 4.27:1 (theme ink #10171F gives 4.58:1); route ids, mixed
+  decimals, "1 passages", a skipped heading level and off-palette info banners. Each fix was checked in the browser
+  in light and dark.
+- Running the UI locally read `frontend/.streamlit/secrets.toml`, which points at the hosted Space; local checks
+  pass `--secrets.files` with an empty file.
+
+Changed from §17: the Home page's measured numbers share one link to Evaluation instead of one each; only the Gap
+check uploaders set `max_upload_size` (the generic upload has no API text limit); the critique ran in a single
+context because sub-agents were not requested.

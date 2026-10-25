@@ -36,23 +36,16 @@ def _plan(payload: GapCheckRequest, refuse_big: bool) -> dict:
         p = gapcheck.plan(payload.policy_text, payload.articles, profile, payload.as_of or date.today())
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
-    if refuse_big and p["est_tokens"] > gapcheck.MAX_TOKENS:
-        raise HTTPException(422, f"This run needs about {p['est_tokens']:,} tokens; choose fewer articles or sections "
-                                 f"(limit {gapcheck.MAX_TOKENS:,}).")
+    msg = gapcheck.budget_error(p) if refuse_big else None
+    if msg:
+        raise HTTPException(422, msg)
     return p
-
-
-def _summary(p: dict) -> dict:
-    return {"passages": p["passages"], "est_tokens": p["est_tokens"], "est_minutes": p["est_minutes"],
-            "too_big": p["est_tokens"] > gapcheck.MAX_TOKENS,
-            "units": [{"selection": u["selection"], "ref": u["ref"], "title": u["title"], "duties": len(u["call"]["duties"]),
-                       "passages": len(u["call"]["passages"]), "est_tokens": u["est_tokens"]} for u in p["units"]]}
 
 
 @router.post("/gapcheck/plan", summary="What a gap check would test and roughly what it costs (no model call)")
 @limiter.limit("30/minute")
 async def gapcheck_plan(request: Request, payload: GapCheckRequest) -> Dict[str, Any]:  # noqa: ARG001
-    return _summary(_plan(payload, refuse_big=False))
+    return gapcheck.plan_summary(_plan(payload, refuse_big=False))
 
 
 @router.post("/gapcheck", summary="Check a policy against the selected articles, duty by duty")
@@ -60,7 +53,7 @@ async def gapcheck_plan(request: Request, payload: GapCheckRequest) -> Dict[str,
 async def gapcheck_run(request: Request, payload: GapCheckRequest) -> Dict[str, Any]:  # noqa: ARG001
     p, llm = _plan(payload, refuse_big=True), get_llm()
     results = [await run_in_threadpool(gapcheck.check_unit, u, llm) for u in p["units"]]
-    return {"plan": _summary(p), "results": results, "summary": gapcheck.summarize(results)}
+    return {"plan": gapcheck.plan_summary(p), "results": results, "summary": gapcheck.summarize(results)}
 
 
 @router.post("/gapcheck/stream", summary="Gap check streamed per article (SSE: plan, article…, done)")
@@ -70,7 +63,7 @@ async def gapcheck_stream(request: Request, payload: GapCheckRequest) -> Streami
 
     async def events() -> AsyncGenerator[str, None]:
         llm, results = get_llm(), []
-        yield _sse("plan", _summary(p))
+        yield _sse("plan", gapcheck.plan_summary(p))
         for unit in p["units"]:
             result = await run_in_threadpool(gapcheck.check_unit, unit, llm)
             results.append(result)

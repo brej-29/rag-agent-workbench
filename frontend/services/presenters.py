@@ -14,7 +14,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 _CITE_RE = re.compile(r"\[(\d+)\](?!\()")
 _IMAGE_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
-_SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
+# A sentence ends at . ! ? (plus any [n] after it) when the next word does not start with a digit or lowercase
+# letter, so "Art. 33(3)" and "e.g. the" stay inside their sentence.
+_SENTENCE_END_RE = re.compile(r"[.!?](?:\s*\[\d+\])*(?=\s*$|\s+[^a-z0-9\s])")
 
 EXAMPLES = [
     "What is retrieval-augmented generation and how does it work?",
@@ -82,7 +84,15 @@ def cite_markdown(answer: str, n_sources: int) -> str:
 
 
 def citing_sentences(answer: str, n: int) -> List[str]:
-    return [s.strip() for s in _SENTENCE_RE.split(answer) if f"[{n}]" in s]
+    """Sentences carrying [n]. A marker written after the full stop ('... persons. [1]') belongs to that sentence."""
+    out: List[str] = []
+    for line in answer.splitlines():
+        start = 0
+        for m in _SENTENCE_END_RE.finditer(line):
+            out.append(line[start:m.end()])
+            start = m.end()
+        out.append(line[start:])
+    return [s.strip() for s in out if f"[{n}]" in s]
 
 
 def step_line(step: Dict[str, Any]) -> str:
@@ -199,6 +209,28 @@ def crosswalk_lines(xw: Optional[Dict[str, Any]], standards: Optional[Dict[str, 
     return [(g, lines, more.get(g, 0)) for g, lines in groups.items()]
 
 
+def _short_ref(ref: str, group: str) -> str:
+    """'SP 800-53 PM-30' under 'NIST SP 800-53' -> 'PM-30': the group heading already names the framework."""
+    words, known, i = ref.split(" "), set(group.split(" ")), 0
+    while i < len(words) - 1 and words[i] in known:
+        i += 1
+    return " ".join(words[i:])
+
+
+def crosswalk_compact(xw: Optional[Dict[str, Any]], standards: Optional[Dict[str, Any]] = None,
+                      inline: int = 3) -> List[Dict[str, Any]]:
+    """Per group: the first `inline` refs as badges on one line, their mapping sources, and the remaining lines."""
+    out = []
+    for group, lines, hidden in crosswalk_lines(xw, standards):
+        top = lines[:inline]
+        out.append({"group": group,
+                    "line": " ".join(f":{color}-badge[{esc(_short_ref(label.split(' · ')[0], group))}]"
+                                     for label, color, _ in top),
+                    "notes": " · ".join(dict.fromkeys(note for _, _, note in top)),
+                    "rest": lines[inline:], "hidden": hidden})
+    return out
+
+
 def chip_label(n: int, src: Dict[str, Any]) -> str:
     if src.get("via"):
         return f"{n} · {src['ref']} · via {src['via']['ref']}"
@@ -310,6 +342,38 @@ _COPY_KEYS = {"iso-27001": "iso-27001", "iso-42001-fdis": "iso-42001"}
 
 def verdict_label(verdict: str) -> Tuple[str, str]:
     return VERDICT_LABELS.get(verdict, ("gray", verdict))
+
+
+def gap_options(cl: Dict[str, Any]) -> Tuple[Dict[str, str], List[str]]:
+    """Every checklist article (and annex section) a gap check can test, with the binding ones preselected.
+    Articles that depend on unanswered facts stay selectable, so a check never needs a finished profile."""
+    opts: Dict[str, str] = {}
+    for g in ("now", "coming", "depends"):
+        tail = " · depends on your answers" if g == "depends" else ""
+        for it in cl["groups"][g]:
+            opts[it["article"]] = f"{it['ref']} · {it['title']}{tail}"
+            sections = sorted({p["id"].split("pt-")[1].split(".")[0] for p in it["paragraphs"] if "/pt-" in p["id"]},
+                              key=int)
+            for sec in sections:
+                key = f"{it['paragraphs'][-1]['id'].split('/pt-')[0]}#{sec}"
+                opts[key] = f"{it['ref'].split(' Art.')[0]} Annex, section {sec}{tail}"
+    binding = [it["article"] for g in ("now", "coming") for it in cl["groups"][g]]
+    return opts, binding[:6]
+
+
+# Text limits are the API's (backend/app/schemas/workspace.py); file sizes only stop absurd uploads early.
+POLICY_CHARS, STANDARD_CHARS = 200_000, 1_000_000
+UPLOAD_MB = {"policy": 10, "standard": 25}
+
+
+def text_limit_error(kind: str, chars: int) -> Optional[str]:
+    limit = POLICY_CHARS if kind == "policy" else STANDARD_CHARS
+    if chars <= limit:
+        return None
+    if kind == "policy":
+        return (f"This policy has {chars:,} characters of text; the limit is {limit:,}. "
+                "Split it, or load only the part you want checked.")
+    return f"This copy has {chars:,} characters of text; the limit is {limit:,}."
 
 
 def copy_clause(match_id: str, standards: Optional[Dict[str, Any]]) -> Optional[Dict[str, str]]:

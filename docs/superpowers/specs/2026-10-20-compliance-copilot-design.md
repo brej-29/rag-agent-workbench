@@ -626,3 +626,40 @@ profile and Evaluation with a snapshot missing. (3) Live, local API over Streama
 `crosswalk`, a one-article `gap_check` with progress, `ask` with a synthetic standard copy (free Groq tier, a few
 thousand tokens; no Pinecone writes). (4) Screenshots reviewed. (5) Docs: results here, CHANGELOG, README (name, MCP
 section, badge), memory; local merge into `revive/2026-10`, no push, branches kept.
+
+## 18. Sub-project 6 results (2026-10-25)
+
+Built: MCP tools `checklist`, `crosswalk`, `gap_check` (API budget, progress per article) and `ask` with your
+licensed copy; resources `rag://facts`, `rag://obligations`, `rag://crosswalk-sources`; a prompt per job; unknown
+profile facts rejected (`StrictProfile`). The UI is "Compliance Workbench" with a Home page; the Evaluation page leads
+with the compliance evals; drawer matches are compact; uploads state their real text limits; the generic pipeline
+sits under "Advanced". 654 tests (619 before).
+
+Evaluation data: lexical, dense and fused retrieval were re-run on the 50 golden questions at k = 6 so the mode
+chart compares one budget and one question set: lexical 0.600, dense 0.848, fused 0.801, diversified 0.871
+(crosswalk boost and inject also 0.871). Gap-check reports now carry a prompt hash; three runs of the current prompt:
+**gate held in all three (no "covered" on a planted gap)**, accuracy 0.824 / 0.824 / 0.765, verified rate 0.941 /
+0.882 / 0.824, planted gaps caught 5 / 6 / 5 of 6, about 11k tokens each. The remaining disagreements are the
+borderline duties noted in §16 (GDPR Art. 34(1); NIS2 IR 11.6/11.7) plus supplier 5.1/5.2 marked unverified once.
+
+Live (local API over Streamable HTTP, `scripts/smoke_mcp.py`): five tools listed; `checklist` for an Annex III
+deployer in the EU returns 3 now, 2 coming, 81 depending; `crosswalk` for CSF GV.SC-01 returns 9 matches; a
+one-section `gap_check` reports progress `1/1 NIS2 IR Annex, section 5` and returns verdicts; `ask` about A.5.19
+with a synthetic copy cites two clauses from it.
+
+Found and fixed:
+- `/mcp` answered with single JSON bodies (`json_response=True`), so progress notifications never reached HTTP
+  clients although the in-memory tests saw them. It now streams (SSE); an integration test checks the content type.
+- Critique (impeccable, single context; 29/40): "Cited for" in the drawer showed the next sentence when the model
+  wrote `[n]` after the full stop, and cut sentences at "Art. 33(3)"; Gap check dead-ended without a profile (now
+  every catalogue article is selectable, binding ones preselected); Checklist controls moved between the form and
+  the "narrow it down" box while answering (now the form is stable and the shortcuts stay in sync); prose ran
+  140–160 characters a line; light-mode captions were 4.27:1 (theme ink #10171F gives 4.58:1); route ids, mixed
+  decimals, "1 passages", a skipped heading level and off-palette info banners. Each fix was checked in the browser
+  in light and dark.
+- Running the UI locally read `frontend/.streamlit/secrets.toml`, which points at the hosted Space; local checks
+  pass `--secrets.files` with an empty file.
+
+Changed from §17: the Home page's measured numbers share one link to Evaluation instead of one each; only the Gap
+check uploaders set `max_upload_size` (the generic upload has no API text limit); the critique ran in a single
+context because sub-agents were not requested.

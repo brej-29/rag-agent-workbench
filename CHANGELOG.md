@@ -90,3 +90,18 @@
   it and crosswalk ISO matches show its clause text.
 - feat(ui): Gap check page (session workspace, checklist-driven selection, streamed verdicts, Markdown/CSV export).
 - feat(eval): golden gap check with planted gaps and an injection policy (gate: no false "covered").
+
+### 2026-10-25 — Sub-project 6: UI + MCP
+- feat(mcp): `checklist`, `crosswalk` and `gap_check` tools (budget enforced, progress per article); `ask` reads
+  your licensed ISO/IEC copy for one call; resources `rag://facts`, `rag://obligations`, `rag://crosswalk-sources`;
+  one prompt per job. Unknown profile facts are rejected rather than ignored.
+- fix(mcp): `/mcp` responses stream (SSE) so progress notifications reach HTTP clients.
+- feat(ui): "Compliance Workbench" name and a Home page (profile, jobs, coverage, measured numbers); Evaluation
+  page leads with the compliance evals, the generic pipeline in its own tab.
+- feat(eval): `publish_results.py` publishes retrieval by mode at k = 6, abstention, routing, gap-check runs
+  grouped by prompt hash, and corpus coverage; lexical, dense and fused re-run on the 50 golden questions.
+- fix(ui): compact crosswalk matches; real text limits on uploads; generic pipeline under "Advanced".
+- fix(ui) from a critique pass: cited sentences no longer split at a citation after the full stop or at
+  abbreviations; Gap check works without a profile; Checklist controls stay in place while you answer; prose
+  capped at a readable width; light-mode captions at 4.58:1; plain job names, consistent decimals, plural fixes.
+- test: live MCP check over HTTP (`scripts/smoke_mcp.py`); 654 tests.

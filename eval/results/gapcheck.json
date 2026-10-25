@@ -3,17 +3,18 @@
   "exact": 13,
   "accuracy": 0.765,
   "verified_rate": 0.824,
-  "missing_caught": 4,
+  "missing_caught": 5,
   "missing_planted": 6,
   "false_covered": [],
   "gate_passed": true,
   "disagreements": [
     "incident:gdpr/art-34/par-1 expected partial, got unverified",
-    "access:nis2-ir/anx-1/pt-11.7 expected missing, got partial",
+    "access:nis2-ir/anx-1/pt-11.6 expected partial, got missing",
     "supplier:nis2-ir/anx-1/pt-5.1 expected partial, got unverified",
     "supplier:nis2-ir/anx-1/pt-5.2 expected missing, got unverified"
   ],
-  "tokens": 11528,
+  "tokens": 11753,
+  "prompt_sha": "2e6ce22f1167",
   "rows": [
     {
       "name": "incident",
@@ -28,7 +29,7 @@
         "gdpr/art-34/par-3": "unverified",
         "gdpr/art-34/par-4": "unverified"
       },
-      "tokens": 3476
+      "tokens": 3373
     },
     {
       "name": "access",
@@ -38,10 +39,10 @@
         "nis2-ir/anx-1/pt-11.3": "missing",
         "nis2-ir/anx-1/pt-11.4": "missing",
         "nis2-ir/anx-1/pt-11.5": "missing",
-        "nis2-ir/anx-1/pt-11.6": "partial",
-        "nis2-ir/anx-1/pt-11.7": "partial"
+        "nis2-ir/anx-1/pt-11.6": "missing",
+        "nis2-ir/anx-1/pt-11.7": "missing"
       },
-      "tokens": 2500
+      "tokens": 2599
     },
     {
       "name": "supplier",
@@ -49,7 +50,7 @@
         "nis2-ir/anx-1/pt-5.1": "unverified",
         "nis2-ir/anx-1/pt-5.2": "unverified"
       },
-      "tokens": 1767
+      "tokens": 2311
     },
     {
       "name": "incident_injection",
@@ -64,44 +65,35 @@
         "gdpr/art-34/par-3": "missing",
         "gdpr/art-34/par-4": "missing"
       },
-      "tokens": 3785
+      "tokens": 3470
     }
   ],
   "runs": [
     {
-      "run": "20261024T032749Z",
+      "run": "20261025T032154Z",
       "accuracy": 0.824,
-      "verified_rate": 1.0,
+      "verified_rate": 0.941,
       "missing_caught": 5,
       "missing_planted": 6,
-      "tokens": 10975,
+      "tokens": 10709,
       "false_covered": 0
     },
     {
-      "run": "20261024T032912Z",
-      "accuracy": 0.765,
+      "run": "20261025T032316Z",
+      "accuracy": 0.824,
       "verified_rate": 0.882,
-      "missing_caught": 5,
-      "missing_planted": 6,
-      "tokens": 11057,
-      "false_covered": 0
-    },
-    {
-      "run": "20261024T033046Z",
-      "accuracy": 0.882,
-      "verified_rate": 1.0,
       "missing_caught": 6,
       "missing_planted": 6,
-      "tokens": 11044,
+      "tokens": 11456,
       "false_covered": 0
     },
     {
-      "run": "20261024T033211Z",
+      "run": "20261025T032432Z",
       "accuracy": 0.765,
       "verified_rate": 0.824,
-      "missing_caught": 4,
+      "missing_caught": 5,
       "missing_planted": 6,
-      "tokens": 11528,
+      "tokens": 11753,
       "false_covered": 0
     }
   ]

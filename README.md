@@ -1,7 +1,8 @@
 <div align="center">
   <h1>🧠 rag-agent-workbench</h1>
-  <p><i>Production-style RAG backend with an 8-node LangGraph pipeline, cosine-gated abstention,
-  corrective retrieval, two-layer faithfulness checking, and honest token streaming.</i></p>
+  <p><i>Compliance Workbench: EU and NIST rules for AI, data and cyber, checked against your profile and
+  your policies. Built on a measured RAG pipeline with cosine-gated abstention, corrective retrieval,
+  faithfulness checks and honest token streaming.</i></p>
 </div>
 
 <br>
@@ -12,7 +13,7 @@
   <img alt="Vector Store" src="https://img.shields.io/badge/Vector%20Store-Pinecone-3776AB">
   <img alt="Frameworks" src="https://img.shields.io/badge/Frameworks-LangChain%20%7C%20LangGraph-ff9800">
   <img alt="Frontend" src="https://img.shields.io/badge/Frontend-Streamlit-ff4b4b">
-  <img alt="Tests" src="https://img.shields.io/badge/Tests-619%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/Tests-654%20passing-brightgreen">
   <img alt="License" src="https://img.shields.io/badge/License-MIT-black">
 </div>
 
@@ -55,13 +56,13 @@ Resilience Act, NIST SP 800-53, CSF 2.0 and the AI RMF**: 3,830 provisions, each
   licensed standard whose text is not public (ISO/IEC 27001, 42001, SOC 2);
 - "nothing relevant enough" when no provision clears the relevance floor.
 
-Measured on 2026-10-20 (details in [the design spec](docs/superpowers/specs/2026-10-20-compliance-copilot-design.md)):
+Latest published runs (the Evaluation page shows each one; details in [the design spec](docs/superpowers/specs/2026-10-20-compliance-copilot-design.md)):
 
 | | |
 |---|---|
-| Retrieval, 46 hand-labelled questions, top 6 | recall 0.860, MRR 0.834 (plain dense: 0.835, 0.750) |
-| Abstention, no LLM | 13 of 14 out-of-scope questions declined; 0 of 46 answerable questions refused |
-| Router (ask / checklist / gap check / clarify) | 27 of 30 correct; every miss fell back to answering |
+| Retrieval, 50 hand-labelled questions, top 6 | recall 0.871, MRR 0.846 (same budget: dense 0.848, fused 0.801, lexical 0.600) |
+| Abstention, no LLM | 13 of 14 out-of-scope questions declined; 0 of 50 answerable questions refused |
+| Router (ask / checklist / gap check / clarify) | 34 of 36 correct; both misses were gap-check requests sent to Ask |
 | Latency, local API | about 2–3 s per answer; declines are instant |
 
 **Checklist.** Describe your organisation (in the chat, or on the Checklist page) and get the articles of the
@@ -86,7 +87,7 @@ CSV. **Your copy of a licensed standard** (ISO/IEC 27001 or 42001) can be loaded
 and crosswalk matches show its clause text. Documents stay in your browser session; the server stores, indexes and
 logs nothing.
 
-The MCP tools and the remaining UI work are next (see the spec's build order). This is information from official
+All four jobs are also MCP tools, so Claude or your IDE can use them (below). This is information from official
 text, not legal advice.
 
 ---
@@ -180,17 +181,25 @@ flowchart TD
 
 ## Use it from any MCP client
 
-The API also serves an **MCP server** (spec 2026-07-28, `mcp` SDK 2.3). It is read-only, so an
-agent can ask and search but never write to the index:
+The API also serves an **MCP server** (`mcp` SDK 2.3) with every job as a tool. It is read-only and stores
+nothing, so an agent can ask, check and compare but never write to the index:
 
-| | |
+| Tool | What it does |
 |---|---|
-| `ask(question, namespace?, top_k?, use_web_fallback?)` | Full pipeline: answer, numbered `sources`, explicit `abstained` flag, `dangling_citations`, judge fields |
+| `ask(question, as_of?, frameworks?, standards?)` | Cited answer with each provision's status on the date, an explicit `abstained` flag and `abstain_reason`; `standards` takes your own ISO/IEC 27001 or 42001 text for that call only |
+| `checklist(profile, as_of?, with_text?)` | Which EU-law articles bind the profile: now, coming, or depending on a fact not given (rules, no model); unknown facts are rejected |
+| `crosswalk(provision, hops?, official_only?)` | Related requirements in other frameworks from published mappings, by provision id or ref |
+| `gap_check(policy_text, articles? \| profile?, as_of?)` | A policy checked duty by duty with verified quotes; refuses runs over the budget and reports progress per article |
 | `search_knowledge_base(query, namespace?, top_k?)` | Cosine-scored chunks, no LLM |
-| `rag://guardrails` · `rag://namespaces` | How to read results · vector counts |
+
+Resources: `rag://guardrails` (how to read every result), `rag://facts` (profile facts and allowed values),
+`rag://obligations` (the checklist's rules), `rag://crosswalk-sources` (mapping sources and licences),
+`rag://namespaces`. Prompts, one per job: `grounded_answer`, `compliance_checklist`, `crosswalk_lookup`,
+`policy_gap_check`.
 
 **Remote (Streamable HTTP):** `POST https://<api-host>/mcp` with header `X-API-Key`, the same key
-as the REST API.
+as the REST API. Responses stream (SSE), so `gap_check` progress reaches the client.
+`python scripts/smoke_mcp.py` runs every tool against a local API.
 
 **Local (stdio)**, e.g. in a desktop client's `mcpServers` config (keys come from your `.env`):
 
@@ -220,15 +229,20 @@ as the REST API.
 
 ## The UI
 
-Two pages (Streamlit 1.66, light and dark themes):
+**Compliance Workbench**, five pages (Streamlit 1.66, light and dark themes):
 
-- **Ask:** answers stream in with a live pipeline trace (retrieval, gate, generation, verification).
-  The gate draws every retrieved passage against the **relevance floor**; when none clears it, the app
-  says "not in the knowledge base" instead of guessing. Citations render as badges, and dangling ones
-  are flagged. Each source opens an evidence drawer showing its score against the floor, the sentences
-  that cite it, and the passage. While a sleeping Space boots, a wake-up indicator replaces the error.
-- **Evaluation:** retrieval metrics, the k sweep, the reranker A/B, answer quality and abstention, and
-  attack results, all read from `eval/results/` (refresh with `python eval/publish_results.py`).
+- **Home:** your profile in plain words, the three jobs, what is covered (instrument, binding or voluntary,
+  provision count, source, retrieval date) and the measured numbers behind it.
+- **Ask:** answers stream in with a live pipeline trace. Each cited provision shows whether it applies on your
+  date and opens an evidence drawer: its score against the **relevance floor**, the sentences that cite it, the
+  passage, and its matches in other frameworks. Your own documents and the generic pipeline sit under "Advanced".
+- **Checklist:** answer what you know; the articles that bind you update as you go, with the questions that
+  would decide the rest. Markdown and CSV export.
+- **Gap check:** load a policy (and, if you have one, your licensed ISO/IEC copy), pick articles, and get verdicts
+  streamed article by article with quotes from both sides.
+- **Evaluation:** the compliance evals first (retrieval by mode at the same budget, abstention, routing, the
+  checklist's tests, the gap-check gate and its range across runs), then the generic pipeline's evals, all read
+  from `eval/results/` (refresh with `python eval/publish_results.py`).
 
 Screenshots predate the 2026-10 redesign and will be refreshed after deploy.
 

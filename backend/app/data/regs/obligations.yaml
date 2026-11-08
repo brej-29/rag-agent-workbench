@@ -25,7 +25,7 @@ defs:
       - {use: eu_nexus}
       - {not: {financial_entity: true}}
       - any:
-          - {nis2_sector: [dns_tld, trust_services, electronic_comms]}
+          - {nis2_sector: [dns, tld, trust_services, electronic_comms]}
           - all: [{nis2_sector: [cloud, data_centre, cdn, managed_services, online_marketplace, search_engine, social_network, other_annex]}, {size: [medium, large]}]
   dora_entity: {financial_entity: true}
   cra_manufacturer: {all: [{product_roles: manufacturer}, {eu_market: true}]}
@@ -33,7 +33,7 @@ defs:
   cra_distributor: {all: [{product_roles: distributor}, {eu_market: true}]}
   cra_operator: {any: [{use: cra_manufacturer}, {use: cra_importer}, {use: cra_distributor}]}
   # Implementing Regulation (EU) 2024/2690 Art. 1: the digital-infrastructure and digital-provider entity types.
-  nis2_ir_entity: {all: [{use: nis2_entity}, {nis2_sector: [dns_tld, cloud, data_centre, cdn, managed_services, online_marketplace, search_engine, social_network, trust_services]}]}
+  nis2_ir_entity: {all: [{use: nis2_entity}, {nis2_sector: [dns, tld, cloud, data_centre, cdn, managed_services, online_marketplace, search_engine, social_network, trust_services]}]}
 
 obligations:
 - article: eu-ai-act/art-4
@@ -193,6 +193,7 @@ obligations:
     all:
     - {use: gpai_provider}
     - {eu_established: false}
+    - any: [{gpai_systemic_risk: true}, {gpai_open_source: false}]
   basis: eu-ai-act/art-54/par-1
   quote: providers established in third countries shall
 - article: eu-ai-act/art-55
@@ -219,6 +220,7 @@ obligations:
     all:
     - {use: ai_deployer}
     - {high_risk: annex_iii}
+    - {significant_decisions: true}
   basis: eu-ai-act/art-86/par-1
   quote: Any affected person subject to a decision which is taken by the deployer on the basis of the output from a high-risk
     AI system listed in Annex III
@@ -419,6 +421,7 @@ obligations:
     all:
     - {use: controller_or_processor}
     - {third_country_transfers: true}
+    - {transfer_safeguards: true}
   basis: gdpr/art-46/par-1
   quote: a controller or processor may transfer personal data to a third country or an international organisation only if
     the controller or processor has provided appropriate safeguards
@@ -443,7 +446,7 @@ obligations:
   when:
     all:
     - {use: nis2_entity}
-    - nis2_sector: [dns_tld, cloud, data_centre, cdn, managed_services, online_marketplace, search_engine, social_network]
+    - nis2_sector: [dns, tld, cloud, data_centre, cdn, managed_services, online_marketplace, search_engine, social_network]
   basis: nis2/art-27/par-2
   quote: Member States shall require entities referred to in paragraph 1 to submit the following information to the competent
     authorities
@@ -547,9 +550,9 @@ obligations:
   quote: distributors shall act with due care in relation
 - article: cra/art-21
   when:
-    any:
-    - {use: cra_importer}
-    - {use: cra_distributor}
+    all:
+    - any: [{use: cra_importer}, {use: cra_distributor}]
+    - {own_brand_or_modified: true}
   basis: cra/art-21
   quote: importer or distributor shall be considered to be a manufacturer
   note: You become the manufacturer if you sell it under your name or substantially modify it.
@@ -592,12 +595,12 @@ obligations:
   basis: nis2-ir/art-4
   quote: "Incidents that individually are not considered a significant incident within the meaning of Article 3, shall be considered collectively as one significant incident"
 - article: nis2-ir/art-5
-  when: {all: [{use: nis2_ir_entity}, {nis2_sector: dns_tld}]}
+  when: {all: [{use: nis2_ir_entity}, {nis2_sector: dns}]}
   basis: nis2-ir/art-5
   quote: "With regard to DNS service providers, an incident shall be considered significant"
   note: Only if you are a DNS service provider.
 - article: nis2-ir/art-6
-  when: {all: [{use: nis2_ir_entity}, {nis2_sector: dns_tld}]}
+  when: {all: [{use: nis2_ir_entity}, {nis2_sector: tld}]}
   basis: nis2-ir/art-6
   quote: "With regard to TLD name registries, an incident shall be considered significant"
   note: Only if you are a TLD name registry.

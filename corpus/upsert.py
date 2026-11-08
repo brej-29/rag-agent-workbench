@@ -3,6 +3,7 @@
 python -m corpus.upsert          dry run: counts, estimated embedding tokens and storage
 python -m corpus.upsert --yes    write to Pinecone namespace regs-v1 (needs explicit approval)
 python -m corpus.upsert --only nis2-ir/ [--yes]   only records whose id starts with the prefix (new sources)
+python -m corpus.upsert --ids ids.txt [--yes]     only the ids listed one per line (records whose text changed)
 """
 import argparse
 import json
@@ -44,8 +45,16 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--yes", action="store_true", help="actually upsert (requires approval)")
     ap.add_argument("--only", help="only records whose id starts with this prefix, e.g. nis2-ir/")
+    ap.add_argument("--ids", help="file with one provision id per line; only those records")
     args = ap.parse_args()
     provisions = select(load_provisions(), args.only)
+    if args.ids:
+        wanted = set(Path(args.ids).read_text(encoding="utf-8").split())
+        provisions = [p for p in provisions if p["id"] in wanted]
+        missing = wanted - {p["id"] for p in provisions}
+        if missing:
+            print(f"unknown ids: {sorted(missing)[:10]}")
+            return 1
     print(json.dumps({"namespace": NAMESPACE, **estimate(provisions)}, indent=2))
     if not args.yes:
         print("Dry run only. Re-run with --yes after approval to upsert.")

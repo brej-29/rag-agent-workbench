@@ -18,7 +18,7 @@
   <img alt="Pinecone" src="https://img.shields.io/badge/Vectors-Pinecone-3776AB">
   <img alt="Streamlit" src="https://img.shields.io/badge/UI-Streamlit%201.66-ff4b4b">
   <img alt="MCP" src="https://img.shields.io/badge/MCP-5%20tools-6f42c1">
-  <img alt="Tests" src="https://img.shields.io/badge/Tests-671%20passing-brightgreen">
+  <img alt="Tests" src="https://img.shields.io/badge/Tests-677%20passing-brightgreen">
   <img alt="License" src="https://img.shields.io/badge/License-MIT-black">
 
   <br><br>
@@ -107,8 +107,9 @@ Measured on labelled test questions; the Evaluation page shows each run.
 | Gap check: planted gaps wrongly called *covered* | 0 in every run |
 | Prompt-injection attacks (10 cases, adversarial suite) | no breaches |
 
-Golden labels for the compliance sets are drafts pending human review (see
-[Labelling the golden sets](#labelling-the-golden-sets)).
+All four compliance golden sets were reviewed by a human on 2026-11-08 (see
+[Labelling the golden sets](#labelling-the-golden-sets)). The retrieval and abstention rows above were measured
+before that review and are re-run once the corrected corpus is re-indexed.
 
 ---
 
@@ -231,7 +232,7 @@ install `requirements-docling.txt` instead if you want it locally.
 
 ```bash
 pip install --require-hashes -r requirements-dev.txt
-DISABLE_DOTENV=1 python -m pytest tests -q            # 671 tests, no network, never reads .env
+DISABLE_DOTENV=1 python -m pytest tests -q            # 677 tests, no network, never reads .env
 PYTHONPATH=frontend python tests/ui/smoke_app.py      # renders every page headlessly
 make check-models                                     # live: fails if a configured model or combo stops answering
 ```
@@ -265,9 +266,11 @@ Publish the latest runs to the UI with `python eval/publish_results.py`.
 
 ### Labelling the golden sets
 
-The compliance golden sets were drafted and are waiting for a human review. Each file starts with a `_meta` line
-that says so (`label_status: draft-claude-2026-10-20: pending human review`, or "draft, pending human review" in
-`gap_golden.jsonl`).
+Each golden file starts with a `_meta` line whose `label_status` records who reviewed it and what changed. All four
+were reviewed by a human on 2026-11-08: the router and gap-check sets were confirmed as they were; 13 retrieval
+questions and 5 checklist profiles were corrected, and the checklist gained four facts so the rules could follow
+(right to an explanation, transfers under safeguards, open-source models, own-brand importers), with DNS providers
+and TLD registries now separate.
 
 | File | One line is | Check that |
 |---|---|---|
@@ -276,7 +279,8 @@ that says so (`label_status: draft-claude-2026-10-20: pending human review`, or 
 | [`eval/regs_router.jsonl`](eval/regs_router.jsonl) | a request and the tool it should go to | the expected tool is right |
 | [`eval/gap_golden.jsonl`](eval/gap_golden.jsonl) | a policy (in `eval/gap_golden/`) and the expected verdict per duty | each verdict matches what the policy says |
 
-Fix a line in place, then set `label_status` in the `_meta` line to something like `reviewed-<your-name>-<date>`.
+To review again: fix a line in place, then update `label_status` in the `_meta` line
+(`reviewed-<who>-<date>: <what changed>`).
 Re-run the matching harness from the table above and `python eval/publish_results.py`, so the UI shows numbers
 measured against the reviewed labels.
 

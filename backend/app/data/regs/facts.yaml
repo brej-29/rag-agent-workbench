@@ -38,6 +38,13 @@
   short: public service or credit/insurance use
   help: Decides the fundamental rights impact assessment (AI Act Art. 27).
   basis: eu-ai-act/art-27
+- id: significant_decisions
+  type: bool
+  group: Your AI
+  label: Are decisions with legal or similarly significant effects on people taken using the high-risk AI's output?
+  short: significant AI-assisted decisions
+  help: For example hiring, credit or access to public services. Decides the right to an explanation (AI Act Art. 86).
+  basis: eu-ai-act/art-86
 - id: gpai_model
   type: bool
   group: Your AI
@@ -51,6 +58,13 @@
   label: Is that model classified as having systemic risk?
   short: systemic-risk model
   basis: eu-ai-act/art-51
+- id: gpai_open_source
+  type: bool
+  group: Your AI
+  label: Is the model released under a free and open-source licence, with its weights public?
+  short: open-source model
+  help: Open-source models without systemic risk are exempt from some duties (AI Act Arts. 53(2) and 54(6)).
+  basis: eu-ai-act/art-54
 - id: eu_established
   type: bool
   group: Where and how big
@@ -111,12 +125,19 @@
   label: Do you transfer personal data outside the EU/EEA?
   short: transfers outside the EU
   basis: gdpr/art-44
+- id: transfer_safeguards
+  type: bool
+  group: Personal data
+  label: Do any of those transfers rely on safeguards such as standard contractual clauses or binding corporate rules?
+  short: transfers under safeguards
+  help: Not needed for countries with an EU adequacy decision (GDPR Art. 45). Decides GDPR Art. 46.
+  basis: gdpr/art-46
 - id: nis2_sector
   type: choice
   group: Sector and products
   label: Main NIS2 sector
-  values: [cloud, data_centre, cdn, dns_tld, trust_services, electronic_comms, managed_services, online_marketplace, search_engine, social_network, other_annex, none]
-  labels: {cloud: cloud computing, data_centre: data centre, cdn: content delivery network, dns_tld: DNS or TLD registry, trust_services: trust services, electronic_comms: public electronic communications, managed_services: managed (security) services, online_marketplace: online marketplace, search_engine: online search engine, social_network: social networking platform, other_annex: another NIS2 Annex I/II sector, none: not in a NIS2 sector}
+  values: [cloud, data_centre, cdn, dns, tld, trust_services, electronic_comms, managed_services, online_marketplace, search_engine, social_network, other_annex, none]
+  labels: {cloud: cloud computing, data_centre: data centre, cdn: content delivery network, dns: DNS service provider, tld: TLD name registry, trust_services: trust services, electronic_comms: public electronic communications, managed_services: managed (security) services, online_marketplace: online marketplace, search_engine: online search engine, social_network: social networking platform, other_annex: another NIS2 Annex I/II sector, none: not in a NIS2 sector}
   help: NIS2 Annex I/II. "Another sector" covers energy, transport, health, water, manufacturing, food, postal, research and others.
   basis: nis2/art-2
 - id: financial_entity
@@ -134,3 +155,10 @@
   labels: {manufacturer: product manufacturer, importer: product importer, distributor: product distributor}
   help: Hardware or software products that connect to a device or network, made available on the EU market (CRA Art. 2(1)).
   basis: cra/art-2
+- id: own_brand_or_modified
+  type: bool
+  group: Sector and products
+  label: As importer or distributor, do you sell products under your own name or trademark, or substantially modify them?
+  short: own-brand or substantially modified products
+  help: If so, the CRA treats you as the manufacturer (CRA Art. 21).
+  basis: cra/art-21

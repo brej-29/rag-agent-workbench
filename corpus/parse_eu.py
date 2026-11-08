@@ -48,18 +48,30 @@ def _base(src: Source) -> dict:
 
 
 def _paragraphs(art: Tag):
-    """Yield (label, element, preceding_marker_text) for numbered paragraphs, both markups."""
-    prev = ""
+    """Yield (label, elements, preceding_marker_text) for numbered paragraphs, both markups.
+
+    In consolidated markup a later subparagraph is a sibling <p class="norm"> after the numbered block, and its
+    points are sibling <div class="grid-list">s (e.g. AI Act Art. 50(4), Art. 6(3)); they belong to that paragraph."""
+    prev, cur = "", None
     for child in art.find_all(recursive=False):
         cls = set(child.get("class") or [])
         m = _OJ_PARA.match(child.get("id", ""))
+        label = None
         if m:
-            yield m.group(1).lstrip("0") or "0", child, prev
+            label = m.group(1).lstrip("0") or "0"
         elif "norm" in cls and child.find("span", class_="no-parag", recursive=False):
             label = child.find("span", class_="no-parag", recursive=False).get_text(strip=True).rstrip(".")
             # Amending articles quote inserted paragraphs ("‘5."): ids must stay ASCII.
-            yield re.sub(r"[^0-9A-Za-z]", "", label), child, prev
+            label = re.sub(r"[^0-9A-Za-z]", "", label)
+        if label is not None:
+            if cur:
+                yield cur
+            cur = (label, [child], prev)
+        elif cur and ((child.name == "p" and "norm" in cls) or (child.name == "div" and "grid-list" in cls)):
+            cur[1].append(child)  # later subparagraph or its points; "modref" markers belong to the next paragraph
         prev = child.get_text(" ", strip=True) if len(child.get_text(strip=True)) < 12 else ""
+    if cur:
+        yield cur
 
 
 def _article(art: Tag, src: Source, mods: Dict[str, str]) -> List[dict]:
@@ -70,10 +82,10 @@ def _article(art: Tag, src: Source, mods: Dict[str, str]) -> List[dict]:
                         f"Section {loc['section']}" if loc["section"] else None) if p] + [f"Article {num}"]
     common = {**_base(src), **loc, "article": num, "title": _text(title_el) if title_el else "", "path": path}
     out = []
-    for label, el, prev in _paragraphs(art):
-        raw = el.get_text(" ") + " " + prev
+    for label, els, prev in _paragraphs(art):
+        raw = " ".join(e.get_text(" ") for e in els) + " " + prev
         out.append({**common, "id": f"{src.prefix}/art-{num}/par-{label}", "ref": f"{src.short} Art. {num}({label})",
-                    "kind": "article_paragraph", "paragraph": label, "text": _text(el),
+                    "kind": "article_paragraph", "paragraph": label, "text": " ".join(_text(e) for e in els),
                     "amended_by": sorted({mods[c] for c in _codes(raw) if c in mods})})
     if not out:
         body = [c for c in art.find_all(recursive=False) if not (set(c.get("class") or []) & _TITLE_CLASSES)

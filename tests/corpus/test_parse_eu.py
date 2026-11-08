@@ -158,3 +158,18 @@ def test_decimal_numbered_annex_becomes_one_record_per_point():
     assert p["text"].startswith("1.1.1. For the purpose") and "1.1.2. The policy shall be reviewed" in p["text"]
     assert "(Article 21(2), point (a)" in p["path"][1]
     assert "(Article 21(2), points (i) and (j)" in recs["nis2-ir/anx-1/pt-11.1"]["path"][1]
+
+
+def test_consolidated_unnumbered_subparagraph_stays_with_its_paragraph():
+    """AI Act Art. 50(4): the second subparagraph is a sibling <p class="norm"> after the numbered block."""
+    html = """<div class="eli-subdivision" id="art_50"><p class="title-article-norm">Article 50</p>
+<div class="norm"><span class="no-parag">4. </span><div class="norm inline-element">Deep fakes shall be disclosed.</div></div>
+<p class="norm">AI-generated text published to inform the public shall be disclosed, unless:</p>
+<div class="grid-container grid-list">(a) it is edited by a person.</div>
+<p class="modref">▼M1</p>
+<div class="norm"><span class="no-parag">5. </span><div class="norm inline-element">Information shall be clear.</div></div></div>"""
+    recs = _by_id(parse_eu(html, AI))
+    assert recs["eu-ai-act/art-50/par-4"]["text"] == (
+        "4. Deep fakes shall be disclosed. AI-generated text published to inform the public shall be disclosed, "
+        "unless: (a) it is edited by a person.")
+    assert recs["eu-ai-act/art-50/par-5"]["text"] == "5. Information shall be clear."

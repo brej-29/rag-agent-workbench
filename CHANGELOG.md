@@ -123,3 +123,15 @@
 - docs: README rewritten around what the app does, with GIFs of Home, Ask, Checklist and the theme switch
   (`docs/media/`); portable MCP config; how to review the golden labels. Local paths removed from docs.
 - fix(home): pulled-out rulebook shows its full description; caption names hover, tap and tab.
+
+### 2026-11-08: human review of the golden sets, corpus fix
+- eval: all four compliance golden sets reviewed by a human. Router (36) and gap check (4 policies) confirmed
+  unchanged. `regs_golden`: 13 rows corrected (labels added, 5 questions narrowed or reworded; DORA left out of
+  the cross-rule deadline question until Delegated Regulation (EU) 2025/301 is in the corpus). `regs_profiles`:
+  5 placements corrected.
+- feat(checklist): four new facts (`significant_decisions`, `gpai_open_source`, `transfer_safeguards`,
+  `own_brand_or_modified`) decide AI Act Arts. 54 and 86, GDPR Art. 46 and CRA Art. 21; `nis2_sector`
+  `dns_tld` split into `dns` and `tld` (Implementing Regulation Arts. 5 and 6).
+- fix(corpus): the consolidated-markup parser dropped later subparagraphs and their point lists; 60 AI Act
+  paragraphs (including Art. 50(4) on AI-generated text) now carry their full text. Ids unchanged; the changed
+  ids are in `corpus/changed-2026-11-08.txt` and `corpus.upsert --ids` re-indexes only those.

@@ -60,7 +60,7 @@ AiRole = Literal["provider", "deployer", "importer", "distributor"]
 DataRole = Literal["controller", "processor"]
 ProductRole = Literal["manufacturer", "importer", "distributor"]
 AiUse = Literal["chatbot", "synthetic_content", "emotion_or_biometric", "deepfake"]
-Nis2Sector = Literal["cloud", "data_centre", "cdn", "dns_tld", "trust_services", "electronic_comms",
+Nis2Sector = Literal["cloud", "data_centre", "cdn", "dns", "tld", "trust_services", "electronic_comms",
                      "managed_services", "online_marketplace", "search_engine", "social_network", "other_annex", "none"]
 
 
@@ -72,8 +72,10 @@ class Profile(BaseModel):
     high_risk: Optional[Literal["annex_iii", "annex_i", "none", "unknown"]] = None
     ai_uses: Optional[List[AiUse]] = None
     fria_trigger: Optional[bool] = None
+    significant_decisions: Optional[bool] = None
     gpai_model: Optional[bool] = None
     gpai_systemic_risk: Optional[bool] = None
+    gpai_open_source: Optional[bool] = None
     eu_established: Optional[bool] = None
     eu_market: Optional[bool] = None
     size: Optional[Literal["micro", "small", "medium", "large"]] = None
@@ -83,9 +85,11 @@ class Profile(BaseModel):
     large_scale_core: Optional[bool] = None
     automated_decisions: Optional[bool] = None
     third_country_transfers: Optional[bool] = None
+    transfer_safeguards: Optional[bool] = None
     nis2_sector: Optional[Nis2Sector] = None
     financial_entity: Optional[bool] = None
     product_roles: Optional[List[ProductRole]] = None
+    own_brand_or_modified: Optional[bool] = None
 
 
 class StandardCopy(BaseModel):

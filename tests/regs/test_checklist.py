@@ -122,3 +122,32 @@ def test_items_carry_crosswalk_and_practices_narrow_to_linked_csf():
     assert csf["narrowed"] and all(i["id"].startswith("nist-csf/") and "-" in i["id"] for g in csf["groups"] for i in g["items"])
     gdpr32 = next(i for g in ("now", "coming") for i in cl["groups"][g] if i["article"] == "gdpr/art-32")
     assert gdpr32["crosswalk"]["items"] == []
+
+
+def buckets(profile):
+    return _outcomes(build_checklist(profile, date(2026, 10, 20)))
+
+
+@pytest.mark.parametrize("name, fact, article", [
+    ("eu_cv_deployer", "significant_decisions", "eu-ai-act/art-86"),
+    ("us_chatbot_provider", "transfer_safeguards", "gdpr/art-46"),
+    ("eu_camera_importer", "own_brand_or_modified", "cra/art-21"),
+])
+def test_reviewed_facts_decide_their_article(name, fact, article):
+    base = PROFILES[name]["profile"]
+    assert buckets({**base, fact: True})[article] == "binds"
+    assert buckets({**base, fact: False})[article] == "not"
+
+
+def test_open_source_gpai_without_systemic_risk_needs_no_eu_representative():
+    base = PROFILES["us_gpai_provider"]["profile"]
+    assert buckets({**base, "gpai_open_source": True})["eu-ai-act/art-54"] == "not"
+    assert buckets({**base, "gpai_open_source": False})["eu-ai-act/art-54"] == "binds"
+    assert buckets({**base, "gpai_open_source": True, "gpai_systemic_risk": True})["eu-ai-act/art-54"] == "binds"
+
+
+def test_dns_and_tld_registries_get_their_own_incident_article():
+    base = PROFILES["dns_micro"]["profile"]
+    assert buckets(base)["nis2-ir/art-5"] == "binds" and buckets(base)["nis2-ir/art-6"] == "not"
+    tld = buckets({**base, "nis2_sector": "tld"})
+    assert tld["nis2-ir/art-6"] == "binds" and tld["nis2-ir/art-5"] == "not"

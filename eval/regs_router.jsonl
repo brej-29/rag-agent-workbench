@@ -1,4 +1,4 @@
-{"_meta": true, "purpose": "Router intent accuracy (eval/run_router.py).", "label_status": "draft-claude-2026-10-20: pending human review", "intents": {"ask": "what a rule says, means or when it applies", "checklist": "which obligations apply to me", "gap_check": "check my own document against the rules", "clarify": "too vague to act on"}}
+{"_meta": true, "purpose": "Router intent accuracy (eval/run_router.py).", "label_status": "reviewed-human-2026-11-08: all 36 routes verified against the intent definitions, no changes", "intents": {"ask": "what a rule says, means or when it applies", "checklist": "which obligations apply to me", "gap_check": "check my own document against the rules", "clarify": "too vague to act on"}}
 {"query": "What does Article 26 of the AI Act require of deployers?", "intent": "ask"}
 {"query": "Within how many hours must a personal data breach be notified under GDPR?", "intent": "ask"}
 {"query": "When do the AI Act's high-risk obligations start to apply?", "intent": "ask"}

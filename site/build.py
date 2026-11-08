@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import sys
 from datetime import date
@@ -16,8 +17,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "frontend"))
-from services.home_html import MILESTONES, basis_ref  # noqa: E402  (stdlib-only modules of the app)
-from services.presenters import RULEBOOK_LINES  # noqa: E402
+from services.eval_data import load_results  # noqa: E402  (stdlib-only modules of the app)
+from services.home_html import COLORS, DEMO, MILESTONES, QUESTIONS, proof_panels, stats  # noqa: E402
+from services.presenters import RULEBOOK_LINES, rulebook_stack_html  # noqa: E402
 
 SITE = os.environ.get("SITE_URL", "https://brej-29.github.io/rag-agent-workbench").rstrip("/")
 VERIFY = os.environ.get("GOOGLE_SITE_VERIFICATION", "")  # Search Console HTML-tag token; public, not a secret
@@ -33,6 +35,10 @@ ROWS = {r["id"]: r for r in map(json.loads, CORPUS.read_text(encoding="utf-8").s
 # Same milestones the app's home timeline shows (it labels 13 of the 14; the unlabelled one is skipped there too).
 MS = [m for m in json.loads(TIMELINE.read_text(encoding="utf-8"))["milestones"] if (m["id"], m["condition"]) in MILESTONES]
 LINES = {name: line for name, _, line in RULEBOOK_LINES}
+RESULTS = load_results()
+# Dates on the pages that are not law dates: the day the replayed answer was recorded (frontend/services/home_html.py).
+NON_LAW_DATES = {"2026-11-08"}
+PREFIX_FW = {"eu-ai-act": "AI Act", "gdpr": "GDPR", "nis2": "NIS2", "nis2-ir": "NIS2", "dora": "DORA", "cra": "CRA"}
 MONTHS = "January February March April May June July August September October November December".split()
 
 
@@ -50,9 +56,10 @@ def quote(row_id: str, text: str) -> str:
     row = ROWS[row_id]
     if norm(text) not in norm(row["text"]):
         raise ValueError(f"quote not found in {row_id}: {text!r}")
-    return (f'<blockquote data-source="{escape(row_id)}" cite="{escape(row["source_url"])}"><p>{escape(text)}</p>'
-            f'<footer><cite><a href="{escape(row["source_url"])}" rel="nofollow">{escape(row["ref"])}</a></cite>'
-            f"</footer></blockquote>")
+    tab = COLORS.get(PREFIX_FW.get(row_id.split("/")[0], ""), "#59627D")
+    return (f'<blockquote data-source="{escape(row_id)}" cite="{escape(row["source_url"])}" style="--tab:{tab}">'
+            f'<p>{escape(text)}</p><footer><cite><a href="{escape(row["source_url"])}" rel="nofollow">'
+            f'{escape(row["ref"])}</a></cite></footer></blockquote>')
 
 
 # Rulebooks -------------------------------------------------------------------------------------------------
@@ -97,11 +104,12 @@ def milestones_for(prefixes):
     return [m for m in MS if m["basis"].split("/")[0] in prefixes]
 
 
-def milestone_html(m) -> str:
+def milestone_html(m, with_quote: bool = True) -> str:
+    """One start date as a rail item. data-from lets a few lines of script mark which ones have passed."""
     fw, label = MILESTONES[(m["id"], m["condition"])]
-    return (f'<li class="ms"><time datetime="{m["from"]}">{long_date(m["from"])}</time>'
-            f'<div><p class="fw">{escape(fw)}</p><h3>{escape(label)}</h3>'
-            f'{quote(m["basis"], m["quote"])}</div></li>')
+    return (f'<li class="r" data-from="{m["from"]}" style="--tab:{COLORS[fw]}"><div class="when">'
+            f'<time datetime="{m["from"]}">{long_date(m["from"])}</time><span class="chip">{escape(fw)}</span></div>'
+            f'<div class="what"><h3>{escape(label)}</h3>{quote(m["basis"], m["quote"]) if with_quote else ""}</div></li>')
 
 
 def contents_html(prefix: str) -> str:
@@ -117,7 +125,7 @@ def contents_html(prefix: str) -> str:
             extra = [s for s in subs if s != top]
             out.append(f"<li><strong>{escape(top.title() if top.isupper() else top)}</strong>"
                        + (f": {escape(', '.join(extra))}" if extra else "") + "</li>")
-        return f'<ul class="toc">{"".join(out)}</ul>'
+        return f'<ul class="toc flat">{"".join(out)}</ul>'
     groups = {}
     for r in rows:
         if r["kind"] in ("article", "article_paragraph") and r["article"]:
@@ -231,38 +239,67 @@ for _id, _q, _a, _slug, quotes in FAQ:  # fail at import, not at render, if a qu
         quote(rid, text)
 
 
-def faq_items(entries, link_rulebook=True) -> str:
+CHECK = ('<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" '
+         'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>')
+
+
+def faq_items(entries) -> str:
     out = []
     for fid, q, a, slug, quotes in entries:
         book = next(b for b in RULEBOOKS if b[0] == slug)
-        more = f' <a href="{slug}.html">More on {escape(book[1])}</a>.' if link_rulebook else ""
-        out.append(f'<section class="qa" id="{fid}"><h2>{escape(q)}</h2><p>{escape(a)}</p>'
-                   + "".join(quote(rid, t) for rid, t in quotes)
-                   + f'<p class="links"><a href="{APP}/ask">Ask a follow-up in the app</a>.{more}</p></section>')
+        out.append(f'<section class="qa" id="{fid}" style="--tab:{book[4]}"><h2>{escape(q)}</h2><p class="ans-text">'
+                   f'{escape(a)}</p>' + "".join(quote(rid, t) for rid, t in quotes)
+                   + f'<p class="links"><a class="btn btn-sm" href="{APP}/ask">Ask this in the app</a>'
+                   f'<a href="{slug}.html">Guide: {escape(book[1])}</a></p></section>')
     return "".join(out)
 
 
 # Page shell -------------------------------------------------------------------------------------------------
+# Every button and card that invites action goes to the app. Navigation between the reading pages (header, footer,
+# guide tabs, "read the law") stays on the site so search engines can crawl it.
 def nav(current: str) -> str:
-    links = [("index.html", "Home"), ("timeline.html", "When the rules start"), ("faq.html", "FAQ")]
+    links = [("timeline.html", "When the rules start"), ("faq.html", "Questions")]
     items = "".join(f'<a href="{h}"' + (' aria-current="page"' if h == current else "") + f">{t}</a>"
                     for h, t in links)
-    return (f'<header class="top"><a class="wordmark" href="index.html">{NAME}</a><nav aria-label="Main">{items}'
-            f'<a class="btn" href="{APP}">Open the app</a></nav></header>')
+    return (f'<header class="top"><div class="wrap bar"><a class="wordmark" href="index.html">{NAME}</a>'
+            f'<nav aria-label="Main">{items}<a class="btn btn-sm" href="{APP}">Open the app</a></nav></div></header>')
 
 
 def footer() -> str:
     books = "".join(f'<li><a href="{b[0]}.html">{escape(b[1])}</a></li>' for b in RULEBOOKS)
-    return (f'<footer class="foot"><p class="disclaimer">{DISCLAIMER}</p><ul class="foot-links">{books}</ul>'
+    return (f'<footer class="foot"><div class="wrap"><p class="disclaimer">{DISCLAIMER}</p>'
+            f'<ul class="foot-links">{books}</ul>'
             '<p>EU texts: © European Union, https://eur-lex.europa.eu. Reuse authorised under Commission Decision '
             '2011/833/EU. NIST texts: U.S. Government work. '
-            f'<a href="{REPO}">Source code</a>.</p></footer>')
+            f'<a href="{REPO}">Source code</a>.</p></div></footer>')
 
 
-def page(path: str, title: str, desc: str, body: str, jsonld=None, tab: str = "#2F45D6") -> tuple[str, str]:
+SCRIPT = """<script>
+(function () {
+  var d = document, today = new Date().toISOString().slice(0, 10);
+  d.querySelectorAll(".rail").forEach(function (ol) {
+    var first = null;
+    ol.querySelectorAll("li.r").forEach(function (li) {
+      if (li.dataset.from > today) { li.classList.add("future"); if (!first) first = li; }
+    });
+    if (first) { var m = d.createElement("li"); m.className = "today"; m.textContent = "Today"; ol.insertBefore(m, first); }
+  });
+  var demo = d.querySelector(".demo");
+  if (demo) {
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(function (e, o) { if (e[0].isIntersecting) { demo.classList.add("in"); o.disconnect(); } },
+        { threshold: 0.35 }).observe(demo);
+    } else { demo.classList.add("in"); }
+  }
+})();
+</script>"""
+
+
+def page(path: str, title: str, desc: str, body: str, jsonld=None, top: str = "") -> tuple[str, str]:
     url = f"{SITE}/" if path == "index.html" else f"{SITE}/{path}"
     ld = "".join('<script type="application/ld+json">' + json.dumps(x, ensure_ascii=False).replace("</", "<\\/")
                  + "</script>" for x in (jsonld or []))
+    verify = f'\n<meta name="google-site-verification" content="{escape(VERIFY)}">' if VERIFY else ""
     html = f"""<!doctype html>
 <html lang="en">
 <head>
@@ -284,51 +321,135 @@ def page(path: str, title: str, desc: str, body: str, jsonld=None, tab: str = "#
 <meta name="twitter:title" content="{escape(title)}">
 <meta name="twitter:description" content="{escape(desc)}">
 <meta name="twitter:image" content="{SITE}/og.png">
-<meta name="theme-color" content="#F6F7FB">{f'{chr(10)}<meta name="google-site-verification" content="{escape(VERIFY)}">' if VERIFY else ""}
+<meta name="theme-color" content="#F6F7FB">{verify}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Public+Sans:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Public+Sans:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="style.css">
+<script>document.documentElement.classList.add("js")</script>
 {ld}
 </head>
-<body style="--tab:{tab}">
+<body>
 <a class="skip" href="#main">Skip to content</a>
 {nav(path)}
+{top}
 <main id="main">
 {body}
 </main>
 {footer()}
+{SCRIPT}
 </body>
 </html>
 """
     return path, html
 
 
-def cta() -> str:
-    return (f'<p class="actions"><a class="btn" href="{APP}/checklist">Try a ready-made example</a>'
-            f'<a class="btn btn-quiet" href="{APP}/ask">Ask a question</a></p>')
+def sec(inner: str, cls: str = "") -> str:
+    return f'<section class="sec {cls}"><div class="wrap">{inner}</div></section>'
+
+
+def cta(inverse: bool = False) -> str:
+    cls = " btn-on-dark" if inverse else ""
+    return (f'<p class="actions"><a class="btn{cls}" href="{APP}/checklist">Try a ready-made example</a>'
+            f'<a class="btn btn-quiet{cls}" href="{APP}/ask">Ask a question</a></p>')
+
+
+def band(h1: str, lead: str, extra: str = "", color: str = "", current: str = "") -> str:
+    """Page header band with the guide tabs sitting on its lower edge, like index tabs on a rulebook."""
+    short = {"eu-ai-act": "EU AI Act", "gdpr": "GDPR", "nis2": "NIS2", "dora": "DORA", "cyber-resilience-act": "CRA",
+             "nist": "NIST"}
+    tabs = "".join(f'<a href="{b[0]}.html" style="--tab:{b[4]}"' + (' aria-current="page"' if b[0] == current else "")
+                   + f">{short[b[0]]}</a>" for b in RULEBOOKS)
+    style = f' style="--tab:{color}"' if color else ""
+    return (f'<div class="band"{style}><div class="wrap"><h1>{escape(h1)}</h1><p class="lead">{escape(lead)}</p>{extra}'
+            f'<nav class="tabs" aria-label="Guides">{tabs}</nav></div></div>')
+
+
+def stack_html() -> str:
+    """The app's own rulebook stack (frontend/services/presenters.py), each tab opening the app."""
+    books = re.findall(r'--i:(\d+);--tab:(#\w+)"><span>(.*?)</span><small>(.*?)</small>', rulebook_stack_html())
+    assert len(books) == 8, "the app's rulebook stack changed shape"
+    items = "".join(f'<a class="book" role="listitem" href="{APP}" style="--i:{i};--tab:{color}"><span>{title}</span>'
+                    f"<small>{line}</small></a>" for i, color, title, line in books)
+    return f'<div class="stack" role="list" aria-label="Eight rulebooks">{items}</div>'
+
+
+def demo_html() -> str:
+    d = DEMO
+    y, m, day = d["status"].rsplit(" ", 1)[1].split("-")
+    status = f"In force since {int(day)} {MONTHS[int(m) - 1]} {y}"
+    assert d["status"].rsplit(" ", 1)[1] in {m_["from"] for m_ in MS}, "demo date is not a tracked start date"
+    steps = "".join(f'<li style="--s:{n}">{CHECK}{escape(t)}</li>' for n, t in enumerate(d["steps"]))
+    words = " ".join(f'<span style="--w:{n}">{escape(w)}</span>' for n, w in enumerate(d["answer"].split()))
+    return (f'<div class="demo" aria-label="Example answer"><p class="bubble">{escape(d["question"])}</p>'
+            f'<ol class="steps-done">{steps}</ol><p class="ans">{words}<sup>1</sup></p>'
+            f'<p class="src"><span class="chip" style="--tab:{COLORS.get(d["source"].split()[0], "#59627D")}">1 · {escape(d["source"])}</span><span class="badge">{status}</span></p></div>')
+
+
+def dots(p) -> str:
+    total = p["total"]
+    cols = next((c for c in (10, 8, 7, 6) if total % c == 0), 10)
+    cells = "".join(f'<i class="{"on" if k < p["filled"] else ""}"></i>' for k in range(total))
+    return (f'<figure class="proof tone-{p["tone"]}"><div class="dots" style="--cols:{cols}" role="img" '
+            f'aria-label="{p["filled"]} of {total}">{cells}</div><figcaption><b>{escape(p["big"])}</b> '
+            f'{escape(p["text"])}</figcaption></figure>')
 
 
 def home():
-    books = "".join(f'<li style="--tab:{b[4]}"><a href="{b[0]}.html">{escape(b[1])}</a><p>{escape(LINES[b[2]])}</p></li>'
-                    for b in RULEBOOKS)
-    picks = "".join(f'<li><a href="faq.html#{f[0]}">{escape(f[1])}</a></li>' for f in FAQ[:6])
-    body = f"""<section class="hero"><h1>Which EU and US rules apply to your AI, data or cyber product?</h1>
-<p class="lead">Plain answers quoted from the official text, with the date each rule starts to apply. For founders, product teams and engineers, not only lawyers.</p>
-<p>{NAME} is a web app that answers questions about the EU AI Act, GDPR, NIS2, DORA, the Cyber Resilience Act and three NIST frameworks. Every answer quotes the article it relies on and says whether that rule is in force on the date you choose. If the rules it holds do not cover your question, it says so instead of guessing.</p>
-{cta()}</section>
-<section><h2>How it works</h2><ol class="steps">
-<li><strong>Tell it about you</strong><p>Pick an example such as “chatbot startup” or answer only what you know.</p></li>
-<li><strong>See what applies</strong><p>Articles that apply now, ones coming later, and the one question that would settle the rest.</p></li>
-<li><strong>Check your policy</strong><p>Paste your policy and see, duty by duty, what it covers, with quotes from both sides.</p></li>
-</ol></section>
-<section><h2>Three tools, one set of sources</h2><ul class="tools">
-<li><h3><a href="{APP}/ask">Ask</a></h3><p>One question, one cited answer with its date.</p></li>
-<li><h3><a href="{APP}/checklist">Checklist</a></h3><p>Which articles bind your product, now and later.</p></li>
-<li><h3><a href="{APP}/gapcheck">Gap check</a></h3><p>What your policy covers and what it misses.</p></li>
-</ul></section>
-<section><h2>What is in the library</h2><ul class="books">{books}</ul></section>
-<section><h2>Questions people ask</h2><ul class="plain">{picks}</ul><p><a href="faq.html">All questions</a> · <a href="timeline.html">When the rules start</a></p></section>"""
+    n = stats(RESULTS.get("corpus"), RESULTS.get("timeline") or {}, len(MS))
+    sentence = (f"Built from {n[0]['n']} official texts and {n[1]['n']:,} indexed articles, paragraphs and controls, "
+                f"with {n[3]['n']} start dates each quoted from the law.")
+    rows = "".join(
+        f'<li style="--tab:{b[4]}"><div><a class="name" href="{APP}/ask">{escape(b[1])}</a><p>{escape(LINES[b[2]])}</p></div>'
+        f'<a class="btn btn-quiet btn-sm" href="{APP}/ask">Ask about it</a></li>' for b in RULEBOOKS)
+    qs = "".join(f'<li><a href="{APP}/ask">{escape(f[1])}</a></li>' for f in FAQ[:6])
+    tools = [("Ask", "ask", "One question, one cited answer with its date.", "Open Ask"),
+             ("Checklist", "checklist", "Which articles bind your product, now and later.", "Build a checklist"),
+             ("Gap check", "gapcheck", "What your policy covers and what it misses.", "Check a policy")]
+    tool_rows = "".join(f'<li><h3>{t}</h3><p>{d}</p><a class="btn btn-quiet btn-sm" href="{APP}/{s}">{c}</a></li>'
+                        for t, s, d, c in tools)
+    hero = (f'<section class="hero"><div class="wrap hero-grid"><div class="hero-copy"><h1>Which EU and US rules '
+            '<mark>apply to your</mark> AI, data or cyber product?</h1><p class="lead">Plain answers quoted from the '
+            'official text, with the date each rule starts to apply. For founders, product teams and engineers, not '
+            f'only lawyers.</p>{cta()}<p class="people-ask"><span>People ask</span><a href="{APP}/ask">'
+            f'{escape(QUESTIONS[1])}</a></p></div>{stack_html()}</div></section>')
+    replay = sec(
+        '<div class="split"><div><h2>See an answer, start to finish</h2><p class="lead">Every answer shows how it was '
+        'found, quotes the law, and says whether the rule applies today.</p><ul class="points">'
+        '<li><strong>It finds the passage first.</strong> The answer is written only from the official text it '
+        'retrieved.</li><li><strong>It says no when it should.</strong> If nothing relevant is found, you get a plain '
+        'decline, not a guess.</li><li><strong>It checks dates.</strong> Each cited rule shows whether it is in force '
+        'on the date you choose.</li></ul><p class="note">Replayed from a real answer on 8 November 2026. Live answers '
+        f'take a few seconds.</p><p><a class="btn" href="{APP}/ask">Ask your own question</a></p></div>{demo_html()}</div>',
+        "soft")
+    how = sec(
+        '<h2>How it works</h2><ol class="how"><li><strong>Tell it about you</strong><p>Pick an example such as '
+        '“chatbot startup” or answer only what you know.</p></li><li><strong>See what applies</strong><p>Articles '
+        'that apply now, ones coming later, and the one question that would settle the rest.</p></li>'
+        '<li><strong>Check your policy</strong><p>Paste your policy and see, duty by duty, what it covers, with quotes '
+        'from both sides.</p></li></ol>')
+    rail = "".join(milestone_html(m, False) for m in MS)
+    when = (f'<section class="sec ink"><div class="wrap split split-rail"><div><h2>When the rules start</h2>'
+            f'<p class="lead">{len(MS)} start dates, each one taken from the sentence of the law that sets it. Some have '
+            f'passed and some are still ahead.</p><p><a class="link-on-dark" href="{APP}/checklist">See which of '
+            f'these apply to you</a></p></div><ol class="rail">{rail}</ol></div></section>')
+    tools_sec = sec(f'<h2>Three tools, one set of sources</h2><ul class="tools">{tool_rows}</ul>')
+    proofs = "".join(dots(p) for p in proof_panels(RESULTS))
+    proof_sec = sec(
+        '<h2>Can you trust it?</h2><p class="lead">Measured on labelled test questions. In the first panel each dot is '
+        f'one percentage point; in the others each dot is one question.</p><div class="proofs">{proofs}</div>'
+        f'<p><a href="{APP}/evaluation">See how each number is measured</a></p>', "soft")
+    library = sec(
+        f'<h2>What is in the library</h2><p class="lead">{sentence}</p><ul class="library">{rows}</ul><p class="note">'
+        'ISO/IEC 27001 and 42001 are licensed. Bring your own copy on Gap check. Questions about other rules are '
+        'declined instead of guessed.</p>')
+    questions = sec(f'<h2>Questions people ask</h2><ul class="qlist">{qs}</ul>'
+                    f'<p><a class="btn" href="{APP}/ask">Ask your own question</a></p>')
+    close = ('<section class="sec close"><div class="wrap"><h2>Find out which rules apply to you</h2><p class="lead">Pick '
+             'a ready-made example or ask about your own product. Every answer quotes the article and shows its '
+             f'date.</p>{cta(True)}<p class="note">The first visit after a quiet spell can take a few seconds while the '
+             'app wakes up.</p></div></section>')
+    body = hero + replay + how + when + tools_sec + proof_sec + library + questions + close
     ld = [{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": NAME, "url": APP,
            "applicationCategory": "BusinessApplication", "operatingSystem": "Web browser",
            "description": "Plain answers about the EU AI Act, GDPR, NIS2, DORA, the Cyber Resilience Act and NIST "
@@ -342,28 +463,27 @@ def home():
 def rulebook(b):
     slug, name, line_key, prefixes, color, title, desc = b
     ms = milestones_for(prefixes)
-    dates = (f'<ol class="timeline">{"".join(milestone_html(m) for m in ms)}</ol>' if ms else
+    dates = (f'<ol class="rail">{"".join(milestone_html(m) for m in ms)}</ol>' if ms else
              "<p>These are voluntary frameworks, so there is no legal start date. Use them as a reference for "
              "security and AI risk practices.</p>")
     contents = "".join((f"<h3>{escape(rows_for(p)[0]['instrument'])}</h3>" if len(prefixes) > 1 else "")
                        + contents_html(p) for p in prefixes)
     faqs = [f for f in FAQ if f[3] == slug]
-    body = (f'<article><p class="kicker">Rulebook</p><h1>{escape(name)}</h1><p class="lead">{escape(LINES[line_key])}</p>'
-            f'<ul class="facts">{instrument_rows(prefixes)}</ul>'
-            f"{cta()}"
-            f"<section><h2>When it applies</h2>{dates}</section>"
-            + (f"<section><h2>Common questions</h2>{faq_items(faqs, link_rulebook=False)}</section>" if faqs else "")
-            + f'<section><h2>What the text covers</h2><div class="contents">{contents}</div></section></article>')
-    return page(f"{slug}.html", title, desc, body, tab=color)
+    top = band(name, LINES[line_key], f'<ul class="facts">{instrument_rows(prefixes)}</ul>{cta(True)}', color, slug)
+    body = (sec(f"<h2>When it applies</h2>{dates}")
+            + (sec(f"<h2>Common questions</h2>{faq_items(faqs)}", "soft") if faqs else "")
+            + sec(f'<h2>What the text covers</h2><div class="contents">{contents}</div>'))
+    return page(f"{slug}.html", title, desc, body, top=top)
 
 
 def timeline():
-    body = (f'<h1>When the rules start</h1><p class="lead">Every start date the app tracks, in order. Each one quotes '
-            f'the sentence of the law that sets it.</p><ol class="timeline">{"".join(milestone_html(m) for m in MS)}</ol>'
-            f"<p>NIST SP 800-53, CSF 2.0 and the AI RMF are voluntary, so they have no legal start date.</p>{cta()}")
+    top = band("When the rules start", "Every start date the app tracks, in order. Each one quotes the sentence of the "
+               "law that sets it.", cta(True), "", "")
+    body = sec(f'<h2>Every start date</h2><ol class="rail">{"".join(milestone_html(m) for m in MS)}</ol>'
+               "<p>NIST SP 800-53, CSF 2.0 and the AI RMF are voluntary, so they have no legal start date.</p>")
     return page("timeline.html", "When the EU AI Act, GDPR, NIS2, DORA and CRA rules start",
                 "Every start date for the EU AI Act, GDPR, NIS2, DORA and the Cyber Resilience Act, from 25 May 2018 "
-                "to 2 August 2028, each quoted from the article that sets it.", body)
+                "to 2 August 2028, each quoted from the article that sets it.", body, top=top)
 
 
 def faq():
@@ -371,11 +491,12 @@ def faq():
         {"@type": "Question", "name": q, "acceptedAnswer": {
             "@type": "Answer", "text": f"{a} Source: {', '.join(dict.fromkeys(ROWS[r]['ref'] for r, _ in qs))}."}}
         for _, q, a, _, qs in FAQ]}]
-    body = (f'<h1>Questions about EU AI, data and cyber rules</h1><p class="lead">Short answers, each with the words of '
-            f'the law and its article.</p>{faq_items(FAQ)}')
+    top = band("Questions about EU AI, data and cyber rules", "Short answers, each with the words of the law and its "
+               "article.", "", "", "")
     return page("faq.html", "EU AI Act, GDPR, NIS2 and CRA questions answered from the law",
                 "When must a GDPR breach be reported? When do the AI Act high-risk rules apply? Short answers "
-                "quoting the GDPR, AI Act, NIS2, DORA and CRA with article references.", body, ld)
+                "quoting the GDPR, AI Act, NIS2, DORA and CRA with article references.", sec(faq_items(FAQ)), ld,
+                top=top)
 
 
 def build(out: Path = HERE / "dist") -> list[str]:

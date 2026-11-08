@@ -55,3 +55,7 @@ updates:
       - dependency-name: "*"
         update-types:
           - version-update:semver-major
+      # docling (optional, requirements-docling.in) pulls torch, which Dependabot's resolver cannot
+      # install, so its group refresh fails. Bump it by hand with the uv pip compile command in
+      # requirements-docling.in.
+      - dependency-name: docling

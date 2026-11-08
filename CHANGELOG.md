@@ -135,3 +135,6 @@
 - fix(corpus): the consolidated-markup parser dropped later subparagraphs and their point lists; 60 AI Act
   paragraphs (including Art. 50(4) on AI-generated text) now carry their full text. Ids unchanged; the changed
   ids are in `corpus/changed-2026-11-08.txt` and `corpus.upsert --ids` re-indexes only those.
+- ops: the 60 corrected AI Act paragraphs re-indexed in Pinecone `regs-v1` (`corpus.upsert --ids`). Re-measured
+  against the reviewed labels: diversified recall@6 0.847 (was 0.871), MRR 0.862 (was 0.846), cross-framework
+  recall 0.601 (was about 0.48); abstention unchanged (13 of 14 declined, 0 of 50 wrongly declined).

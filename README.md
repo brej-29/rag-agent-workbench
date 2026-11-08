@@ -100,7 +100,7 @@ Measured on labelled test questions; the Evaluation page shows each run.
 
 | What was measured | Result |
 |---|---|
-| Right article in the top 6 results, 50 hand-labelled questions | recall 0.871, MRR 0.846 (same budget: dense 0.848, fused 0.801, lexical 0.600) |
+| Right article in the top 6 results, 50 hand-labelled questions | recall 0.847, MRR 0.862 (same budget: dense 0.818, fused 0.779, lexical 0.607) |
 | Questions about rules it does not cover, declined with no model call | 13 of 14 |
 | Questions it does cover, wrongly declined | 0 of 50 |
 | Requests sent to the right tool (ask, checklist, gap check, clarify) | 34 of 36 |
@@ -108,8 +108,8 @@ Measured on labelled test questions; the Evaluation page shows each run.
 | Prompt-injection attacks (10 cases, adversarial suite) | no breaches |
 
 All four compliance golden sets were reviewed by a human on 2026-11-08 (see
-[Labelling the golden sets](#labelling-the-golden-sets)). The retrieval and abstention rows above were measured
-before that review and are re-run once the corrected corpus is re-indexed.
+[Labelling the golden sets](#labelling-the-golden-sets)); the retrieval and abstention rows above were re-measured
+against the reviewed labels and the corrected corpus on 2026-11-08.
 
 ---
 

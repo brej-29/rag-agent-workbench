@@ -22,15 +22,24 @@ class Page(HTMLParser):
 
     def __init__(self):
         super().__init__()
-        self.quotes, self.rest, self.source, self.in_quote_p = [], [], None, False
+        self.quotes, self.rest, self.source, self.in_quote_p, self.links = [], [], None, False, []
+        self.main_links, self.in_main = [], False
 
     def handle_starttag(self, tag, attrs):
+        if tag == "main":
+            self.in_main = True
+        if tag == "a":
+            self.links.append((dict(attrs).get("class") or "", dict(attrs).get("href") or ""))
+            if self.in_main:
+                self.main_links.append(dict(attrs).get("href") or "")
         if tag == "blockquote":
             self.source = dict(attrs)["data-source"]
         elif tag == "p" and self.source:
             self.in_quote_p, self.quotes = True, self.quotes + [(self.source, "")]
 
     def handle_endtag(self, tag):
+        if tag == "main":
+            self.in_main = False
         if tag == "blockquote":
             self.source = None
         elif tag == "p":
@@ -67,11 +76,20 @@ def test_site_pages_use_only_verified_quotes_and_dates(tmp_path):
         n_quotes += len(page.quotes)
         for day, month, year in DATE_RE.findall(" ".join(page.rest)):
             iso = f"{year}-{MONTHS.index(month) + 1:02d}-{int(day):02d}"
-            assert iso in DATES, f"{name}: date {day} {month} {year} is not in timeline.json"
+            assert iso in DATES | build.NON_LAW_DATES, f"{name}: date {day} {month} {year} is not in timeline.json"
+        for cls, href in page.links:  # every button, tab and tool card opens the app
+            if re.search(r"(btn|book)", cls):
+                assert href.startswith(build.APP), f"{name}: {cls!r} link goes to {href!r}, not the app"
+        if name == "index.html":  # the home page body sends every link to the app; only the header and footer stay
+            assert page.main_links and all(h.startswith(build.APP) for h in page.main_links), page.main_links
         for iso in re.findall(r'datetime="([\d-]+)"', html):
             assert iso in DATES, f"{name}: <time> {iso} is not in timeline.json"
     assert len(titles) == len(names) and len(descs) == len(names), "titles and descriptions must be unique"
     assert n_quotes >= 20
+    home = (tmp_path / "index.html").read_text(encoding="utf-8")
+    for panel in build.proof_panels(build.RESULTS):  # the measured numbers shown on the home page
+        assert panel["big"] in home and panel["text"] in home
+    assert f"{sum(c['provisions'] for c in build.RESULTS['corpus']):,} indexed" in home and f"{len(build.MS)} start dates" in home
     sitemap = (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
     assert sitemap.count("<loc>") == len(names)
     assert "Sitemap:" in (tmp_path / "robots.txt").read_text(encoding="utf-8")

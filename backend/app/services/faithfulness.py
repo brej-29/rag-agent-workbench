@@ -29,6 +29,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from app.core.config import get_settings
 from app.core.cost_accounting import extract_token_usage
 from app.core.logging import get_logger
 from app.services.prompts.faithfulness_prompt import build_faithfulness_judge_messages
@@ -36,6 +37,33 @@ from app.services.prompts.faithfulness_prompt import build_faithfulness_judge_me
 logger = get_logger(__name__)
 
 _CITATION_RE = re.compile(r"\[(\d+)\]")
+
+# Strict JSON-schema structured output: constrained decoding guarantees a parseable,
+# correctly typed verdict (Groq: gpt-oss-20b/120b support strict mode; not with streaming,
+# which the judge does not use).
+JUDGE_RESPONSE_FORMAT: Dict[str, Any] = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "faithfulness_verdict",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "grounded": {"type": "boolean"},
+                "score": {"type": "number"},
+                "rationale": {"type": "string"},
+            },
+            "required": ["grounded", "score", "rationale"],
+            "additionalProperties": False,
+        },
+    },
+}
+
+
+def _invoke_judge(llm: Any, messages: List[Any]) -> Any:
+    if get_settings().LLM_STRUCTURED_OUTPUT:
+        return llm.invoke(messages, response_format=JUDGE_RESPONSE_FORMAT)
+    return llm.invoke(messages)
 
 
 @dataclass
@@ -51,6 +79,14 @@ class FaithfulnessVerdict:
     grounded: Optional[bool]
     faithfulness_score: Optional[float]
     rationale: str
+
+
+_LENTICULAR_RE = re.compile(r"【(\d+)(?:†[^】]*)?】")
+
+
+def normalize_citations(answer_text: str) -> str:
+    """Rewrite 【n】 / 【n†L3-L5】 (gpt-oss house style) to [n] so the citation check and UI see them."""
+    return _LENTICULAR_RE.sub(r"[\1]", answer_text)
 
 
 def verify_citations(
@@ -104,7 +140,7 @@ def judge_faithfulness(
     """
     messages = build_faithfulness_judge_messages(answer_text, retrieved_context)
     try:
-        response = llm.invoke(messages)
+        response = _invoke_judge(llm, messages)
         raw: str = str(getattr(response, "content", "") or response)
     except Exception as exc:  # noqa: BLE001
         logger.error("Faithfulness judge LLM call failed: %s", exc)
@@ -135,7 +171,7 @@ def judge_faithfulness_with_usage(
     messages = build_faithfulness_judge_messages(answer_text, retrieved_context)
     _empty_usage: dict = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
     try:
-        response = llm.invoke(messages)
+        response = _invoke_judge(llm, messages)
         raw: str = str(getattr(response, "content", "") or response)
         usage = extract_token_usage(response)
     except Exception as exc:  # noqa: BLE001
@@ -196,9 +232,12 @@ def _parse_verdict(raw: str) -> FaithfulnessVerdict:
         or ""
     )
 
-    try:
-        grounded: Optional[bool] = bool(grounded_raw) if grounded_raw is not None else None
-    except Exception:  # noqa: BLE001
+    # bool("false") is True, so strings must be read, not cast.
+    if isinstance(grounded_raw, bool):
+        grounded: Optional[bool] = grounded_raw
+    elif isinstance(grounded_raw, str):
+        grounded = {"true": True, "false": False}.get(grounded_raw.strip().lower())
+    else:
         grounded = None
 
     try:

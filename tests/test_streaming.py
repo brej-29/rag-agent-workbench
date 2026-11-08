@@ -242,7 +242,7 @@ class TestTrueStreamingTokenEvents:
         ):
             frames = _collect(stream_chat_response(_initial_state(), {}))
 
-        events = [_parse(f)[0] for f in frames]
+        events = [_parse(f)[0] for f in frames if _parse(f)[0] != "step"]  # step = trace frames
         done_idx = events.index("done")
         assert all(e == "token" for e in events[:done_idx])
 
@@ -341,7 +341,7 @@ class TestAbstentionPath:
         ):
             frames = _collect(stream_chat_response(_initial_state(), {}))
 
-        _, token_data = _parse(frames[0])
+        _, token_data = next(_parse(f) for f in frames if _parse(f)[0] == "token")
         # state has no "answer" key → falls back to ABSTENTION_ANSWER constant
         assert ABSTENTION_ANSWER in token_data["text"]
 
@@ -479,6 +479,7 @@ class TestGenerationError:
         ):
             frames = _collect(stream_chat_response(_initial_state(), {}))
 
+        frames = [f for f in frames if _parse(f)[0] != "step"]  # step = trace frames
         assert len(frames) == 1
         event, data = _parse(frames[0])
         assert event == "error"

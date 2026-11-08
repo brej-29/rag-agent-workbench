@@ -1,0 +1,647 @@
+{
+  "timestamp": "20261019T154022Z",
+  "config": {
+    "generator": "openai/gpt-oss-20b",
+    "judge": "openai/gpt-oss-120b",
+    "reasoning_effort": "low",
+    "namespace": "eval",
+    "top_k": 5,
+    "min_chunk_score": 0.2,
+    "crag": false,
+    "contextualize": false,
+    "label_status": "draft-claude-2026-10-19: drafted by Claude from document text; needs human review before results are quoted as final."
+  },
+  "summary": {
+    "n_answerable": 13,
+    "n_unanswerable": 8,
+    "false_abstain_rate": 0.0,
+    "correct_abstain_rate": 1.0,
+    "mean_claim_recall": 0.9359,
+    "mean_faithfulness": 0.9462,
+    "mean_citation_precision": 0.8611,
+    "dangling_citation_answers": 0,
+    "errors": 21
+  },
+  "rows": [
+    {
+      "query": "What is retrieval-augmented generation and how does it work?",
+      "answerable": true,
+      "kind": null,
+      "deterministic_abstain": false,
+      "latency_ms": 2334,
+      "answer": "Retrieval‑augmented generation (RAG) is a technique that lets a large language model (LLM) look up and use fresh information from external documents when answering a user query. Instead of relying solely on the knowledge encoded in its training data, the model first retrieves a set of relevant documents (or passages) from a specified source and then conditions its response on both the retrieved content and its internal knowledge. This allows the system to incorporate domain‑specific or up‑to‑date facts that were not present in the LLM’s pre‑training corpus [1].",
+      "cited_doc_ids": [
+        "eaf004fe",
+        "078af71a",
+        "6abde0ae",
+        "078af71a",
+        "6abde0ae"
+      ],
+      "abstained": false,
+      "abstain_type": null,
+      "claims": [
+        "RAG enables large language models to retrieve and incorporate information from external data sources.",
+        "With RAG, the LLM first refers to a specified set of documents and then responds to the user query.",
+        "The retrieved documents supplement the LLM's pre-existing training data, allowing domain-specific or updated information."
+      ],
+      "claims_supported": [
+        true,
+        true,
+        true
+      ],
+      "claim_recall": 1.0,
+      "faithfulness": 1.0,
+      "grounded": true,
+      "citation_precision": 1.0,
+      "dangling_citations": []
+    },
+    {
+      "query": "What is a vector database and what is it used for in AI?",
+      "answerable": true,
+      "kind": null,
+      "deterministic_abstain": false,
+      "latency_ms": 1120,
+      "answer": "A vector database (also called a vector store or vector search engine) is a specialized database that stores data as high‑dimensional numerical vectors—embeddings that represent the semantic content of text, images, audio, or other modalities. It uses approximate nearest‑neighbor algorithms to quickly find vectors that are close to a query vector, enabling searches for items that are semantically similar rather than just exact keyword matches [1].\n\nIn AI, vector databases are used for:\n\n* **Similarity and semantic search** – retrieving documents, images, or other items that are meaningfully related to a query [2].\n* **Recommendation engines** – finding items similar to a user’s preferences or past interactions.\n* **Multi‑modal search** – matching across different data types (e.g., text to ",
+      "cited_doc_ids": [
+        "2b529e6a",
+        "fa08a772",
+        "0fd17246"
+      ],
+      "abstained": false,
+      "abstain_type": null,
+      "claims": [
+        "A vector database stores and retrieves embeddings of data in vector space.",
+        "Vector databases typically implement approximate nearest neighbor algorithms to find semantically similar records.",
+        "Use cases include similarity search, semantic search, recommendations and retrieval-augmented generation."
+      ],
+      "claims_supported": [
+        true,
+        true,
+        true
+      ],
+      "claim_recall": 1.0,
+      "faithfulness": 1.0,
+      "grounded": true,
+      "citation_precision": 0.3333333333333333,
+      "dangling_citations": []
+    },
+    {
+      "query": "What is a large language model?",
+      "answerable": true,
+      "kind": null,
+      "deterministic_abstain": false,
+      "latency_ms": 1183,
+      "answer": "A large language model (LLM) is a neural network that has been trained on a vast amount of text data for natural language processing tasks, especially language generation. LLMs can typically generate, summarize, translate, and analyze text in many contexts, and they form the foundational technology behind modern chatbots. However, biased or inaccurate training data can make an LLM’s output less reliable. [1]",
+      "cited_doc_ids": [
+        "1c168904",
+        "6abde0ae",
+        "eaf004fe",
+        "6abde0ae",
+        "fce7c6ea"
+      ],
+      "abstained": false,
+      "abstain_type": null,
+      "claims": [
+        "A large language model is a neural network trained on a vast amount of text for natural language processing tasks, especially language generation.",
+        "LLMs can generate, summarize, translate and analyze text.",
+        "LLMs are a foundational technology behind modern chatbots."
+      ],
+      "claims_supported": [
+        true,
+        true,
+        true
+      ],
+      "claim_recall": 1.0,
+      "faithfulness": 1.0,
+      "grounded": true,
+      "citation_precision": 1.0,
+      "dangling_citations": []
+    },
+    {
+      "query": "How does the transformer self-attention mechanism work?",
+      "answerable": true,
+      "kind": null,
+      "deterministic_abstain": false,
+      "latency_ms": 1111,
+      "answer": "The transformer’s core operation is **self‑attention**. In each layer, every token in the input sequence is first mapped to a vector (via a word‑embedding lookup). These vectors are then processed in parallel by a multi‑head attention mechanism: for each token, the model computes how much “attention” it should pay to every other token in the same context window. This allows the signal for key tokens to be amplified while less important tokens are diminished. Because self‑attention alone does not preserve token order, transformers inject positional information (e.g., positional encodings or learned positional embeddings) so that the order of tokens can influence the output [1].",
+      "cited_doc_ids": [
+        "0fd17246",
+        "a0643195"
+      ],
+      "abstained": false,
+      "abstain_type": null,
+      "claims": [
+        "Transformers are based on the multi-head attention mechanism.",
+        "At each layer, each token is contextualized with the other unmasked tokens in the context window through parallel multi-head attention.",
+        "Because self-attention is permutation-invariant, transformers inject positional information such as positional encodings or learned positional embeddings."
+      ],
+      "claims_supported": [
+        true,
+        true,
+        true
+      ],
+      "claim_recall": 1.0,
+      "faithfulness": 1.0,
+      "grounded": true,
+      "citation_precision": 1.0,
+      "dangling_citations": []
+    },
+    {
+      "query": "What is approximate nearest neighbor search?",
+      "answerable": true,
+      "kind": null,
+      "deterministic_abstain": false,
+      "latency_ms": 1121,
+      "answer": "Approximate nearest neighbor (ANN) search is a proximity‑search problem that seeks the point in a given set that is closest to a query point, but allows for a small error in the distance to speed up retrieval. Instead of computing exact distances to all points, ANN algorithms use techniques such as clustering, subspace projection, or window filters to reduce the search space and return a point that is within a specified approximation factor of the true nearest neighbor [1]. Vector databases commonly implement ANN algorithms to enable fast semantic or similarity search over high‑dimensional embeddings [5].",
+      "cited_doc_ids": [
+        "95af516f",
+        "9e590954",
+        "ce46ed6f",
+        "1dffe01c",
+        "2b529e6a"
+      ],
+      "abstained": false,
+      "abstain_type": null,
+      "claims": [
+        "Nearest neighbor search is the optimization problem of finding the point in a set that is closest to a given point.",
+        "Closeness is typically expressed with a dissimilarity function."
+      ],
+      "claims_supported": [
+        true,
+        false
+      ],
+      "claim_recall": 0.5,
+      "faithfulness": 1.0,
+      "grounded": true,
+      "citation_precision": 0.5,
+      "dangling_citations": []
+    },
+    {
+      "query": "What is information retrieval?",
+      "answerable": true,
+      "kind": null,
+      "deterministic_abstain": false,
+      "latency_ms": 1130,
+      "answer": "Information retrieval (IR) is the task of identifying and retrieving information system resources that are relevant to an information need. It involves searching for documents, metadata, or other data that match a user’s query, which can be based on full‑text or other content‑based indexing. IR also covers searching for the metadata that describes data and for databases of texts, images, or sounds, and can include cross‑modal retrieval across different modalities. [1]",
+      "cited_doc_ids": [
+        "2e087b3b",
+        "181ab66a",
+        "eaf004fe",
+        "1ccde846",
+        "7e776e26"
+      ],
+      "abstained": false,
+      "abstain_type": null,
+      "claims": [
+        "Information retrieval is the task of identifying and retrieving information system resources relevant to an information need.",
+        "The information need can be specified as a search query.",
+        "Information retrieval covers searching for information in documents, for documents themselves, and for metadata."
+      ],
+      "claims_supported": [
+        true,
+        true,
+        true
+      ],
+      "claim_recall": 1.0,
+      "faithfulness": 1.0,
+      "grounded": true,
+      "citation_precision": 1.0,
+      "dangling_citations": []
+    },
+    {
+      "query": "What is semantic search and how does it differ from keyword search?",
+      "answerable": true,
+      "kind": null,
+      "deterministic_abstain": false,
+      "latency_ms": 2500,
+      "answer": "Semantic search is an approach to information retrieval that goes beyond simple keyword matching. Instead of looking for literal occurrences of the query words, it tries to understand the meaning behind the query and the contextual meaning of terms in the data set. This is typically achieved by converting words, phrases, or entire documents into numerical vectors (embeddings) and then searching for vectors that are close in that space, which corresponds to semantic similarity rather than exact text matches [1].\n\nIn contrast, keyword (or lexical) search simply looks for documents that contain the exact query terms or their direct variants. It does not account for synonyms, related concepts, or the broader intent of the user, so it can miss relevant results that use different wording or incl",
+      "cited_doc_ids": [
+        "fa08a772",
+        "1dffe01c",
+        "2b529e6a",
+        "2e087b3b",
+        "1dffe01c"
+      ],
+      "abstained": false,
+      "abstain_type": null,
+      "claims": [
+        "Semantic search is search with meaning, as distinguished from lexical search that looks for literal matches of the query words.",
+        "Semantic search seeks to understand the searcher's intent and the contextual meaning of terms.",
+        "Modern semantic search systems use vector embeddings to find results based on meaning rather than exact keyword matches."
+      ],
+      "claims_supported": [
+        true,
+        true,
+        true
+      ],
+      "claim_recall": 1.0,
+      "faithfulness": 1.0,
+      "grounded": true,
+      "citation_precision": 1.0,
+      "dangling_citations": []
+    },
+    {
+      "query": "What is question answering in the context of NLP?",
+      "answerable": true,
+      "kind": null,
+      "deterministic_abstain": false,
+      "latency_ms": 1708,
+      "answer": "Question answering (QA) in natural language processing is a subfield that focuses on building systems capable of automatically answering questions posed by humans in natural language. These systems typically combine information retrieval techniques with NLP methods to locate relevant information and generate or select the correct answer from that information [1].",
+      "cited_doc_ids": [
+        "181ab66a",
+        "ce46ed6f",
+        "a0643195",
+        "55d1d1e4",
+        "6abde0ae"
+      ],
+      "abstained": false,
+      "abstain_type": null,
+      "claims": [
+        "Question answering is a discipline within information retrieval and natural language processing.",
+        "It is concerned with building systems that automatically answer questions posed by humans in natural language."
+      ],
+      "claims_supported": [
+        true,
+        true
+      ],
+      "claim_recall": 1.0,
+      "faithfulness": 0.9,
+      "grounded": true,
+      "citation_precision": 1.0,
+      "dangling_citations": []
+    },
+    {
+      "query": "What is dense passage retrieval for open-domain QA?",
+      "answerable": true,
+      "kind": null,
+      "deterministic_abstain": false,
+      "latency_ms": 1708,
+      "answer": "Dense passage retrieval (DPR) is a neural‑retrieval approach for open‑domain question answering that replaces traditional keyword‑based models (e.g., TF‑IDF or BM25) with dense vector representations. In DPR, both questions and passages are encoded into continuous embeddings using a dual‑encoder architecture; the embeddings are learned from a small set of question‑passage pairs. At inference time, the question embedding is compared (e.g., via dot product) to passage embeddings to retrieve the most relevant passages. This dense‑retrieval strategy has been shown to outperform strong sparse baselines, improving top‑20 passage retrieval accuracy by 9–19 % and boosting end‑to‑end QA performance on several benchmarks【1】.",
+      "cited_doc_ids": [
+        "55d1d1e4",
+        "7e776e26",
+        "1ccde846",
+        "a0643195",
+        "a0643195"
+      ],
+      "abstained": false,
+      "abstain_type": null,
+      "claims": [
+        "Open-domain question answering relies on passage retrieval to select candidate contexts, traditionally with sparse models such as TF-IDF or BM25.",
+        "Dense passage retrieval uses dense embeddings learned from questions and passages with a dual-encoder framework.",
+        "The dense retriever outperforms a Lucene-BM25 system by 9%-19% absolute in top-20 passage retrieval accuracy."
+      ],
+      "claims_supported": [
+        true,
+        true,
+        true
+      ],
+      "claim_recall": 1.0,
+      "faithfulness": 1.0,
+      "grounded": true,
+      "citation_precision": null,
+      "dangling_citations": []
+    },
+    {
+      "query": "How does zero-shot question generation improve passage retrieval?",
+      "answerable": true,
+      "kind": null,
+      "deterministic_abstain": false,
+      "latency_ms": 1920,
+      "answer": "Zero‑shot question generation improves passage retrieval by acting as a re‑ranking step that scores each retrieved passage based on how well it can generate the original query. A pre‑trained language model is used to compute the probability of the input question conditioned on a passage; passages that are more likely to produce the query are ranked higher. This method can be applied on top of any retrieval system (neural or keyword‑based) and does not require task‑specific training, making it robust to distribution shifts. In experiments, the re‑ranker boosts top‑20 passage retrieval accuracy by 6–18 % for unsupervised models and up to 12 % for supervised models, and it yields new state‑of‑the‑art results when added to existing open‑domain QA pipelines [1][3].",
+      "cited_doc_ids": [
+        "a0643195",
+        "55d1d1e4",
+        "a0643195",
+        "7e776e26",
+        "1ccde846"
+      ],
+      "abstained": false,
+      "abstain_type": null,
+      "claims": [
+        "It is a re-ranking method that re-scores retrieved passages with a zero-shot question generation model.",
+        "A pre-trained language model computes the probability of the input question conditioned on a retrieved passage.",
+        "It improves unsupervised retrieval models by 6%-18% absolute and supervised models by up to 12% in top-20 retrieval accuracy."
+      ],
+      "claims_supported": [
+        true,
+        true,
+        true
+      ],
+      "claim_recall": 1.0,
+      "faithfulness": 1.0,
+      "grounded": true,
+      "citation_precision": 1.0,
+      "dangling_citations": []
+    },
+    {
+      "query": "How do vector databases support RAG pipelines?",
+      "answerable": true,
+      "kind": null,
+      "deterministic_abstain": false,
+      "latency_ms": 1938,
+      "answer": "Vector databases store data as high‑dimensional embeddings and provide efficient approximate nearest‑neighbor search. In a RAG pipeline the language model first encodes a user query (or a partial generation) into an embedding, then the vector database retrieves the most semantically similar documents or passages. These retrieved snippets are fed back into the model as context, allowing the model to augment its generation with up‑to‑date or domain‑specific information that was not present in its pre‑training data. Thus, vector databases supply the fast, similarity‑based retrieval step that is central to RAG workflows. [1] [3]",
+      "cited_doc_ids": [
+        "2b529e6a",
+        "078af71a",
+        "eaf004fe",
+        "078af71a"
+      ],
+      "abstained": false,
+      "abstain_type": null,
+      "claims": [
+        "Vector databases store embeddings and support search for semantically similar records.",
+        "Retrieval-augmented generation is a use case of vector databases.",
+        "In RAG, the LLM refers to retrieved documents before responding."
+      ],
+      "claims_supported": [
+        true,
+        true,
+        true
+      ],
+      "claim_recall": 1.0,
+      "faithfulness": 1.0,
+      "grounded": true,
+      "citation_precision": 1.0,
+      "dangling_citations": []
+    },
+    {
+      "query": "How do large language models use retrieval to access external knowledge?",
+      "answerable": true,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "What are the trade-offs between exact and approximate nearest neighbor search?",
+      "answerable": true,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "How do embedding vectors enable semantic similarity search?",
+      "answerable": true,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "What are the challenges and solutions for open-domain question answering?",
+      "answerable": true,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "How does semantic search improve over traditional information retrieval?",
+      "answerable": true,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "What pre-training techniques improve dense retrieval models?",
+      "answerable": true,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "What are single-representation versus multi-representation dense retrieval models?",
+      "answerable": true,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "How can retrieval-augmented generation help automate literature review?",
+      "answerable": true,
+      "kind": null,
+      "deterministic_abstain": false,
+      "latency_ms": 65839,
+      "answer": "Retrieval‑augmented generation (RAG) can automate literature reviews by letting a large language model (LLM) pull in up‑to‑date, domain‑specific information from a set of documents (e.g., PDFs or a curated corpus) before it generates a summary or review. In practice, an RAG‑based system first retrieves relevant passages from the literature, then conditions the LLM on those passages so that the generated review reflects the latest findings rather than only the model’s pre‑training data. This approach has been demonstrated in an automated literature‑review study where a GPT‑3.5‑turbo‑based RAG system achieved the highest ROUGE‑1 score (0.364) compared with simpler NLP methods such as spaCy or a transformer model [1][2]. Thus, RAG enables the creation of accurate, up‑to‑date literature review",
+      "cited_doc_ids": [
+        "6abde0ae",
+        "6abde0ae",
+        "eaf004fe",
+        "078af71a",
+        "a0643195"
+      ],
+      "abstained": false,
+      "abstain_type": null,
+      "claims": [
+        "The study compared a frequency-based method (spaCy), a transformer model (Simple T5) and RAG with GPT-3.5-turbo for generating literature reviews.",
+        "The systems were evaluated on the SciTLDR dataset using ROUGE scores.",
+        "RAG with GPT-3.5-turbo achieved the highest ROUGE-1 score, 0.364."
+      ],
+      "claims_supported": [
+        true,
+        false,
+        true
+      ],
+      "claim_recall": 0.6666666666666666,
+      "faithfulness": 0.9,
+      "grounded": true,
+      "citation_precision": 1.0,
+      "dangling_citations": []
+    },
+    {
+      "query": "What graph-based algorithms are used for disk-resident ANN search?",
+      "answerable": true,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "How does clustering improve approximate nearest neighbor search efficiency?",
+      "answerable": true,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "What NLP tasks can be formulated as nearest neighbor search problems?",
+      "answerable": true,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "How do language model representations differ from sparse (BM25/TF-IDF) retrieval?",
+      "answerable": true,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "What are the privacy risks and mitigations in passage retrieval systems?",
+      "answerable": true,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "How can AI systems augment human cognitive abilities without replacing critical thinking?",
+      "answerable": true,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "What are the I/O bottlenecks in approximate nearest neighbor search on SSDs?",
+      "answerable": true,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "How does masked language model pre-training relate to retrieval quality?",
+      "answerable": true,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "What is ANN search with metadata/attribute filters (window search)?",
+      "answerable": true,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "What are the key components of a transformer-based language model architecture?",
+      "answerable": true,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "How do RAG systems combine retrieval and generation to reduce hallucination?",
+      "answerable": true,
+      "kind": null,
+      "deterministic_abstain": false,
+      "latency_ms": 9895,
+      "answer": "Retrieval‑augmented generation (RAG) reduces hallucination by grounding the language model’s output in real, external documents.  \nIn a RAG pipeline the model first queries a retrieval system for relevant passages or images, then conditions its generation on those retrieved pieces. Because the generated text is anchored to concrete evidence rather than only to the model’s internal weights, the likelihood of producing fabricated or unsupported statements is lowered [1].  \n\nFor example, in the image‑generation variant AR‑RAG the model performs context‑aware retrievals at each decoding step, using previously generated patches as queries to fetch the most relevant visual references. This continual, step‑by‑step grounding helps the model adapt to evolving generation needs and mitigates issues s",
+      "cited_doc_ids": [
+        "eaf004fe",
+        "078af71a",
+        "6abde0ae",
+        "078af71a",
+        "6abde0ae"
+      ],
+      "abstained": false,
+      "abstain_type": null,
+      "claims": [
+        "RAG lets LLMs retrieve and incorporate information from external data sources before responding.",
+        "RAG enables responses based on authoritative sources."
+      ],
+      "claims_supported": [
+        true,
+        true
+      ],
+      "claim_recall": 1.0,
+      "faithfulness": 0.5,
+      "grounded": false,
+      "citation_precision": 0.5,
+      "dangling_citations": []
+    },
+    {
+      "query": "What was the score of the 1987 Super Bowl?",
+      "answerable": false,
+      "kind": "off_topic",
+      "deterministic_abstain": true,
+      "latency_ms": 1816,
+      "answer": "I was unable to find sufficient information in the knowledge base to answer your question. No retrieved chunks met the minimum relevance score threshold. Try enabling the web search fallback, broadening your query, or ingesting additional documents.",
+      "cited_doc_ids": [],
+      "abstained": true,
+      "abstain_type": "deterministic"
+    },
+    {
+      "query": "How do I bake sourdough bread at home?",
+      "answerable": false,
+      "kind": "off_topic",
+      "deterministic_abstain": true,
+      "latency_ms": 588,
+      "answer": "I was unable to find sufficient information in the knowledge base to answer your question. No retrieved chunks met the minimum relevance score threshold. Try enabling the web search fallback, broadening your query, or ingesting additional documents.",
+      "cited_doc_ids": [],
+      "abstained": true,
+      "abstain_type": "deterministic"
+    },
+    {
+      "query": "What is the capital of Australia?",
+      "answerable": false,
+      "kind": "off_topic",
+      "deterministic_abstain": true,
+      "latency_ms": 295,
+      "answer": "I was unable to find sufficient information in the knowledge base to answer your question. No retrieved chunks met the minimum relevance score threshold. Try enabling the web search fallback, broadening your query, or ingesting additional documents.",
+      "cited_doc_ids": [],
+      "abstained": true,
+      "abstain_type": "deterministic"
+    },
+    {
+      "query": "Who won the 2018 FIFA World Cup?",
+      "answerable": false,
+      "kind": "off_topic",
+      "deterministic_abstain": true,
+      "latency_ms": 326,
+      "answer": "I was unable to find sufficient information in the knowledge base to answer your question. No retrieved chunks met the minimum relevance score threshold. Try enabling the web search fallback, broadening your query, or ingesting additional documents.",
+      "cited_doc_ids": [],
+      "abstained": true,
+      "abstain_type": "deterministic"
+    },
+    {
+      "query": "What is the boiling point of ethanol in Celsius?",
+      "answerable": false,
+      "kind": "off_topic",
+      "deterministic_abstain": true,
+      "latency_ms": 297,
+      "answer": "I was unable to find sufficient information in the knowledge base to answer your question. No retrieved chunks met the minimum relevance score threshold. Try enabling the web search fallback, broadening your query, or ingesting additional documents.",
+      "cited_doc_ids": [],
+      "abstained": true,
+      "abstain_type": "deterministic"
+    },
+    {
+      "query": "How do I change a flat tire on a car?",
+      "answerable": false,
+      "kind": "off_topic",
+      "deterministic_abstain": true,
+      "latency_ms": 303,
+      "answer": "I was unable to find sufficient information in the knowledge base to answer your question. No retrieved chunks met the minimum relevance score threshold. Try enabling the web search fallback, broadening your query, or ingesting additional documents.",
+      "cited_doc_ids": [],
+      "abstained": true,
+      "abstain_type": "deterministic"
+    },
+    {
+      "query": "Who were the authors who first proposed retrieval-augmented generation?",
+      "answerable": false,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "How many parameters does GPT-3.5-turbo have?",
+      "answerable": false,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "What ROUGE-2 score did the spaCy system achieve in the automated literature review study?",
+      "answerable": false,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "What is the HNSW algorithm and who invented it?",
+      "answerable": false,
+      "kind": "near_miss",
+      "deterministic_abstain": true,
+      "latency_ms": 702,
+      "answer": "I was unable to find sufficient information in the knowledge base to answer your question. No retrieved chunks met the minimum relevance score threshold. Try enabling the web search fallback, broadening your query, or ingesting additional documents.",
+      "cited_doc_ids": [],
+      "abstained": true,
+      "abstain_type": "deterministic"
+    },
+    {
+      "query": "What batch size was used to train the Dense Passage Retrieval dual encoder?",
+      "answerable": false,
+      "abstained": false,
+      "error": "UpstreamServiceError: Upstream Groq chat completion failed. Please try again later."
+    },
+    {
+      "query": "How much does Pinecone's serverless vector database cost per month?",
+      "answerable": false,
+      "kind": "near_miss",
+      "deterministic_abstain": false,
+      "latency_ms": 60871,
+      "answer": "I’m sorry, but the provided context does not contain any information about Pinecone’s pricing. I don’t have enough data to answer that question. You might want to check Pinecone’s official website or use a web search to find the current serverless pricing details.",
+      "cited_doc_ids": [
+        "2b529e6a"
+      ],
+      "abstained": true,
+      "abstain_type": "declined"
+    }
+  ]
+}

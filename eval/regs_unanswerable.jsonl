@@ -1,0 +1,15 @@
+{"_meta": true, "purpose": "Questions the regs-v1 corpus cannot answer, for calibrating the relevance floor and the abstention eval (sub-project 2).", "rule": "Each question is outside the eight frameworks in scope (EU AI Act, GDPR, NIS2, DORA, CRA, NIST SP 800-53, CSF 2.0, AI RMF) or asks for text deliberately excluded (ISO, SOC 2). Checked against the corpus scope, not against retriever output.", "label_status": "draft-claude-2026-10-20: pending human review"}
+{"query": "What penalties apply under the California Consumer Privacy Act?", "kind": "other_jurisdiction", "why": "US state law; not in scope"}
+{"query": "What does HIPAA require for protecting patient health information?", "kind": "other_jurisdiction", "why": "US health privacy law; not in scope"}
+{"query": "What are the consent requirements under India's Digital Personal Data Protection Act?", "kind": "other_jurisdiction", "why": "Indian law; not in scope"}
+{"query": "What does the UK Online Safety Act require of social media platforms?", "kind": "other_jurisdiction", "why": "UK law; not in scope"}
+{"query": "What does Sarbanes-Oxley section 404 require for internal controls over financial reporting?", "kind": "other_jurisdiction", "why": "US securities law; not in scope"}
+{"query": "What does ISO/IEC 27001 Annex A control 5.1 say about information security policies?", "kind": "licensed_text", "why": "ISO text is not in the public corpus (licence)"}
+{"query": "Which SOC 2 Trust Services Criteria cover availability?", "kind": "licensed_text", "why": "AICPA text is not in the public corpus (licence)"}
+{"query": "What clauses does ISO/IEC 42001 require for an AI management system internal audit?", "kind": "licensed_text", "why": "ISO text is not in the public corpus (licence)"}
+{"query": "What PCI DSS requirements apply to storing cardholder data?", "kind": "other_standard", "why": "PCI DSS not in scope"}
+{"query": "What is the corporate income tax rate in Ireland?", "kind": "off_topic", "why": "tax; not in scope"}
+{"query": "How many days of annual leave are employees entitled to in Germany?", "kind": "off_topic", "why": "employment law; not in scope"}
+{"query": "What are the labelling rules for allergens on packaged food in the EU?", "kind": "off_topic", "why": "food law; not in scope"}
+{"query": "Who won the 2018 FIFA World Cup?", "kind": "off_topic", "why": "not regulatory"}
+{"query": "How do I bake sourdough bread at home?", "kind": "off_topic", "why": "not regulatory"}

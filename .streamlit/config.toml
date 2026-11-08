@@ -1,0 +1,49 @@
+# Theme: marked-up rulebooks on a cool paper desk.
+
+[client]
+toolbarMode = "viewer"
+
+[theme]
+font = "Public Sans:https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&display=swap"
+headingFont = "Newsreader:https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap"
+codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+headingFontWeights = [600, 600, 600, 500, 500, 500]
+baseRadius = "0.35rem"
+buttonRadius = "0.35rem"
+showWidgetBorder = true
+
+[theme.light]
+primaryColor = "#2F45D6"
+backgroundColor = "#F6F7FB"
+secondaryBackgroundColor = "#ECEEF6"
+textColor = "#141A47"
+borderColor = "#D5D9EA"
+linkColor = "#2F45D6"
+codeTextColor = "#141A47"
+codeBackgroundColor = "#ECEEF6"
+greenColor = "#2E7D5B"
+orangeColor = "#B86A12"
+redColor = "#C2362F"
+grayColor = "#565D7E"
+chartCategoricalColors = ["#2F45D6", "#2E7D5B", "#7651A8", "#9B596B"]
+
+[theme.light.sidebar]
+backgroundColor = "#ECEEF6"
+
+[theme.dark]
+primaryColor = "#8E9BFF"
+backgroundColor = "#0D1230"
+secondaryBackgroundColor = "#151B45"
+textColor = "#E7E9F7"
+borderColor = "#2A3166"
+linkColor = "#AAB3FF"
+codeTextColor = "#E7E9F7"
+codeBackgroundColor = "#151B45"
+greenColor = "#6FCF9F"
+orangeColor = "#F2A94A"
+redColor = "#FF7A70"
+grayColor = "#A8AEC9"
+chartCategoricalColors = ["#8E9BFF", "#6FCF9F", "#A98AE0", "#D58AA0"]
+
+[theme.dark.sidebar]
+backgroundColor = "#151B45"

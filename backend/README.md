@@ -34,7 +34,9 @@ Required for `/chat`:
 
 - `GROQ_API_KEY` – your Groq API key
 - `GROQ_BASE_URL` – Groq OpenAI-compatible endpoint (default `https://api.groq.com/openai/v1`)
-- `GROQ_MODEL` – Groq chat model name (default `llama-3.1-8b-instant`)
+- `GROQ_MODEL` – primary chat model (default `openai/gpt-oss-20b`; `llama-3.1-8b-instant` was retired by Groq on 2026-08-16)
+- `LLM_FALLBACK_MODELS` – comma-separated models tried in order if the primary call fails (default `openai/gpt-oss-120b`; empty disables)
+- `LLM_REASONING_EFFORT` – `low`|`medium`|`high` for reasoning models (default `low`; set empty for non-reasoning models)
 
 Optional for web search fallback:
 
@@ -326,7 +328,7 @@ Notes:
    - `PINECONE_TEXT_FIELD=content` (or your actual text field)
    - `GROQ_API_KEY`
    - `GROQ_BASE_URL` (optional, defaults to `https://api.groq.com/openai/v1`)
-   - `GROQ_MODEL` (optional, defaults to `llama-3.1-8b-instant`)
+   - `GROQ_MODEL` (optional, defaults to `openai/gpt-oss-20b`). **Remove any old `llama-3.1-8b-instant` value from the Space settings.**
 
    Optional:
 

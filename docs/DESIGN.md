@@ -12,8 +12,8 @@
 
 A production-style RAG (Retrieval-Augmented Generation) backend built as a deliberate engineering
 exercise in decision-driven design.  It ingests documents from Wikipedia, arXiv, and OpenAlex
-into a Pinecone vector index, then answers questions over that corpus via a **7-node LangGraph
-pipeline** backed by Groq (LLaMA) and optional Tavily web search.
+into a Pinecone vector index, then answers questions over that corpus via an **8-node LangGraph
+pipeline** backed by Groq (gpt-oss, config-driven fallback chain) and optional Tavily web search.
 
 The headline capability: agentic RAG with corrective retrieval, cosine-gated abstention,
 two-layer faithfulness checking, honest token-level streaming, and per-request cost accounting —
@@ -23,7 +23,7 @@ Every major feature was preceded by a retrieval evaluation harness.  The rule: n
 change without a measurement that justifies it.
 
 **Stack:** FastAPI · LangGraph/LangChain · Pinecone (`llama-text-embed-v2`, 1024-dim, cosine) ·
-Groq (LLaMA 3.1 8B) · Tavily (optional) · Streamlit · Prometheus · Docker
+Groq (`openai/gpt-oss-20b` → `gpt-oss-120b`) · Tavily (optional) · Streamlit · Prometheus · Docker
 
 ---
 
@@ -248,7 +248,7 @@ answer-quality evaluation to tune.
 
 ## Testing & Observability
 
-**343 tests** (321 unit + 22 integration) run in CI with zero network calls, zero credentials.
+**351 tests** (329 unit + 22 integration) run in CI with zero network calls, zero credentials.
 
 | Layer | What it tests |
 |---|---|

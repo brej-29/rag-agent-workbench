@@ -14,7 +14,7 @@ MAILTO       ?=
 CANDIDATES   ?= 20
 RERANK_MODEL ?= bge-reranker-v2-m3
 
-.PHONY: eval-corpus eval eval-ab eval-ab-topk eval-sweep corpus-manifest corpus-verify test help
+.PHONY: eval-corpus eval eval-ab eval-ab-topk eval-sweep corpus-manifest corpus-verify check-models eval-answers eval-adversarial test help
 
 ## help: Print this help message.
 help:
@@ -92,6 +92,21 @@ corpus-manifest:
 corpus-verify:
 	@echo ">>> Verifying eval corpus manifest (namespace='$(EVAL_NS)')..."
 	$(PYTHON) eval/corpus_manifest.py validate --namespace $(EVAL_NS)
+
+## eval-answers: Answer-quality + abstention eval (live Groq + Pinecone; ~15 min on the free tier).
+##   Judge = EVAL_JUDGE_MODEL (default openai/gpt-oss-120b), generator = GROQ_MODEL, no fallbacks.
+##   Also writes eval/labels/judge_calibration_<ts>.csv for human labelling.
+eval-answers:
+	$(PYTHON) eval/run_answers.py --namespace $(EVAL_NS)
+
+## eval-adversarial: Live adversarial eval (injection, indirect injection, exfiltration).
+##   Structural cases also run in CI (tests/test_adversarial.py) against a compromised fake model.
+eval-adversarial:
+	$(PYTHON) eval/adversarial.py
+
+## check-models: Fail if a configured chat model is retired, deprecated or missing (live, needs GROQ_API_KEY).
+check-models:
+	$(PYTHON) scripts/check_models.py
 
 ## test: Run CI-safe unit tests (zero network calls).
 test:

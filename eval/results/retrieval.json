@@ -1,0 +1,632 @@
+{
+  "timestamp": "20261019T152622Z",
+  "namespace": "eval",
+  "top_k": 10,
+  "total_queries": 30,
+  "skipped_entries": 0,
+  "aggregate": {
+    "mean_recall_at_k": 0.969444,
+    "mean_mrr": 0.983333,
+    "mean_ndcg_at_k": 0.92803
+  },
+  "per_query": [
+    {
+      "query": "What is retrieval-augmented generation and how does it work?",
+      "retrieved_count": 8,
+      "retrieved_doc_ids": [
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975",
+        "078af71a5bee07ec816c45c139cfe1678dd2d3b4c915e26200d5d9abbbfa5945",
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04",
+        "a0643195a3218ae4b105bdff96c6dd3f9d10b7b534b75dec27595ba7163eed8e",
+        "1ccde846e825ac6a4016233e685845521b721c427fca21c940447cb0d5c01fd7",
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45",
+        "2e087b3b53d1df66054abd4804242600f6d16bde1347817c857d1758dd948bb2"
+      ],
+      "relevant_doc_ids": [
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 0.919721
+    },
+    {
+      "query": "What is a vector database and what is it used for in AI?",
+      "retrieved_count": 10,
+      "retrieved_doc_ids": [
+        "2b529e6ae899cf68473c9269463a1eeb7ff769ad6ae5d428c9b9c6fb1d9d05b5",
+        "fa08a772f25ab55d7dc0dc6722a0322e82481ed33098a049e1faba627817567e",
+        "0fd1724654d44b871e048f59c382b9b033fb748e2fd6e6c28a6ff4f91e9cc333",
+        "95af516f7ab30dd9d834fe530d599915070a06ab0d9a54b181848f13790d8fe9",
+        "1c168904a9a26aadacbedeb48bb0a7f0cbf661a83958bdb1792d151bcec8c119",
+        "9e5909547c859b138204dd201cc7e6b8f9524d3b3af6a5c0b5908a143466c56d",
+        "2e087b3b53d1df66054abd4804242600f6d16bde1347817c857d1758dd948bb2",
+        "078af71a5bee07ec816c45c139cfe1678dd2d3b4c915e26200d5d9abbbfa5945",
+        "1dffe01c4ff11522924153faf36c550e94785d88aed7df8fa93d572cb9dd6241",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975"
+      ],
+      "relevant_doc_ids": [
+        "2b529e6ae899cf68473c9269463a1eeb7ff769ad6ae5d428c9b9c6fb1d9d05b5"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 1.0
+    },
+    {
+      "query": "What is a large language model?",
+      "retrieved_count": 9,
+      "retrieved_doc_ids": [
+        "1c168904a9a26aadacbedeb48bb0a7f0cbf661a83958bdb1792d151bcec8c119",
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975",
+        "fce7c6eac0e5cd800f1555202a67f9b4893572acacff7b1e0e1a0d7538a283d7",
+        "1ccde846e825ac6a4016233e685845521b721c427fca21c940447cb0d5c01fd7",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "c0ef3c6101a07de94871d33d2b94497fe384c8f975d89f9037962f4cde0d59a8",
+        "0fd1724654d44b871e048f59c382b9b033fb748e2fd6e6c28a6ff4f91e9cc333"
+      ],
+      "relevant_doc_ids": [
+        "1c168904a9a26aadacbedeb48bb0a7f0cbf661a83958bdb1792d151bcec8c119"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 1.0
+    },
+    {
+      "query": "How does the transformer self-attention mechanism work?",
+      "retrieved_count": 8,
+      "retrieved_doc_ids": [
+        "0fd1724654d44b871e048f59c382b9b033fb748e2fd6e6c28a6ff4f91e9cc333",
+        "a0643195a3218ae4b105bdff96c6dd3f9d10b7b534b75dec27595ba7163eed8e",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "1ccde846e825ac6a4016233e685845521b721c427fca21c940447cb0d5c01fd7",
+        "fa08a772f25ab55d7dc0dc6722a0322e82481ed33098a049e1faba627817567e",
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45",
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04"
+      ],
+      "relevant_doc_ids": [
+        "0fd1724654d44b871e048f59c382b9b033fb748e2fd6e6c28a6ff4f91e9cc333"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 1.0
+    },
+    {
+      "query": "What is approximate nearest neighbor search?",
+      "retrieved_count": 8,
+      "retrieved_doc_ids": [
+        "95af516f7ab30dd9d834fe530d599915070a06ab0d9a54b181848f13790d8fe9",
+        "9e5909547c859b138204dd201cc7e6b8f9524d3b3af6a5c0b5908a143466c56d",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "1dffe01c4ff11522924153faf36c550e94785d88aed7df8fa93d572cb9dd6241",
+        "2b529e6ae899cf68473c9269463a1eeb7ff769ad6ae5d428c9b9c6fb1d9d05b5",
+        "457202a3c6ab06efd4d062daae6c351154d058dc72f85042df3d84617841fec4",
+        "fa08a772f25ab55d7dc0dc6722a0322e82481ed33098a049e1faba627817567e",
+        "2e087b3b53d1df66054abd4804242600f6d16bde1347817c857d1758dd948bb2"
+      ],
+      "relevant_doc_ids": [
+        "457202a3c6ab06efd4d062daae6c351154d058dc72f85042df3d84617841fec4",
+        "95af516f7ab30dd9d834fe530d599915070a06ab0d9a54b181848f13790d8fe9"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 0.831555
+    },
+    {
+      "query": "What is information retrieval?",
+      "retrieved_count": 9,
+      "retrieved_doc_ids": [
+        "2e087b3b53d1df66054abd4804242600f6d16bde1347817c857d1758dd948bb2",
+        "181ab66a9bc68c0460eca4c35cc4199b7395ac3f30132b4b084e7cf18cfa716e",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975",
+        "1ccde846e825ac6a4016233e685845521b721c427fca21c940447cb0d5c01fd7",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45",
+        "fa08a772f25ab55d7dc0dc6722a0322e82481ed33098a049e1faba627817567e",
+        "078af71a5bee07ec816c45c139cfe1678dd2d3b4c915e26200d5d9abbbfa5945",
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04",
+        "a0643195a3218ae4b105bdff96c6dd3f9d10b7b534b75dec27595ba7163eed8e"
+      ],
+      "relevant_doc_ids": [
+        "2e087b3b53d1df66054abd4804242600f6d16bde1347817c857d1758dd948bb2"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 1.0
+    },
+    {
+      "query": "What is semantic search and how does it differ from keyword search?",
+      "retrieved_count": 8,
+      "retrieved_doc_ids": [
+        "fa08a772f25ab55d7dc0dc6722a0322e82481ed33098a049e1faba627817567e",
+        "1dffe01c4ff11522924153faf36c550e94785d88aed7df8fa93d572cb9dd6241",
+        "2b529e6ae899cf68473c9269463a1eeb7ff769ad6ae5d428c9b9c6fb1d9d05b5",
+        "2e087b3b53d1df66054abd4804242600f6d16bde1347817c857d1758dd948bb2",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45",
+        "95af516f7ab30dd9d834fe530d599915070a06ab0d9a54b181848f13790d8fe9",
+        "9e5909547c859b138204dd201cc7e6b8f9524d3b3af6a5c0b5908a143466c56d"
+      ],
+      "relevant_doc_ids": [
+        "2e087b3b53d1df66054abd4804242600f6d16bde1347817c857d1758dd948bb2",
+        "fa08a772f25ab55d7dc0dc6722a0322e82481ed33098a049e1faba627817567e"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 0.877215
+    },
+    {
+      "query": "What is question answering in the context of NLP?",
+      "retrieved_count": 8,
+      "retrieved_doc_ids": [
+        "181ab66a9bc68c0460eca4c35cc4199b7395ac3f30132b4b084e7cf18cfa716e",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "a0643195a3218ae4b105bdff96c6dd3f9d10b7b534b75dec27595ba7163eed8e",
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975",
+        "1c168904a9a26aadacbedeb48bb0a7f0cbf661a83958bdb1792d151bcec8c119",
+        "2e087b3b53d1df66054abd4804242600f6d16bde1347817c857d1758dd948bb2"
+      ],
+      "relevant_doc_ids": [
+        "181ab66a9bc68c0460eca4c35cc4199b7395ac3f30132b4b084e7cf18cfa716e"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 1.0
+    },
+    {
+      "query": "What is dense passage retrieval for open-domain QA?",
+      "retrieved_count": 7,
+      "retrieved_doc_ids": [
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45",
+        "1ccde846e825ac6a4016233e685845521b721c427fca21c940447cb0d5c01fd7",
+        "a0643195a3218ae4b105bdff96c6dd3f9d10b7b534b75dec27595ba7163eed8e",
+        "82f543cc6b407e91bcabab2b4618838f5c461ecc8f4067d4a8ec6ab79bf1d530",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975",
+        "2e087b3b53d1df66054abd4804242600f6d16bde1347817c857d1758dd948bb2"
+      ],
+      "relevant_doc_ids": [
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 1.0
+    },
+    {
+      "query": "How does zero-shot question generation improve passage retrieval?",
+      "retrieved_count": 7,
+      "retrieved_doc_ids": [
+        "a0643195a3218ae4b105bdff96c6dd3f9d10b7b534b75dec27595ba7163eed8e",
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45",
+        "1ccde846e825ac6a4016233e685845521b721c427fca21c940447cb0d5c01fd7",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975",
+        "82f543cc6b407e91bcabab2b4618838f5c461ecc8f4067d4a8ec6ab79bf1d530",
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04"
+      ],
+      "relevant_doc_ids": [
+        "a0643195a3218ae4b105bdff96c6dd3f9d10b7b534b75dec27595ba7163eed8e"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 1.0
+    },
+    {
+      "query": "How do vector databases support RAG pipelines?",
+      "retrieved_count": 7,
+      "retrieved_doc_ids": [
+        "2b529e6ae899cf68473c9269463a1eeb7ff769ad6ae5d428c9b9c6fb1d9d05b5",
+        "078af71a5bee07ec816c45c139cfe1678dd2d3b4c915e26200d5d9abbbfa5945",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975",
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04",
+        "457202a3c6ab06efd4d062daae6c351154d058dc72f85042df3d84617841fec4",
+        "9e5909547c859b138204dd201cc7e6b8f9524d3b3af6a5c0b5908a143466c56d",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45"
+      ],
+      "relevant_doc_ids": [
+        "2b529e6ae899cf68473c9269463a1eeb7ff769ad6ae5d428c9b9c6fb1d9d05b5",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 0.919721
+    },
+    {
+      "query": "How do large language models use retrieval to access external knowledge?",
+      "retrieved_count": 7,
+      "retrieved_doc_ids": [
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975",
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04",
+        "1ccde846e825ac6a4016233e685845521b721c427fca21c940447cb0d5c01fd7",
+        "1c168904a9a26aadacbedeb48bb0a7f0cbf661a83958bdb1792d151bcec8c119",
+        "a0643195a3218ae4b105bdff96c6dd3f9d10b7b534b75dec27595ba7163eed8e",
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45"
+      ],
+      "relevant_doc_ids": [
+        "1c168904a9a26aadacbedeb48bb0a7f0cbf661a83958bdb1792d151bcec8c119",
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 0.967468
+    },
+    {
+      "query": "What are the trade-offs between exact and approximate nearest neighbor search?",
+      "retrieved_count": 7,
+      "retrieved_doc_ids": [
+        "95af516f7ab30dd9d834fe530d599915070a06ab0d9a54b181848f13790d8fe9",
+        "1dffe01c4ff11522924153faf36c550e94785d88aed7df8fa93d572cb9dd6241",
+        "9e5909547c859b138204dd201cc7e6b8f9524d3b3af6a5c0b5908a143466c56d",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "457202a3c6ab06efd4d062daae6c351154d058dc72f85042df3d84617841fec4",
+        "2b529e6ae899cf68473c9269463a1eeb7ff769ad6ae5d428c9b9c6fb1d9d05b5",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45"
+      ],
+      "relevant_doc_ids": [
+        "457202a3c6ab06efd4d062daae6c351154d058dc72f85042df3d84617841fec4",
+        "95af516f7ab30dd9d834fe530d599915070a06ab0d9a54b181848f13790d8fe9",
+        "9e5909547c859b138204dd201cc7e6b8f9524d3b3af6a5c0b5908a143466c56d"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 0.88546
+    },
+    {
+      "query": "How do embedding vectors enable semantic similarity search?",
+      "retrieved_count": 7,
+      "retrieved_doc_ids": [
+        "fa08a772f25ab55d7dc0dc6722a0322e82481ed33098a049e1faba627817567e",
+        "2b529e6ae899cf68473c9269463a1eeb7ff769ad6ae5d428c9b9c6fb1d9d05b5",
+        "1dffe01c4ff11522924153faf36c550e94785d88aed7df8fa93d572cb9dd6241",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45",
+        "9e5909547c859b138204dd201cc7e6b8f9524d3b3af6a5c0b5908a143466c56d",
+        "95af516f7ab30dd9d834fe530d599915070a06ab0d9a54b181848f13790d8fe9"
+      ],
+      "relevant_doc_ids": [
+        "2b529e6ae899cf68473c9269463a1eeb7ff769ad6ae5d428c9b9c6fb1d9d05b5",
+        "95af516f7ab30dd9d834fe530d599915070a06ab0d9a54b181848f13790d8fe9",
+        "fa08a772f25ab55d7dc0dc6722a0322e82481ed33098a049e1faba627817567e"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 0.921787
+    },
+    {
+      "query": "What are the challenges and solutions for open-domain question answering?",
+      "retrieved_count": 9,
+      "retrieved_doc_ids": [
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "a0643195a3218ae4b105bdff96c6dd3f9d10b7b534b75dec27595ba7163eed8e",
+        "181ab66a9bc68c0460eca4c35cc4199b7395ac3f30132b4b084e7cf18cfa716e",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "fce7c6eac0e5cd800f1555202a67f9b4893572acacff7b1e0e1a0d7538a283d7",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45",
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04",
+        "1c168904a9a26aadacbedeb48bb0a7f0cbf661a83958bdb1792d151bcec8c119"
+      ],
+      "relevant_doc_ids": [
+        "181ab66a9bc68c0460eca4c35cc4199b7395ac3f30132b4b084e7cf18cfa716e",
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "a0643195a3218ae4b105bdff96c6dd3f9d10b7b534b75dec27595ba7163eed8e"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 1.0
+    },
+    {
+      "query": "How does semantic search improve over traditional information retrieval?",
+      "retrieved_count": 8,
+      "retrieved_doc_ids": [
+        "fa08a772f25ab55d7dc0dc6722a0322e82481ed33098a049e1faba627817567e",
+        "2e087b3b53d1df66054abd4804242600f6d16bde1347817c857d1758dd948bb2",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45",
+        "1dffe01c4ff11522924153faf36c550e94785d88aed7df8fa93d572cb9dd6241",
+        "2b529e6ae899cf68473c9269463a1eeb7ff769ad6ae5d428c9b9c6fb1d9d05b5",
+        "a0643195a3218ae4b105bdff96c6dd3f9d10b7b534b75dec27595ba7163eed8e",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d"
+      ],
+      "relevant_doc_ids": [
+        "2e087b3b53d1df66054abd4804242600f6d16bde1347817c857d1758dd948bb2",
+        "fa08a772f25ab55d7dc0dc6722a0322e82481ed33098a049e1faba627817567e"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 1.0
+    },
+    {
+      "query": "What pre-training techniques improve dense retrieval models?",
+      "retrieved_count": 7,
+      "retrieved_doc_ids": [
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "1ccde846e825ac6a4016233e685845521b721c427fca21c940447cb0d5c01fd7",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45",
+        "a0643195a3218ae4b105bdff96c6dd3f9d10b7b534b75dec27595ba7163eed8e",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "82f543cc6b407e91bcabab2b4618838f5c461ecc8f4067d4a8ec6ab79bf1d530"
+      ],
+      "relevant_doc_ids": [
+        "1ccde846e825ac6a4016233e685845521b721c427fca21c940447cb0d5c01fd7",
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 1.0
+    },
+    {
+      "query": "What are single-representation versus multi-representation dense retrieval models?",
+      "retrieved_count": 9,
+      "retrieved_doc_ids": [
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45",
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "1ccde846e825ac6a4016233e685845521b721c427fca21c940447cb0d5c01fd7",
+        "2e087b3b53d1df66054abd4804242600f6d16bde1347817c857d1758dd948bb2",
+        "82f543cc6b407e91bcabab2b4618838f5c461ecc8f4067d4a8ec6ab79bf1d530",
+        "9e5909547c859b138204dd201cc7e6b8f9524d3b3af6a5c0b5908a143466c56d",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "fa08a772f25ab55d7dc0dc6722a0322e82481ed33098a049e1faba627817567e",
+        "2b529e6ae899cf68473c9269463a1eeb7ff769ad6ae5d428c9b9c6fb1d9d05b5"
+      ],
+      "relevant_doc_ids": [
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 1.0
+    },
+    {
+      "query": "How can retrieval-augmented generation help automate literature review?",
+      "retrieved_count": 8,
+      "retrieved_doc_ids": [
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975",
+        "078af71a5bee07ec816c45c139cfe1678dd2d3b4c915e26200d5d9abbbfa5945",
+        "a0643195a3218ae4b105bdff96c6dd3f9d10b7b534b75dec27595ba7163eed8e",
+        "c0ef3c6101a07de94871d33d2b94497fe384c8f975d89f9037962f4cde0d59a8",
+        "fce7c6eac0e5cd800f1555202a67f9b4893572acacff7b1e0e1a0d7538a283d7",
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "1ccde846e825ac6a4016233e685845521b721c427fca21c940447cb0d5c01fd7"
+      ],
+      "relevant_doc_ids": [
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 1.0
+    },
+    {
+      "query": "What graph-based algorithms are used for disk-resident ANN search?",
+      "retrieved_count": 6,
+      "retrieved_doc_ids": [
+        "457202a3c6ab06efd4d062daae6c351154d058dc72f85042df3d84617841fec4",
+        "1dffe01c4ff11522924153faf36c550e94785d88aed7df8fa93d572cb9dd6241",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "9e5909547c859b138204dd201cc7e6b8f9524d3b3af6a5c0b5908a143466c56d",
+        "2b529e6ae899cf68473c9269463a1eeb7ff769ad6ae5d428c9b9c6fb1d9d05b5",
+        "95af516f7ab30dd9d834fe530d599915070a06ab0d9a54b181848f13790d8fe9"
+      ],
+      "relevant_doc_ids": [
+        "457202a3c6ab06efd4d062daae6c351154d058dc72f85042df3d84617841fec4",
+        "95af516f7ab30dd9d834fe530d599915070a06ab0d9a54b181848f13790d8fe9"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 0.831555
+    },
+    {
+      "query": "How does clustering improve approximate nearest neighbor search efficiency?",
+      "retrieved_count": 7,
+      "retrieved_doc_ids": [
+        "9e5909547c859b138204dd201cc7e6b8f9524d3b3af6a5c0b5908a143466c56d",
+        "95af516f7ab30dd9d834fe530d599915070a06ab0d9a54b181848f13790d8fe9",
+        "1dffe01c4ff11522924153faf36c550e94785d88aed7df8fa93d572cb9dd6241",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "457202a3c6ab06efd4d062daae6c351154d058dc72f85042df3d84617841fec4",
+        "2b529e6ae899cf68473c9269463a1eeb7ff769ad6ae5d428c9b9c6fb1d9d05b5",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45"
+      ],
+      "relevant_doc_ids": [
+        "457202a3c6ab06efd4d062daae6c351154d058dc72f85042df3d84617841fec4",
+        "95af516f7ab30dd9d834fe530d599915070a06ab0d9a54b181848f13790d8fe9"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 0.5,
+      "ndcg_at_k": 0.624051
+    },
+    {
+      "query": "What NLP tasks can be formulated as nearest neighbor search problems?",
+      "retrieved_count": 8,
+      "retrieved_doc_ids": [
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "95af516f7ab30dd9d834fe530d599915070a06ab0d9a54b181848f13790d8fe9",
+        "1dffe01c4ff11522924153faf36c550e94785d88aed7df8fa93d572cb9dd6241",
+        "9e5909547c859b138204dd201cc7e6b8f9524d3b3af6a5c0b5908a143466c56d",
+        "2b529e6ae899cf68473c9269463a1eeb7ff769ad6ae5d428c9b9c6fb1d9d05b5",
+        "457202a3c6ab06efd4d062daae6c351154d058dc72f85042df3d84617841fec4",
+        "fa08a772f25ab55d7dc0dc6722a0322e82481ed33098a049e1faba627817567e",
+        "2e087b3b53d1df66054abd4804242600f6d16bde1347817c857d1758dd948bb2"
+      ],
+      "relevant_doc_ids": [
+        "95af516f7ab30dd9d834fe530d599915070a06ab0d9a54b181848f13790d8fe9",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "fa08a772f25ab55d7dc0dc6722a0322e82481ed33098a049e1faba627817567e"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 0.921787
+    },
+    {
+      "query": "How do language model representations differ from sparse (BM25/TF-IDF) retrieval?",
+      "retrieved_count": 6,
+      "retrieved_doc_ids": [
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45",
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "1ccde846e825ac6a4016233e685845521b721c427fca21c940447cb0d5c01fd7",
+        "82f543cc6b407e91bcabab2b4618838f5c461ecc8f4067d4a8ec6ab79bf1d530",
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509"
+      ],
+      "relevant_doc_ids": [
+        "2e087b3b53d1df66054abd4804242600f6d16bde1347817c857d1758dd948bb2",
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45"
+      ],
+      "recall_at_k": 0.666667,
+      "mrr": 1.0,
+      "ndcg_at_k": 0.765361
+    },
+    {
+      "query": "What are the privacy risks and mitigations in passage retrieval systems?",
+      "retrieved_count": 7,
+      "retrieved_doc_ids": [
+        "82f543cc6b407e91bcabab2b4618838f5c461ecc8f4067d4a8ec6ab79bf1d530",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45",
+        "1ccde846e825ac6a4016233e685845521b721c427fca21c940447cb0d5c01fd7",
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "a0643195a3218ae4b105bdff96c6dd3f9d10b7b534b75dec27595ba7163eed8e",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "2e087b3b53d1df66054abd4804242600f6d16bde1347817c857d1758dd948bb2"
+      ],
+      "relevant_doc_ids": [
+        "82f543cc6b407e91bcabab2b4618838f5c461ecc8f4067d4a8ec6ab79bf1d530"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 1.0
+    },
+    {
+      "query": "How can AI systems augment human cognitive abilities without replacing critical thinking?",
+      "retrieved_count": 7,
+      "retrieved_doc_ids": [
+        "c0ef3c6101a07de94871d33d2b94497fe384c8f975d89f9037962f4cde0d59a8",
+        "fce7c6eac0e5cd800f1555202a67f9b4893572acacff7b1e0e1a0d7538a283d7",
+        "d1f5554128b4918654e6e79d6e627a0a353d0acc8571e486cbf3cbee48fabfa3",
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975",
+        "457202a3c6ab06efd4d062daae6c351154d058dc72f85042df3d84617841fec4",
+        "078af71a5bee07ec816c45c139cfe1678dd2d3b4c915e26200d5d9abbbfa5945"
+      ],
+      "relevant_doc_ids": [
+        "82f543cc6b407e91bcabab2b4618838f5c461ecc8f4067d4a8ec6ab79bf1d530",
+        "c0ef3c6101a07de94871d33d2b94497fe384c8f975d89f9037962f4cde0d59a8",
+        "d1f5554128b4918654e6e79d6e627a0a353d0acc8571e486cbf3cbee48fabfa3",
+        "fce7c6eac0e5cd800f1555202a67f9b4893572acacff7b1e0e1a0d7538a283d7"
+      ],
+      "recall_at_k": 0.75,
+      "mrr": 1.0,
+      "ndcg_at_k": 0.831872
+    },
+    {
+      "query": "What are the I/O bottlenecks in approximate nearest neighbor search on SSDs?",
+      "retrieved_count": 6,
+      "retrieved_doc_ids": [
+        "457202a3c6ab06efd4d062daae6c351154d058dc72f85042df3d84617841fec4",
+        "1dffe01c4ff11522924153faf36c550e94785d88aed7df8fa93d572cb9dd6241",
+        "95af516f7ab30dd9d834fe530d599915070a06ab0d9a54b181848f13790d8fe9",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "9e5909547c859b138204dd201cc7e6b8f9524d3b3af6a5c0b5908a143466c56d",
+        "2b529e6ae899cf68473c9269463a1eeb7ff769ad6ae5d428c9b9c6fb1d9d05b5"
+      ],
+      "relevant_doc_ids": [
+        "457202a3c6ab06efd4d062daae6c351154d058dc72f85042df3d84617841fec4"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 1.0
+    },
+    {
+      "query": "How does masked language model pre-training relate to retrieval quality?",
+      "retrieved_count": 7,
+      "retrieved_doc_ids": [
+        "1ccde846e825ac6a4016233e685845521b721c427fca21c940447cb0d5c01fd7",
+        "a0643195a3218ae4b105bdff96c6dd3f9d10b7b534b75dec27595ba7163eed8e",
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04"
+      ],
+      "relevant_doc_ids": [
+        "1ccde846e825ac6a4016233e685845521b721c427fca21c940447cb0d5c01fd7",
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 0.919721
+    },
+    {
+      "query": "What is ANN search with metadata/attribute filters (window search)?",
+      "retrieved_count": 6,
+      "retrieved_doc_ids": [
+        "1dffe01c4ff11522924153faf36c550e94785d88aed7df8fa93d572cb9dd6241",
+        "457202a3c6ab06efd4d062daae6c351154d058dc72f85042df3d84617841fec4",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "95af516f7ab30dd9d834fe530d599915070a06ab0d9a54b181848f13790d8fe9",
+        "9e5909547c859b138204dd201cc7e6b8f9524d3b3af6a5c0b5908a143466c56d",
+        "fa08a772f25ab55d7dc0dc6722a0322e82481ed33098a049e1faba627817567e"
+      ],
+      "relevant_doc_ids": [
+        "1dffe01c4ff11522924153faf36c550e94785d88aed7df8fa93d572cb9dd6241"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 1.0
+    },
+    {
+      "query": "What are the key components of a transformer-based language model architecture?",
+      "retrieved_count": 8,
+      "retrieved_doc_ids": [
+        "0fd1724654d44b871e048f59c382b9b033fb748e2fd6e6c28a6ff4f91e9cc333",
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04",
+        "1c168904a9a26aadacbedeb48bb0a7f0cbf661a83958bdb1792d151bcec8c119",
+        "1ccde846e825ac6a4016233e685845521b721c427fca21c940447cb0d5c01fd7",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975",
+        "7e776e26bb476eeda54c523511af848518aca2ed8c4970a75fc9b1c3b0ea5c45",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "55d1d1e4d13fcd7e903fe3e4315ebf9f40162c9848f5f8e39634f685517e2c1d"
+      ],
+      "relevant_doc_ids": [
+        "0fd1724654d44b871e048f59c382b9b033fb748e2fd6e6c28a6ff4f91e9cc333",
+        "1c168904a9a26aadacbedeb48bb0a7f0cbf661a83958bdb1792d151bcec8c119"
+      ],
+      "recall_at_k": 1.0,
+      "mrr": 1.0,
+      "ndcg_at_k": 0.919721
+    },
+    {
+      "query": "How do RAG systems combine retrieval and generation to reduce hallucination?",
+      "retrieved_count": 8,
+      "retrieved_doc_ids": [
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975",
+        "078af71a5bee07ec816c45c139cfe1678dd2d3b4c915e26200d5d9abbbfa5945",
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04",
+        "ce46ed6fc0d9bc53a250213926400524cbe21352edc099e7f11de756d19fc509",
+        "1ccde846e825ac6a4016233e685845521b721c427fca21c940447cb0d5c01fd7",
+        "a0643195a3218ae4b105bdff96c6dd3f9d10b7b534b75dec27595ba7163eed8e",
+        "457202a3c6ab06efd4d062daae6c351154d058dc72f85042df3d84617841fec4",
+        "2e087b3b53d1df66054abd4804242600f6d16bde1347817c857d1758dd948bb2"
+      ],
+      "relevant_doc_ids": [
+        "1c168904a9a26aadacbedeb48bb0a7f0cbf661a83958bdb1792d151bcec8c119",
+        "6abde0ae4237fe9dcaed71d53787be4af88d249eb54c65c69c964d6968813d04",
+        "eaf004fec892968d5561c536c50eb1b0c12fd5fb08e18607ef9ed0666bb4a975"
+      ],
+      "recall_at_k": 0.666667,
+      "mrr": 1.0,
+      "ndcg_at_k": 0.703918
+    }
+  ]
+}

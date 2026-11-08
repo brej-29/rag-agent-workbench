@@ -112,13 +112,14 @@ RAG_PHASE_DURATION = Histogram(
 # LLM token counter (T2.7)
 # ---------------------------------------------------------------------------
 #
-# call_type is a BOUNDED enumeration with exactly 4 values:
+# call_type is a BOUNDED enumeration with exactly 5 values:
 #   generation  — main answer LLM call
 #   judge       — faithfulness judge call (when RAG_FAITHFULNESS_ENABLED=True)
 #   crag_rewrite — CRAG corrective query rewrite (when RAG_CRAG_ENABLED=True)
 #   contextualize — history-aware query rewrite (when RAG_CONTEXTUALIZE_ENABLED=True)
+#   router      — intent + profile extraction (regs namespace only)
 #
-# 4 call_type values × 1 counter = 4 max time series.  Strictly bounded.
+# 5 call_type values × 1 counter = 5 max time series.  Strictly bounded.
 # NEVER label by model name, user, namespace, or any unbounded field.
 LLM_TOKENS_TOTAL = Counter(
     "llm_tokens_total",

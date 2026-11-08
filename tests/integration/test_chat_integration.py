@@ -414,6 +414,33 @@ class TestChatStream:
         assert event_types.count("done") == 1, "expected exactly one done event"
         assert event_types[-1] == "done", "done must be the last event"
 
+    def test_rate_limited_generation_ends_with_a_failed_step_reason_and_the_found_sources(self, integration_client):
+        """No spinner left running: generate is marked error, then one error event the UI can explain."""
+
+        class RateLimitError(Exception):
+            status_code = 429
+
+        async def _failing_astream(messages, **kwargs):
+            raise RateLimitError("upstream said: secret-ish detail")
+            yield  # pragma: no cover
+
+        mock_llm = _make_mock_llm()
+        mock_llm.astream = _failing_astream
+        with (
+            patch("app.services.chat.graph.pinecone_search", return_value=[_FAKE_CHUNK]),
+            patch("app.services.chat.graph.get_llm", return_value=_make_mock_llm()),
+            patch("app.services.chat.streaming.get_llm", return_value=mock_llm),
+            patch("app.services.chat.graph.is_tavily_configured", return_value=False),
+        ):
+            resp = integration_client.post("/chat/stream", json=_CHAT_PAYLOAD, headers=_AUTH_HEADERS)
+
+        frames = _parse_sse(resp.text)
+        gen = [d for e, d in frames if e == "step" and d["id"] == "generate"]
+        assert gen[-1]["status"] == "error" and gen[-1]["detail"]["reason"] == "busy"
+        event, data = frames[-1]
+        assert event == "error" and data["code"] == "busy" and data["sources"]
+        assert "secret-ish" not in resp.text
+
     def test_token_events_carry_text_field(self, integration_client):
         """Each token event data has a 'text' key (T2.9 SSE protocol)."""
         mock_llm = _make_mock_llm()

@@ -1,0 +1,23 @@
+{
+  "n": 36,
+  "accuracy": 0.944,
+  "confusion": {
+    "ask->ask": 17,
+    "checklist->checklist": 11,
+    "clarify->clarify": 3,
+    "gap_check->ask": 2,
+    "gap_check->gap_check": 3
+  },
+  "misses": [
+    {
+      "query": "Here is our incident response policy. Does it meet NIS2 reporting requirements?",
+      "label": "gap_check",
+      "predicted": "ask"
+    },
+    {
+      "query": "I'll paste our access control standard: does it cover SP 800-53 AC-2?",
+      "label": "gap_check",
+      "predicted": "ask"
+    }
+  ]
+}

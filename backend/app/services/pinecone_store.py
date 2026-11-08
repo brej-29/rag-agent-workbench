@@ -205,7 +205,23 @@ def search(
     if not isinstance(hits, list):
         return []
 
-    return hits  # type: ignore[return-value]
+    return [_normalise_hit(h) for h in hits]
+
+
+def _normalise_hit(hit: Any) -> Dict[str, Any]:
+    """Return the hit with the API's wire keys `_id` / `_score`.
+
+    pinecone>=8 `to_dict()` emits Python attribute names (`id_`, `score_`); every
+    caller (cosine gating, CRAG grading, /search, eval) reads `_id` / `_score`.
+    Without this, scores read as 0.0 and every chat request abstains.
+    """
+    if not isinstance(hit, dict):
+        return hit
+    hit = dict(hit)
+    for wire, attr in (("_id", "id_"), ("_score", "score_")):
+        if attr in hit:
+            hit.setdefault(wire, hit.pop(attr))
+    return hit
 
 
 def describe_index_stats(namespace_filter: Optional[str] = None) -> Dict[str, Any]:

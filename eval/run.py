@@ -95,6 +95,13 @@ def _run_retrieval(namespace: str, query: str, top_k: int) -> List[str]:
         filters=None,
         fields=None,
     )
+    # Ranking metrics only need doc order, so a broken score field would pass
+    # silently while production cosine gating abstains on everything.
+    if any("_score" not in h for h in hits):
+        raise SystemExit(
+            "ERROR: search hits lack `_score` (Pinecone response shape changed?). "
+            "Cosine gating and CRAG grading depend on it."
+        )
     return _extract_ranked_doc_ids(hits)
 
 

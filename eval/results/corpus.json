@@ -1,0 +1,74 @@
+[
+  {
+    "key": "eu-ai-act",
+    "name": "EU AI Act",
+    "binding": "regulation",
+    "provisions": 854,
+    "url": "http://publications.europa.eu/resource/celex/02024R1689-20260727",
+    "retrieved": "2026-10-20"
+  },
+  {
+    "key": "gdpr",
+    "name": "GDPR",
+    "binding": "regulation",
+    "provisions": 563,
+    "url": "http://publications.europa.eu/resource/celex/32016R0679",
+    "retrieved": "2026-10-20"
+  },
+  {
+    "key": "nis2",
+    "name": "NIS2",
+    "binding": "directive",
+    "provisions": 349,
+    "url": "http://publications.europa.eu/resource/celex/32022L2555",
+    "retrieved": "2026-10-20"
+  },
+  {
+    "key": "nis2-ir",
+    "name": "NIS2 Implementing Regulation 2024/2690",
+    "binding": "regulation",
+    "provisions": 116,
+    "url": "http://publications.europa.eu/resource/celex/32024R2690",
+    "retrieved": "2026-10-24"
+  },
+  {
+    "key": "dora",
+    "name": "DORA",
+    "binding": "regulation",
+    "provisions": 375,
+    "url": "http://publications.europa.eu/resource/celex/32022R2554",
+    "retrieved": "2026-10-20"
+  },
+  {
+    "key": "cra",
+    "name": "Cyber Resilience Act",
+    "binding": "regulation",
+    "provisions": 475,
+    "url": "http://publications.europa.eu/resource/celex/32024R2847",
+    "retrieved": "2026-10-20"
+  },
+  {
+    "key": "nist-800-53",
+    "name": "NIST SP 800-53",
+    "binding": "voluntary_framework",
+    "provisions": 1014,
+    "url": "https://raw.githubusercontent.com/usnistgov/oscal-content/main/nist.gov/SP800-53/rev5/json/NIST_SP-800-53_rev5_catalog.json",
+    "retrieved": "2026-10-20"
+  },
+  {
+    "key": "nist-csf",
+    "name": "NIST CSF 2.0",
+    "binding": "voluntary_framework",
+    "provisions": 128,
+    "url": "https://raw.githubusercontent.com/usnistgov/oscal-content/main/nist.gov/CSF/v2.0/json/NIST_CSF_v2.0_catalog.json",
+    "retrieved": "2026-10-20"
+  },
+  {
+    "key": "nist-ai-rmf",
+    "name": "NIST AI RMF",
+    "binding": "voluntary_framework",
+    "provisions": 72,
+    "url": "https://airc.nist.gov/docs/playbook.json",
+    "retrieved": "2026-10-20"
+  }
+]

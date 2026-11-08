@@ -323,6 +323,32 @@ rag-agent-workbench/
   the sources it found and a retry button.
 - `make check-models` (also run weekly in CI) fails when a configured model or combo stops answering.
 
+### Landing site (GitHub Pages)
+
+The Streamlit app is a single-page app, so search engines see almost no text on it. `site/` holds a small
+static site that they can read: a home page, one page per rulebook, "When the rules start" and an FAQ, each
+linking into the app.
+
+```bash
+python site/build.py          # writes site/dist/ (stdlib only); open site/dist/index.html or serve it:
+python -m http.server -d site/dist 8000
+```
+
+Dates come only from `eval/results/timeline.json` and quotes only from `backend/app/data/regs/regs-v1.jsonl`;
+the build stops on a quote that is not in its provision, and `tests/test_site.py` fails on any date or quote
+that is not in those files. `.github/workflows/pages.yml` builds the site on every push to `main` that touches
+it, and deploys only once Pages is switched on.
+
+Steps that need the repository owner (none is done yet):
+
+| Step | Where | Cost |
+|---|---|---|
+| 1. Turn on Pages: Source = "GitHub Actions" | Settings > Pages | Free for public repositories |
+| 2. Add the repository variable `PAGES_ENABLED` = `true`, then run "Landing site" once | Settings > Secrets and variables > Actions > Variables; Actions tab | Free |
+| 3. Check https://brej-29.github.io/rag-agent-workbench/ loads | Browser | Free |
+| 4. Add a URL-prefix property for that address in Google Search Console, choose the HTML tag method, put the tag's `content` value in a repository variable `GOOGLE_SITE_VERIFICATION`, rerun "Landing site", press Verify, then submit `sitemap.xml` | search.google.com/search-console | Free |
+| 5. Optional: a custom domain. Set the `SITE_URL` repository variable to it, add it under Settings > Pages, and point DNS at GitHub | Domain registrar | Domain costs money (price not checked) |
+
 ---
 
 ## Documentation

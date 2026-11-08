@@ -473,20 +473,16 @@ RULEBOOK_LINES: List[Tuple[str, str, str]] = [
 ]
 
 
-def dot_grid_html(value: int, total: int) -> str:
-    """A 10 by 10 proof grid, scaled from a measured fraction."""
-    filled = round((value / total) * 100) if total else 0
-    dots = "".join(f'<span class="cw-dot{" is-filled" if i < filled else ""}"></span>' for i in range(100))
-    return f'<div class="cw-dot-grid" role="img" aria-label="{value} of {total}">{dots}</div>'
-
-
 def rulebook_stack_html() -> str:
-    """Eight index-tabbed volumes for the home hero."""
+    """Eight index-tabbed volumes for the home hero; hovering or focusing one pulls it out to show what it covers."""
     books = [
-        ("EU AI Act", "#2F45D6"), ("GDPR", "#237B78"), ("NIS2", "#7651A8"), ("DORA", "#8B4D72"),
-        ("Cyber Resilience Act", "#9A6518"), ("NIST SP 800-53", "#59627D"),
-        ("NIST CSF 2.0", "#69738F"), ("NIST AI RMF", "#7C86A0"),
+        ("EU AI Act", "#2F45D6", RULEBOOK_LINES[0][2]), ("GDPR", "#237B78", RULEBOOK_LINES[1][2]),
+        ("NIS2", "#7651A8", RULEBOOK_LINES[2][2]), ("DORA", "#8B4D72", RULEBOOK_LINES[3][2]),
+        ("Cyber Resilience Act", "#9A6518", RULEBOOK_LINES[4][2]),
+        ("NIST SP 800-53", "#59627D", "A US catalogue of security and privacy controls. Voluntary here."),
+        ("NIST CSF 2.0", "#69738F", "A US framework for managing cybersecurity risk. Voluntary here."),
+        ("NIST AI RMF", "#7C86A0", "A US framework for managing the risks of AI systems. Voluntary here."),
     ]
-    rows = "".join(f'<div class="cw-book" style="--i:{i};--tab:{esc(color)}"><span>{esc(title)}</span></div>'
-                   for i, (title, color) in enumerate(books))
-    return f'<div class="cw-rulebooks" aria-label="Eight rulebooks">{rows}</div>'
+    rows = "".join(f'<div class="cw-book" tabindex="0" style="--i:{i};--tab:{esc(color)}"><span>{esc(title)}</span>'
+                   f'<small>{esc(line)}</small></div>' for i, (title, color, line) in enumerate(books))
+    return f'<div class="cw-rulebooks" role="list" aria-label="Eight rulebooks">{rows}</div>'

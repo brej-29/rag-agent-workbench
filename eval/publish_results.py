@@ -91,6 +91,19 @@ def corpus_summary(data_dir: Path) -> List[dict]:
              "retrieved": manifest[k]["retrieved"]} for k, name in INSTRUMENTS.items() if k in counts]
 
 
+def timeline_summary(data_dir: Path) -> dict:
+    """Every dated applicability rule (date, condition, legal basis, verbatim quote) and the checklist size,
+    so the Home page timeline shows only dates the corpus tests have checked."""
+    import yaml  # noqa: PLC0415  (backend venv only; the UI reads the JSON this writes)
+
+    rules = yaml.safe_load((data_dir / "applicability.yaml").read_text(encoding="utf-8"))
+    milestones = [{"id": r["id"], "from": str(d["from"]), "condition": d.get("condition"), "basis": r["basis"],
+                   "quote": r.get("quote", "")}
+                  for r in rules for d in r.get("dates") or [] if d.get("from")]
+    obligations = yaml.safe_load((data_dir / "obligations.yaml").read_text(encoding="utf-8"))["obligations"]
+    return {"milestones": sorted(milestones, key=lambda m: m["from"]), "obligations": len(obligations)}
+
+
 def publish(reports: Path = REPORTS, results: Path = RESULTS, data_dir: Path = REGS_DATA) -> List[str]:
     results.mkdir(exist_ok=True)
     done = []
@@ -102,7 +115,8 @@ def publish(reports: Path = REPORTS, results: Path = RESULTS, data_dir: Path = R
             shutil.copyfile(candidates[-1], results / f"{kind}.json")
             done.append(kind)
     built = {"regs_retrieval": regs_retrieval(reports), "regs_modes": regs_modes(reports) or None,
-             "gapcheck": gapcheck_runs(reports), "corpus": corpus_summary(data_dir)}
+             "gapcheck": gapcheck_runs(reports), "corpus": corpus_summary(data_dir),
+             "timeline": timeline_summary(data_dir)}
     for kind, data in built.items():
         if data:
             (results / f"{kind}.json").write_text(json.dumps(data, indent=2), encoding="utf-8")

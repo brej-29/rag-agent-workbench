@@ -1,7 +1,7 @@
 # Theme: marked-up rulebooks on a cool paper desk.
 
 [client]
-toolbarMode = "minimal"
+toolbarMode = "viewer"
 
 [theme]
 font = "Public Sans:https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&display=swap"

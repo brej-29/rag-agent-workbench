@@ -50,3 +50,12 @@ def test_publish_writes_the_compliance_snapshots(tmp_path):
     assert {"router", "regs_retrieval", "regs_modes", "corpus"} <= set(done)
     corpus = json.loads((results / "corpus.json").read_text(encoding="utf-8"))
     assert {c["key"] for c in corpus} >= {"eu-ai-act", "gdpr", "nis2", "nis2-ir", "dora", "cra", "nist-csf"}
+
+
+def test_timeline_keeps_every_dated_rule_with_its_quote():
+    tl = pub.timeline_summary(pub.REGS_DATA)
+    by_id = {(m["id"], m["condition"]): m for m in tl["milestones"]}
+    assert by_id[("gdpr", None)]["from"] == "2018-05-25"
+    assert by_id[("ai-act-high-risk", "annex_iii")]["quote"].startswith("(i) 2 December 2027")
+    assert [m["from"] for m in tl["milestones"]] == sorted(m["from"] for m in tl["milestones"])
+    assert tl["obligations"] > 100

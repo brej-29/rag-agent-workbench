@@ -20,7 +20,42 @@ THEME_CSS = Path(__file__).resolve().parents[1] / "static" / "theme.css"
 
 def inject_theme() -> None:
     """Load the shared, selector-stable visual layer once at the app entry point."""
-    st.html(f"<style>{THEME_CSS.read_text(encoding='utf-8')}</style>")
+    dark = DARK_TOKENS if is_dark() else ""
+    st.html(f"<style>{THEME_CSS.read_text(encoding='utf-8')}{dark}</style>")
+
+
+# The page's own tokens follow the theme Streamlit renders (not the OS), so a switched theme stays consistent.
+DARK_TOKENS = (":root{--cw-paper:#0D1230;--cw-paper-2:#151B45;--cw-ink:#E7E9F7;--cw-primary:#8E9BFF;"
+               "--cw-stamp:#FF7A70;--cw-sage:#6FCF9F;--cw-amber:#F2A94A;--cw-rule:#2A3166}")
+_SUN = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">'
+        '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2'
+        'M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>')
+_MOON = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">'
+         '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>')
+PAGES = ("", "ask", "checklist", "gapcheck", "evaluation")
+
+
+def theme_switch() -> None:
+    """Light/dark switch in the header. Streamlit keeps the viewer's theme in localStorage under
+    stActiveTheme-<path>-v2 (one key per first-loaded path); the button writes it for every page and reloads.
+    Static script, no user input, so unsafe_allow_javascript carries no injection risk."""
+    target = "Light" if is_dark() else "Dark"
+    pages = ",".join(f"'{p}'" for p in PAGES)
+    st.html(f"""<button class="cw-theme-switch" id="cw-theme-switch" type="button"
+  title="Switch to the {target.lower()} theme (reloads the page)">{_SUN if target == "Light" else _MOON}{target}</button>
+<script>
+(() => {{
+  const b = document.getElementById("cw-theme-switch");
+  if (!b) return;
+  b.onclick = () => {{
+    const base = location.pathname.replace(/(ask|checklist|gapcheck|evaluation)[/]?$/, "");
+    for (const p of [{pages}]) {{
+      try {{ localStorage.setItem(`stActiveTheme-${{base}}${{p}}-v2`, JSON.stringify("{target}")); }} catch (e) {{}}
+    }}
+    location.reload();
+  }};
+}})();
+</script>""", width="content", unsafe_allow_javascript=True)
 
 
 def _config(name: str, default: Optional[str] = None) -> Optional[str]:

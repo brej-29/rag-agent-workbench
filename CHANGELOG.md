@@ -115,3 +115,8 @@
 - feat(checklist): 8 ready-made examples and "Reset all answers"; the form follows the chosen example.
 - feat(ui): redesign per `docs/superpowers/specs/2026-11-08-ui-redesign.md` (rulebook hero, plain
   "how it works", eval numbers as sentences with a dot grid, library rows, serif headings, new palette).
+- feat(home): richer Home: count-up facts strip, rotating example questions, replayed real answer, animated
+  "how it works", a timeline of 13 start dates from `applicability.yaml` (each with its quoted legal basis,
+  published to `eval/results/timeline.json`), dot-grid trust panels, scroll reveal; reduced motion respected.
+- feat(ui): light/dark switch in the header; page tokens follow the theme Streamlit renders.
+- chore(deps): pypdf 6.21.4 (7 CVEs).

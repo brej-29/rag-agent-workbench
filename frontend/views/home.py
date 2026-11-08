@@ -47,7 +47,7 @@ with st.container(key="hero"):
                 st.page_link("views/ask.py", label="Ask a question", icon=":material/forum:")
     with stack:
         st.html(rulebook_stack_html())
-        st.caption("Hover or tab to a rulebook to see what it covers.")
+        st.caption("Point at a rulebook, tap it, or tab to it to see what it covers.")
 
 numbers = stats(results.get("corpus"), results.get("timeline") or {}, len(milestones))
 if numbers:

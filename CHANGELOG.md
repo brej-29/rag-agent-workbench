@@ -3,7 +3,7 @@
 ## [Unreleased] — revive/2026-10
 
 ### 2026-10-19 — Phases 0–3 (audit only, no code changes)
-- Backups: git bundles + working-tree archive in `D:\Project\_backups\revive-2026-10-19\`.
+- Backups: git bundles + working-tree archive in a local backup folder outside the repo.
 - Created branch `revive/2026-10` in both repos.
 - Added `RESURRECTION_REPORT.md` (status, verified risks, baseline, hosting analysis, options).
 - Baseline: 343/343 tests pass hermetically; live eval not yet re-run (needs Pinecone key).
@@ -120,3 +120,6 @@
   published to `eval/results/timeline.json`), dot-grid trust panels, scroll reveal; reduced motion respected.
 - feat(ui): light/dark switch in the header; page tokens follow the theme Streamlit renders.
 - chore(deps): pypdf 6.21.4 (7 CVEs).
+- docs: README rewritten around what the app does, with GIFs of Home, Ask, Checklist and the theme switch
+  (`docs/media/`); portable MCP config; how to review the golden labels. Local paths removed from docs.
+- fix(home): pulled-out rulebook shows its full description; caption names hover, tap and tab.

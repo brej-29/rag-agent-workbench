@@ -8,10 +8,10 @@ Evidence tags: **VERIFIED** means read on an official page or reproduced by a co
 
 | Repo | Role | Remote | Last commit |
 |---|---|---|---|
-| `D:\Project\rag-agent-workbench` | **Monorepo and source of truth**: backend, Streamlit UI (`frontend/`), 343 tests, eval harness, CI | `github.com/brej-29/rag-agent-workbench` | 2026-06-26 |
-| `D:\Project\rag-agent-workbench-api` | **Deploy copy for the HF Space** (Docker). Its `backend/` is identical to the monorepo's. There are no tests, and 35 `__pycache__/*.pyc` files are committed | `huggingface.co/spaces/BrejBala/rag-agent-workbench-api` | 2026-06-26 |
+| `rag-agent-workbench` | **Monorepo and source of truth**: backend, Streamlit UI (`frontend/`), 343 tests, eval harness, CI | `github.com/brej-29/rag-agent-workbench` | 2026-06-26 |
+| `rag-agent-workbench-api` (local clone) | **Deploy copy for the HF Space** (Docker). Its `backend/` is identical to the monorepo's. There are no tests, and 35 `__pycache__/*.pyc` files are committed | `huggingface.co/spaces/BrejBala/rag-agent-workbench-api` | 2026-06-26 |
 
-- **Backups:** `D:\Project\_backups\revive-2026-10-19\` holds both `--all` git bundles (verified) and `working-trees.tgz`. The archive includes your gitignored local `.env` files, so keep it private.
+- **Backups:** a local backup folder outside the repo holds both `--all` git bundles (verified) and `working-trees.tgz`. The archive includes your gitignored local `.env` files, so keep it private.
 - **Secrets:** I scanned every blob in the full history of both repos for provider key patterns (`gsk_`, `pcsk_`, `tvly-`, `lsv2_`, `hf_`, `sk-`, `AKIA`) and for `*_KEY/TOKEN/SECRET=` assignments. **No real secrets were found.** The only matches are placeholders: `backend/.env.example` (`your-…`), `tests/integration/conftest.py:INTEGRATION_API_KEY` and `scripts/bench_mocked.py:_BENCH_API_KEY` (test fixtures). **Nothing needs rotating because of git.** Local gitignored files that do contain keys are `.env`, `backend/.env.docker` and `frontend/.streamlit/secrets.toml`. I did not read their values.
 - **Variables the backend expects:** `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`, `PINECONE_HOST`, `PINECONE_NAMESPACE`, `PINECONE_TEXT_FIELD`, `GROQ_API_KEY`, `GROQ_BASE_URL`, `GROQ_MODEL`, `TAVILY_API_KEY`, `API_KEY`, `ENV`, `ALLOWED_ORIGINS`, `RATE_LIMIT_ENABLED`, `CACHE_ENABLED`, `LOG_LEVEL`, `LANGCHAIN_TRACING_V2`, `LANGCHAIN_API_KEY`, `LANGCHAIN_PROJECT`, `WIKIMEDIA_USER_AGENT`, and the `RAG_*` tunables. **Variables the UI expects:** `BACKEND_BASE_URL` and `API_KEY`.
 - **Pipeline:** 8 LangGraph nodes (`graph.py:654-661`). The README says "7-node", which is a documentation error.

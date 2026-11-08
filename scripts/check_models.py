@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Fail loudly when a configured chat model is retired, deprecated or missing.
 
-Checks every model in GROQ_MODEL + LLM_FALLBACK_MODELS:
-  1. listed by GET {GROQ_BASE_URL}/models
+Checks every configured chat model (OmniRoute combos when OMNIROUTE_API_KEY is set, else Groq):
+  1. listed by GET {base_url}/models
   2. answers a 1-message chat completion (HTTP 200)
   3. (Groq only) not named in a heading on console.groq.com/docs/deprecations,
      which catches models announced for shutdown before they disappear.
 
-Exit 0 = all good, 1 = at least one problem.  Needs GROQ_API_KEY (env or .env).
+Exit 0 = all good, 1 = at least one problem.  Needs OMNIROUTE_API_KEY + OMNIROUTE_BASE_URL or GROQ_API_KEY (env or .env).
 
 Usage:  python scripts/check_models.py
 """
@@ -39,15 +39,21 @@ def deprecated_models(html: str) -> dict[str, str]:
 
 def main() -> int:
     from app.core.config import get_settings  # noqa: PLC0415
-    from app.services.llm.groq_llm import configured_models  # noqa: PLC0415
+    from app.services.llm.groq_llm import provider  # noqa: PLC0415
 
     s = get_settings()
-    if not s.GROQ_API_KEY:
-        print("FAIL: GROQ_API_KEY is not set")
+    try:
+        p = provider()
+    except RuntimeError as exc:
+        print(f"FAIL: {exc}")
         return 1
-    models = configured_models()
-    headers = {"Authorization": f"Bearer {s.GROQ_API_KEY}"}
-    base = s.GROQ_BASE_URL.rstrip("/")
+    if not p.api_key:
+        print("FAIL: no LLM key is set (OMNIROUTE_API_KEY or GROQ_API_KEY)")
+        return 1
+    print(f"Provider: {p.name}")
+    models = p.models
+    headers = {"Authorization": f"Bearer {p.api_key}"}
+    base = p.base_url.rstrip("/")
     problems: list[str] = []
 
     with httpx.Client(timeout=30, headers=headers) as client:

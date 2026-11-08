@@ -132,6 +132,10 @@ def step_line(step: Dict[str, Any]) -> str:
     if sid == "generate":
         if status == "skipped":
             return ""  # the gate line already says why nothing was generated
+        if status == "error":
+            why = {"busy": "the language model is busy", "timeout": "the language model timed out"}.get(
+                d.get("reason"), "the language model could not be reached")
+            return f"Stopped writing the answer: {why}" + _ms(ms)
         return ":shimmer[Writing the answer…]" if status == "running" else ("Wrote the answer" + _ms(ms))
     if sid == "verify":
         dangling = d.get("dangling") or []
@@ -414,3 +418,75 @@ def gap_csv(results: List[Dict[str, Any]]) -> str:
             w.writerow([r["ref"], d["ref"], d["verdict"], d.get("claimed") or "", d.get("law_quote", ""),
                         d.get("policy_quote", ""), d.get("passage_id", ""), d.get("reason", ""), d.get("problem", "")])
     return out.getvalue()
+
+
+# Ready-made situations for the Checklist page (taken from the golden checklist profiles).
+# (title, one-line story, Material icon, profile)
+PRESETS: List[Tuple[str, str, str, Dict[str, Any]]] = [
+    ("AI hiring tool", "EU company using AI to screen CVs", ":material/badge:",
+     {"ai_system": True, "ai_roles": ["deployer"], "high_risk": "annex_iii", "fria_trigger": False,
+      "eu_established": True, "eu_market": True, "size": "small", "personal_data": True, "data_roles": ["controller"],
+      "sensitive_data": False, "large_scale_core": False, "third_country_transfers": False, "nis2_sector": "none",
+      "financial_entity": False, "product_roles": []}),
+    ("Chatbot startup", "US startup selling a chatbot into the EU", ":material/forum:",
+     {"ai_system": True, "ai_roles": ["provider"], "high_risk": "none", "ai_uses": ["chatbot"], "gpai_model": False,
+      "eu_established": False, "eu_market": True, "size": "small", "personal_data": True, "data_roles": ["controller"],
+      "sensitive_data": False, "large_scale_core": False, "automated_decisions": False,
+      "third_country_transfers": True, "nis2_sector": "none", "financial_entity": False, "product_roles": []}),
+    ("Bank scoring credit", "Large EU bank using AI for credit decisions", ":material/account_balance:",
+     {"ai_system": True, "ai_roles": ["deployer"], "high_risk": "annex_iii", "fria_trigger": True, "ai_uses": [],
+      "eu_established": True, "eu_market": True, "size": "large", "personal_data": True, "data_roles": ["controller"],
+      "sensitive_data": False, "large_scale_core": False, "automated_decisions": True,
+      "third_country_transfers": False, "nis2_sector": "other_annex", "financial_entity": True, "product_roles": []}),
+    ("Cloud provider", "Large EU cloud platform hosting customer data", ":material/cloud:",
+     {"ai_system": False, "gpai_model": False, "eu_established": True, "eu_market": True, "size": "large",
+      "personal_data": True, "data_roles": ["controller", "processor"], "sensitive_data": False,
+      "large_scale_core": False, "automated_decisions": False, "third_country_transfers": True,
+      "nis2_sector": "cloud", "financial_entity": False, "product_roles": []}),
+    ("Smart camera maker", "EU manufacturer of connected cameras", ":material/videocam:",
+     {"ai_system": False, "gpai_model": False, "eu_established": True, "eu_market": True, "size": "medium",
+      "personal_data": False, "nis2_sector": "none", "financial_entity": False, "product_roles": ["manufacturer"]}),
+    ("Foundation model lab", "US lab offering a general-purpose AI model in the EU", ":material/neurology:",
+     {"gpai_model": True, "gpai_systemic_risk": False, "ai_roles": ["provider"], "high_risk": "none",
+      "ai_uses": ["synthetic_content"], "eu_established": False, "eu_market": True, "personal_data": False,
+      "nis2_sector": "none", "financial_entity": False, "product_roles": []}),
+    ("Medical AI device", "EU company building AI into a medical device", ":material/stethoscope:",
+     {"ai_system": True, "ai_roles": ["provider"], "high_risk": "annex_i", "ai_uses": [], "gpai_model": False,
+      "eu_established": True, "eu_market": True, "size": "medium", "personal_data": True, "data_roles": ["processor"],
+      "sensitive_data": True, "large_scale_core": False, "automated_decisions": False,
+      "third_country_transfers": False, "nis2_sector": "none", "financial_entity": False, "product_roles": []}),
+    ("Social network", "Large EU social platform", ":material/groups:",
+     {"ai_system": False, "gpai_model": False, "eu_established": True, "eu_market": True, "size": "large",
+      "personal_data": True, "data_roles": ["controller"], "sensitive_data": False, "large_scale_core": True,
+      "automated_decisions": False, "third_country_transfers": True, "nis2_sector": "social_network",
+      "financial_entity": False, "product_roles": []}),
+]
+
+RULEBOOK_LINES: List[Tuple[str, str, str]] = [
+    ("EU AI Act", "#2F45D6", "Rules for building, selling or using AI in the EU, stricter as the risk rises."),
+    ("GDPR", "#237B78", "How organisations may collect and use personal data about people in the EU."),
+    ("NIS2 and its Implementing Regulation", "#7651A8",
+     "Cybersecurity duties for important sectors such as cloud, digital infrastructure, energy and health."),
+    ("DORA", "#8B4D72", "Digital resilience duties for banks, insurers and other financial firms."),
+    ("Cyber Resilience Act", "#9A6518", "Security requirements for hardware and software products sold in the EU."),
+    ("NIST SP 800-53, CSF 2.0, AI RMF", "#59627D", "Voluntary US frameworks of security and AI risk practices."),
+]
+
+
+def dot_grid_html(value: int, total: int) -> str:
+    """A 10 by 10 proof grid, scaled from a measured fraction."""
+    filled = round((value / total) * 100) if total else 0
+    dots = "".join(f'<span class="cw-dot{" is-filled" if i < filled else ""}"></span>' for i in range(100))
+    return f'<div class="cw-dot-grid" role="img" aria-label="{value} of {total}">{dots}</div>'
+
+
+def rulebook_stack_html() -> str:
+    """Eight index-tabbed volumes for the home hero."""
+    books = [
+        ("EU AI Act", "#2F45D6"), ("GDPR", "#237B78"), ("NIS2", "#7651A8"), ("DORA", "#8B4D72"),
+        ("Cyber Resilience Act", "#9A6518"), ("NIST SP 800-53", "#59627D"),
+        ("NIST CSF 2.0", "#69738F"), ("NIST AI RMF", "#7C86A0"),
+    ]
+    rows = "".join(f'<div class="cw-book" style="--i:{i};--tab:{esc(color)}"><span>{esc(title)}</span></div>'
+                   for i, (title, color) in enumerate(books))
+    return f'<div class="cw-rulebooks" aria-label="Eight rulebooks">{rows}</div>'

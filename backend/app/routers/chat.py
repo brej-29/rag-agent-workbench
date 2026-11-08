@@ -26,6 +26,7 @@ from app.schemas.chat import (
     ChatTraceMetadata,
     SourceHit,
 )
+from app.services.llm.groq_llm import configured_models
 from app.services.chat.graph import get_chat_graph
 from app.services.chat.streaming import regs_response_fields, stream_chat_response
 
@@ -81,7 +82,7 @@ def _build_chat_response(state: Dict) -> ChatResponse:
     settings = get_settings()
     usage: Optional[ChatTokenUsage] = None
     if total_tokens > 0 or by_call:
-        cost = estimate_cost_usd(total_prompt, total_completion, settings.GROQ_MODEL)
+        cost = estimate_cost_usd(total_prompt, total_completion, configured_models()[0])
         usage = ChatTokenUsage(
             prompt_tokens=total_prompt,
             completion_tokens=total_completion,

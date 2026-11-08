@@ -710,10 +710,10 @@ def generate_answer(state: ChatState, config: RunnableConfig | None = None) -> C
         elapsed_ms = (perf_counter() - start) * 1000.0
         timings["generate_ms"] = elapsed_ms
         state["timings"] = timings
-        logger.error("Groq chat completion failed: %s", exc)
+        logger.error("LLM chat completion failed: %s", type(exc).__name__)
         raise UpstreamServiceError(
-            service="Groq",
-            message="Upstream Groq chat completion failed. Please try again later.",
+            service="LLM",
+            message="The language model could not answer right now. Please try again shortly.",
         ) from exc
 
     elapsed_ms = (perf_counter() - start) * 1000.0

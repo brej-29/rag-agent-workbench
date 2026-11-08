@@ -68,7 +68,7 @@ from app.services.chat.graph import (
     route_request,
     web_search,
 )
-from app.services.llm.groq_llm import get_llm
+from app.services.llm.groq_llm import configured_models, get_llm
 
 logger = get_logger(__name__)
 
@@ -81,6 +81,24 @@ logger = get_logger(__name__)
 def _sse(event: str, data: Any) -> str:
     """Format a single SSE frame."""
     return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
+
+
+_FAILURE_MESSAGES = {
+    "busy": "The language model is busy right now (rate limit). The sources below were found; try again in a minute.",
+    "timeout": "The language model took too long to reply. The sources below were found; try again.",
+    "unavailable": "The language model could not be reached. The sources below were found; try again shortly.",
+}
+
+
+def generation_failure(exc: BaseException) -> str:
+    """Classify an LLM failure into a reason code the UI can explain.  Never echoes the error text."""
+    name = type(exc).__name__.lower()
+    status = getattr(exc, "status_code", None)
+    if status == 429 or "ratelimit" in name:
+        return "busy"
+    if "timeout" in name:
+        return "timeout"
+    return "unavailable"
 
 
 def _step(step_id: str, status: str, ms: Optional[float] = None, **detail: Any) -> str:
@@ -109,16 +127,9 @@ def _pre_generation_steps(state: Dict) -> list[str]:
     return frames
 
 
-def _build_done_payload(state: Dict, total_ms: float, *, cached: bool = False) -> Dict:
-    """Assemble the 'done' SSE event payload from pipeline state.
-
-    Carries the same observability fields as ChatResponse (grounding, cost,
-    timings, CRAG/contextualize state) plus 'cached' and 'top_score'.
-    """
-    timings_raw = dict(state.get("timings") or {})
-
-    sources_raw = (state.get("retrieved") or []) + (state.get("web_results") or [])
-    sources = [
+def _sources(state: Dict) -> list[Dict[str, Any]]:
+    """Retrieved passages and web results in the shape the UI renders."""
+    return [
         {
             "source": str(s.get("source") or "unknown"),
             "title": str(s.get("title") or ""),
@@ -128,8 +139,19 @@ def _build_done_payload(state: Dict, total_ms: float, *, cached: bool = False) -
             "doc_id": str(s.get("doc_id") or ""),
             **_regs_source_fields(s),
         }
-        for s in sources_raw
+        for s in (state.get("retrieved") or []) + (state.get("web_results") or [])
     ]
+
+
+def _build_done_payload(state: Dict, total_ms: float, *, cached: bool = False) -> Dict:
+    """Assemble the 'done' SSE event payload from pipeline state.
+
+    Carries the same observability fields as ChatResponse (grounding, cost,
+    timings, CRAG/contextualize state) plus 'cached' and 'top_score'.
+    """
+    timings_raw = dict(state.get("timings") or {})
+
+    sources = _sources(state)
 
     # Token usage: same aggregation logic as routers/chat.py _build_chat_response.
     by_call: Dict = dict(state.get("token_usage_by_call") or {})
@@ -139,7 +161,7 @@ def _build_done_payload(state: Dict, total_ms: float, *, cached: bool = False) -
     total_tokens = total_prompt + total_completion
 
     try:
-        groq_model = get_settings().GROQ_MODEL
+        groq_model = configured_models()[0]
     except Exception:
         groq_model = ""
     usage: Optional[Dict] = None
@@ -384,8 +406,12 @@ async def stream_chat_response(
                 answer_chunks.append(text)
                 yield _sse("token", {"text": text})
     except Exception as exc:  # noqa: BLE001
-        logger.error("Streaming: LLM generation failed: %s", exc)
-        yield _sse("error", {"message": "LLM generation failed. Please try again later."})
+        reason = generation_failure(exc)
+        logger.error("Streaming: LLM generation failed (%s): %s", reason, type(exc).__name__)
+        yield _step("generate", "error", (perf_counter() - gen_start) * 1000.0, reason=reason,
+                    partial=bool(answer_chunks))
+        yield _sse("error", {"message": _FAILURE_MESSAGES[reason], "code": reason,
+                             "sources": _sources(state)})
         return
 
     generate_ms = (perf_counter() - gen_start) * 1000.0

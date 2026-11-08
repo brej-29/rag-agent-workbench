@@ -1,13 +1,14 @@
 """Compliance Workbench UI: entry point and app shell (top navigation, API status)."""
 import streamlit as st
 
-from services.shell import status_badge
+from services.shell import inject_theme, status_badge
 
 st.set_page_config(
     page_title="Compliance Workbench",
     page_icon=":material/fact_check:",
     layout="wide",
 )
+inject_theme()
 
 pages = st.navigation(
     [
@@ -20,7 +21,8 @@ pages = st.navigation(
     position="top",
 )
 
-with st.container(horizontal=True, horizontal_alignment="right"):
+with st.container(key="app-header", horizontal=True, horizontal_alignment="right", vertical_alignment="center"):
+    st.html('<span class="cw-wordmark">Compliance Workbench</span>')
     status_badge()
 
 pages.run()

@@ -25,8 +25,9 @@ def _date(stamp: str) -> str:
 
 
 st.title("Evaluation", anchor=False)
-st.markdown("Every number here comes from a harness in `eval/`. Labels were set by reading the official "
-            "text or the documents, never by copying what the system returned.", width=PROSE_WIDTH)
+st.markdown("This page shows where the workbench succeeds, where it misses, and how each result was checked. "
+            "Every number comes from a harness in `eval/`. Labels were set by reading the official text or the "
+            "documents, never by copying what the system returned.", width=PROSE_WIDTH)
 compliance, generic = st.tabs(["Compliance", "Generic pipeline"])
 
 

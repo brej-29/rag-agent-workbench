@@ -1,52 +1,49 @@
-# Theme: "relevance floor" instrument look.
-#   verdigris = grounded / primary;  signal orange = the relevance floor and abstention.
-#   Headings Bricolage Grotesque, body IBM Plex Sans, readouts Martian Mono.
+# Theme: marked-up rulebooks on a cool paper desk.
 
 [client]
 toolbarMode = "minimal"
 
 [theme]
-font = "IBM Plex Sans:https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap"
-headingFont = "Bricolage Grotesque:https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&display=swap"
-codeFont = "Martian Mono:https://fonts.googleapis.com/css2?family=Martian+Mono:wght@400;500&display=swap"
-headingFontWeights = [800, 700, 700, 600, 600, 600]
-baseRadius = "0.4rem"
-buttonRadius = "2rem"
+font = "Public Sans:https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&display=swap"
+headingFont = "Newsreader:https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap"
+codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+headingFontWeights = [600, 600, 600, 500, 500, 500]
+baseRadius = "0.35rem"
+buttonRadius = "0.35rem"
 showWidgetBorder = true
 
 [theme.light]
-primaryColor = "#2E6B5B"
-backgroundColor = "#F5F7F4"
-secondaryBackgroundColor = "#E8EDE7"
-# Captions render this ink at 60% opacity: #10171F keeps them at 4.58:1 on the background (WCAG AA).
-textColor = "#10171F"
-borderColor = "#C9D1C8"
-linkColor = "#2E6B5B"
-codeTextColor = "#2E6B5B"
-codeBackgroundColor = "#E8EDE7"
-greenColor = "#2E6B5B"
-orangeColor = "#C9661E"
-redColor = "#B23A3A"
-grayColor = "#5E6B66"
-chartCategoricalColors = ["#1C8466", "#5B5FCF", "#B8457E"]
+primaryColor = "#2F45D6"
+backgroundColor = "#F6F7FB"
+secondaryBackgroundColor = "#ECEEF6"
+textColor = "#141A47"
+borderColor = "#D5D9EA"
+linkColor = "#2F45D6"
+codeTextColor = "#141A47"
+codeBackgroundColor = "#ECEEF6"
+greenColor = "#2E7D5B"
+orangeColor = "#B86A12"
+redColor = "#C2362F"
+grayColor = "#565D7E"
+chartCategoricalColors = ["#2F45D6", "#2E7D5B", "#7651A8", "#9B596B"]
 
 [theme.light.sidebar]
-backgroundColor = "#E8EDE7"
+backgroundColor = "#ECEEF6"
 
 [theme.dark]
-primaryColor = "#6DB89E"
-backgroundColor = "#11161B"
-secondaryBackgroundColor = "#1A2229"
-textColor = "#E4EAE5"
-borderColor = "#2C3740"
-linkColor = "#6DB89E"
-codeTextColor = "#6DB89E"
-codeBackgroundColor = "#1A2229"
-greenColor = "#6DB89E"
-orangeColor = "#E8913F"
-redColor = "#E07070"
-grayColor = "#93A19B"
-chartCategoricalColors = ["#2A9C7A", "#7E83E2", "#D2669B"]
+primaryColor = "#8E9BFF"
+backgroundColor = "#0D1230"
+secondaryBackgroundColor = "#151B45"
+textColor = "#E7E9F7"
+borderColor = "#2A3166"
+linkColor = "#AAB3FF"
+codeTextColor = "#E7E9F7"
+codeBackgroundColor = "#151B45"
+greenColor = "#6FCF9F"
+orangeColor = "#F2A94A"
+redColor = "#FF7A70"
+grayColor = "#A8AEC9"
+chartCategoricalColors = ["#8E9BFF", "#6FCF9F", "#A98AE0", "#D58AA0"]
 
 [theme.dark.sidebar]
-backgroundColor = "#161D23"
+backgroundColor = "#151B45"

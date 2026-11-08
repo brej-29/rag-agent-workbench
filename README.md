@@ -24,8 +24,9 @@
 An agentic RAG system built as a deliberate engineering exercise: every design decision is
 measurement-driven, every limitation is documented, and every feature ships with a test.
 
-**Stack:** FastAPI · LangGraph/LangChain · Pinecone (`llama-text-embed-v2`, 1024-dim) · Groq
-(`openai/gpt-oss-20b`, fallback `gpt-oss-120b`) · Tavily · Streamlit · Prometheus · Docker
+**Stack:** FastAPI · LangGraph/LangChain · Pinecone (`llama-text-embed-v2`, 1024-dim) · an
+OpenAI-compatible LLM gateway (OmniRoute combos `free-normal`, fallback `free-advanced`; Groq
+`openai/gpt-oss-20b` when no gateway key is set) · Tavily · Streamlit · Prometheus · Docker
 
 **Standout decisions** (details in [`docs/DESIGN.md`](docs/DESIGN.md)):
 - **Eval-first:** retrieval evaluation harness built before any parameter was tuned; labels
@@ -162,7 +163,8 @@ flowchart TD
 | nDCG@10 | 0.9280 | | k=10 | 0.9806 | 0.9326 | 0.20 |
 
 **Environment variables (names only):** backend `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`,
-`PINECONE_HOST`, `PINECONE_NAMESPACE`, `PINECONE_TEXT_FIELD`, `GROQ_API_KEY`, `GROQ_BASE_URL`,
+`PINECONE_HOST`, `PINECONE_NAMESPACE`, `PINECONE_TEXT_FIELD`, `OMNIROUTE_API_KEY` (secret),
+`OMNIROUTE_BASE_URL` (https only), `OMNIROUTE_CHAT_MODEL`, `OMNIROUTE_FALLBACK_MODELS`, `GROQ_API_KEY`, `GROQ_BASE_URL`,
 `GROQ_MODEL`, `LLM_FALLBACK_MODELS`, `LLM_REASONING_EFFORT`, `TAVILY_API_KEY`, `API_KEY`, `ENV`,
 `ALLOWED_ORIGINS`, `RAG_*` flags; UI `BACKEND_BASE_URL`, `API_KEY`. Full list:
 [`backend/README.md`](backend/README.md).
@@ -174,7 +176,8 @@ flowchart TD
 - Pinecone Starter: one region (`us-east-1`), 2 GB, 1M read units a month.
   Tavily free: 1,000 credits a month.
 - Model retirement: `make check-models` (also run weekly in CI) fails loudly when a configured
-  model is retired or appears on Groq's deprecations page. `LLM_FALLBACK_MODELS` keeps `/chat`
+  model or OmniRoute combo is not listed or does not answer, or a Groq model appears on Groq's
+  deprecations page. `LLM_FALLBACK_MODELS` keeps `/chat`
   answering while you switch.
 
 ---

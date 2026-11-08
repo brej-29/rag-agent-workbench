@@ -39,3 +39,37 @@ def test_profile_words_never_borrows_another_facts_label():
     assert words == "nis2 sector: none, Annex III, size: small, eu market"
     facts = [{"id": "nis2_sector", "labels": {"none": "not in a NIS2 sector"}}, {"id": "eu_market", "short": "EU market"}]
     assert profile_words({"nis2_sector": "none", "eu_market": True}, facts) == "not in a NIS2 sector, EU market"
+
+
+def test_every_preset_uses_only_known_facts_and_values():
+    import yaml
+    from pathlib import Path
+
+    from frontend.services.presenters import PRESETS
+
+    facts = {f["id"]: f for f in yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / "backend/app/data/regs/facts.yaml").read_text(encoding="utf-8"))}
+    assert len(PRESETS) == len({p[0] for p in PRESETS}) >= 6
+    for title, _, _, profile in PRESETS:
+        for k, v in profile.items():
+            f = facts[k]
+            if f["type"] == "bool":
+                assert isinstance(v, bool), (title, k)
+            elif f["type"] == "choice":
+                assert v in f["values"], (title, k)
+            else:
+                assert set(v) <= set(f["values"]), (title, k)
+
+
+def test_widget_value_inverts_the_profile_for_each_question_type():
+    import ast
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parents[1] / "frontend/views/checklist.py").read_text(encoding="utf-8")
+    fn = next(n for n in ast.parse(src).body if isinstance(n, ast.FunctionDef) and n.name == "widget_value")
+    ns = {"NOT_SURE": "Not sure", "NONE": "none of these", "Any": object, "Dict": dict}
+    exec(compile(ast.Module([fn], []), "checklist", "exec"), ns)
+    wv = ns["widget_value"]
+    assert [wv({"type": "bool"}, v) for v in (None, True, False)] == ["Not sure", "Yes", "No"]
+    assert [wv({"type": "choice"}, v) for v in (None, "cloud")] == ["Not sure", "cloud"]
+    assert [wv({"type": "multi"}, v) for v in (None, [], ["deployer"])] == [[], ["none of these"], ["deployer"]]

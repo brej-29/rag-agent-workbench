@@ -59,10 +59,19 @@ def post_checklist(base_url: str, api_key: Optional[str], profile: Dict[str, Any
     return resp.json()
 
 
+class StreamError(RuntimeError):
+    """An `error` event: message for people, reason code, and the sources found before it failed."""
+
+    def __init__(self, message: str, data: Optional[Dict[str, Any]] = None) -> None:
+        super().__init__(message)
+        self.code = (data or {}).get("code") or "unavailable"
+        self.sources = (data or {}).get("sources") or []
+
+
 def parse_sse(lines: Iterable[str]) -> Iterator[Tuple[str, Any]]:
     """Turn /chat/stream lines into ("step", dict) | ("token", str) | ("done", dict).
 
-    Raises RuntimeError on an `error` event.  Unknown event types are ignored, so
+    Raises StreamError (a RuntimeError) on an `error` event.  Unknown event types are ignored, so
     the client keeps working when the backend adds new ones.
     """
     event: Optional[str] = None
@@ -87,8 +96,9 @@ def parse_sse(lines: Iterable[str]) -> Iterator[Tuple[str, Any]]:
         elif event in ("step", "done"):
             yield event, data
         elif event == "error":
-            message = data.get("message", raw) if isinstance(data, dict) else raw
-            raise RuntimeError(message)
+            if isinstance(data, dict):
+                raise StreamError(data.get("message", raw), data)
+            raise StreamError(raw)
 
 
 def stream_chat(base_url: str, api_key: Optional[str], payload: Dict[str, Any]) -> Iterator[Tuple[str, Any]]:

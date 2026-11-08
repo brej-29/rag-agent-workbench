@@ -1,5 +1,7 @@
 """Pure UI logic (no Streamlit import): citation badges, trace wording, verdicts,
 the relevance-floor bars, and the SSE event parser."""
+import pytest
+
 from frontend.services.backend_client import parse_sse
 from frontend.services.presenters import (
     cite_markdown,
@@ -107,3 +109,17 @@ def test_citing_sentences_do_not_split_at_abbreviations():
     answer = "The notice must list what Art. 33(3) requires, e.g. the nature of the breach. [1] It also says more."
     assert citing_sentences(answer, 1) == [
         "The notice must list what Art. 33(3) requires, e.g. the nature of the breach. [1]"]
+
+
+def test_error_event_carries_reason_and_found_sources():
+    from frontend.services.backend_client import StreamError
+
+    lines = ["event: error", 'data: {"message": "busy", "code": "busy", "sources": [{"title": "Art. 5"}]}', ""]
+    with pytest.raises(StreamError) as e:
+        list(parse_sse(lines))
+    assert (str(e.value), e.value.code, e.value.sources) == ("busy", "busy", [{"title": "Art. 5"}])
+
+
+def test_failed_generate_step_says_why_without_a_spinner():
+    line = step_line({"id": "generate", "status": "error", "ms": 900.0, "detail": {"reason": "busy"}})
+    assert "busy" in line and ":shimmer[" not in line

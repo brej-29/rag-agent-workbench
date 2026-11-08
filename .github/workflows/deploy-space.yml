@@ -3,7 +3,9 @@ name: Deploy API to Hugging Face Space
 # Manual only: syncs backend/ + Dockerfile from this repo into the Space repo
 # (replacing the old hand-copied deploy that drifted and shipped __pycache__).
 # The Space README (with its YAML header) is left as-is.
-# Requires repo secret HF_TOKEN (write access to the Space).
+# Requires repo secret HF_TOKEN (write access to the Space), and OMNIROUTE_API_KEY +
+# OMNIROUTE_BASE_URL (or GROQ_API_KEY) for the model gate.  The Space reads its own
+# copies of the LLM secrets from Space settings; this workflow never sends them there.
 on:
   workflow_dispatch:
 
@@ -19,6 +21,8 @@ jobs:
       - name: Gate on configured models
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
+          OMNIROUTE_BASE_URL: ${{ secrets.OMNIROUTE_BASE_URL }}
           PINECONE_API_KEY: unused
           PINECONE_INDEX_NAME: unused
           PINECONE_HOST: https://unused.invalid

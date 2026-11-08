@@ -15,8 +15,8 @@ APP = str(Path(__file__).resolve().parents[2] / "frontend" / "app.py")
 
 at = AppTest.from_file(APP, default_timeout=60).run()
 assert not at.exception, at.exception
-assert at.title and at.title[0].value == "Compliance Workbench", [t.value for t in at.title]
-assert any("Not set yet" in m.value for m in at.markdown), "profile empty state missing"
+assert any("Which EU and US rules apply" in h.value for h in at.html), "home hero missing"
+assert any("Not set yet" in h.value for h in at.html), "profile empty state missing"
 print("Home page OK (no profile, API unreachable)")
 
 at.switch_page("views/ask.py").run()

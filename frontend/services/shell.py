@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import time
+from pathlib import Path
 from typing import Optional
 
 import httpx
@@ -14,6 +15,12 @@ from services.backend_client import get_facts, probe_health
 WAKE_LIMIT_S = 180
 # Prose stays readable (about 75 characters a line) inside the wide layout that tables and columns need.
 PROSE_WIDTH = 720
+THEME_CSS = Path(__file__).resolve().parents[1] / "static" / "theme.css"
+
+
+def inject_theme() -> None:
+    """Load the shared, selector-stable visual layer once at the app entry point."""
+    st.html(f"<style>{THEME_CSS.read_text(encoding='utf-8')}</style>")
 
 
 def _config(name: str, default: Optional[str] = None) -> Optional[str]:

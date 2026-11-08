@@ -93,6 +93,17 @@ class Settings(BaseSettings):
             "(model retired, 404, 429, timeout).  Same endpoint and key.  Empty disables."
         ),
     )
+    # OmniRoute (OpenAI-compatible gateway).  When OMNIROUTE_API_KEY is set it replaces
+    # the Groq settings above for every LLM call.  The key is a secret: env/.env only.
+    OMNIROUTE_API_KEY: Optional[str] = Field(default=None, description="OmniRoute API key (secret).")
+    OMNIROUTE_BASE_URL: Optional[str] = Field(
+        default=None, description="OmniRoute OpenAI-compatible base URL ending in /v1 (https only)."
+    )
+    OMNIROUTE_CHAT_MODEL: str = Field(default="free-normal", description="OmniRoute combo for chat.")
+    OMNIROUTE_FALLBACK_MODELS: str = Field(
+        default="free-advanced",
+        description="Comma-separated OmniRoute combos tried in order when the primary fails.  Keep short.",
+    )
     LLM_STRUCTURED_OUTPUT: bool = Field(
         default=True,
         description=(

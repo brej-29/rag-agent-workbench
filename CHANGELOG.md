@@ -105,3 +105,13 @@
   abbreviations; Gap check works without a profile; Checklist controls stay in place while you answer; prose
   capped at a readable width; light-mode captions at 4.58:1; plain job names, consistent decimals, plural fixes.
 - test: live MCP check over HTTP (`scripts/smoke_mcp.py`); 654 tests.
+
+### 2026-11-08: OmniRoute, graceful Ask failures, checklist presets, UI redesign
+- feat(llm): OmniRoute gateway replaces Groq when `OMNIROUTE_API_KEY` is set (`free-normal`, fallback
+  `free-advanced`); https-only base URL (http only for localhost), 1 client retry, key never logged.
+  `check_models.py`, `deploy-space.yml` and `model-check.yml` read the OmniRoute secrets.
+- fix(ask): a failed generation marks the step failed with a reason (busy, timeout, unreachable), keeps
+  the found sources on screen and offers "Try again"; no spinner left running; error text never echoed.
+- feat(checklist): 8 ready-made examples and "Reset all answers"; the form follows the chosen example.
+- feat(ui): redesign per `docs/superpowers/specs/2026-11-08-ui-redesign.md` (rulebook hero, plain
+  "how it works", eval numbers as sentences with a dot grid, library rows, serif headings, new palette).

@@ -154,6 +154,24 @@ def headline(results: Dict[str, Any]) -> List[Dict[str, str]]:
     return out
 
 
+def trust_proof(results: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Two plain-language home proof points, derived only from published eval snapshots."""
+    out: List[Dict[str, Any]] = []
+    retrieval = results.get("regs_retrieval")
+    if retrieval:
+        found = round(retrieval["aggregate"]["recall"] * 100)
+        out.append({"value": found, "total": 100,
+                    "sentence": f"Across {retrieval['n']} test questions, the right article was in its top {retrieval['k']} "
+                                f"results {found} times in 100."})
+    abstain = results.get("regs_abstain")
+    if abstain:
+        value, total = abstain["correct_abstain"], abstain["unanswerable"]
+        out.append({"value": value, "total": total,
+                    "sentence": f"It declined {value} of {total} questions about rules it does not cover, and wrongly "
+                                f"declined {abstain['false_abstain']} of {abstain['answerable']} it does cover."})
+    return out
+
+
 def coverage_rows(corpus: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return [{"Instrument": c["name"], "Type": _BINDING.get(c["binding"], c["binding"]), "Provisions": c["provisions"],
              "Source": c["url"], "Retrieved": c["retrieved"]} for c in corpus]

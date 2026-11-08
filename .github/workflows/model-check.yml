@@ -26,6 +26,8 @@ jobs:
       - name: Check configured models
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
+          OMNIROUTE_BASE_URL: ${{ secrets.OMNIROUTE_BASE_URL }}
           PINECONE_API_KEY: unused
           PINECONE_INDEX_NAME: unused
           PINECONE_HOST: https://unused.invalid

@@ -1,6 +1,7 @@
 """Checklist: which EU-law articles bind your product on a date, from facts you choose."""
 from __future__ import annotations
 
+import copy
 from datetime import date
 from typing import Any, Dict, List, Optional
 
@@ -9,7 +10,7 @@ import streamlit as st
 
 from services.backend_client import get_facts, post_checklist
 from services.presenters import (
-    CROSSWALK_CAVEAT, GROUP_TITLES, checklist_csv, checklist_markdown, crosswalk_lines, dates_note, esc, profile_words,
+    CROSSWALK_CAVEAT, GROUP_TITLES, PRESETS, checklist_csv, checklist_markdown, crosswalk_lines, dates_note, esc, profile_words,
     status_label,
 )
 from services.shell import PROSE_WIDTH, api_key, backend_state, backend_url, wake_watcher
@@ -39,6 +40,38 @@ def _sync(f: Dict[str, Any], key: str) -> None:
         s.profile.pop(f["id"], None)
     else:
         s.profile[f["id"]] = value
+
+
+def widget_value(f: Dict[str, Any], value: Any) -> Any:
+    """Profile value -> what the question's widget holds (the inverse of _sync)."""
+    if f["type"] == "bool":
+        return NOT_SURE if value is None else ("Yes" if value else "No")
+    if f["type"] == "choice":
+        return NOT_SURE if value is None else value
+    return [] if value is None else (list(value) or [NONE])
+
+
+def _set_profile(facts: List[Dict[str, Any]], profile: Dict[str, Any], name: Optional[str] = None) -> None:
+    """Replace the whole profile (a preset, or {} to reset) and set every question to match.
+    Widgets keep their value by key, so deleting keys would not reset them; writing the value does."""
+    s.profile.clear()
+    s.profile.update(copy.deepcopy(profile))
+    s.preset = name
+    for f in facts:
+        for prefix in ("f-", "q-"):
+            s[prefix + f["id"]] = widget_value(f, profile.get(f["id"]))
+
+
+def preset_picker(facts: List[Dict[str, Any]]) -> None:
+    with st.container(horizontal=True, vertical_alignment="center"):
+        st.markdown("**Start from an example** or answer the questions yourself.")
+        st.button("Reset all answers", icon=":material/restart_alt:", type="tertiary", on_click=_set_profile,
+                  args=(facts, {}), disabled=not s.profile)
+    with st.container(key="preset-picker", horizontal=True, wrap=True, gap="small"):
+        for i, (title, story, icon, profile) in enumerate(PRESETS):
+            st.button(f"**{title}**  \n{story}", key=f"preset-{i}", icon=icon, width=228,
+                      type="primary" if s.get("preset") == title and s.profile == profile else "secondary",
+                      on_click=_set_profile, args=(facts, profile, title))
 
 
 def fact_input(f: Dict[str, Any], key: str) -> None:
@@ -135,6 +168,7 @@ except httpx.HTTPError as exc:
     st.error(f"The checklist could not be built: {exc}", icon=":material/error:")
     st.stop()
 
+preset_picker(facts)
 left, right = st.columns([2, 3], gap="large")
 with left:
     st.subheader("Your situation", anchor=False)
@@ -145,11 +179,14 @@ with left:
                     fact_input(f, f"f-{f['id']}")
 with right:
     c = cl["counts"]
-    with st.container(horizontal=True):
+    with st.container(key="checklist-counts", horizontal=True):
         st.metric("Apply now", c["now"])
         st.metric("Coming", c["coming"])
         st.metric("Depend on answers", c["depends"])
         st.metric("Do not apply", c["not_applicable"])
+    count_key = "-".join(str(c[k]) for k in ("now", "coming", "depends", "not_applicable"))
+    with st.container(key=f"count-sweep-{count_key}"):
+        st.html('<span aria-hidden="true"></span>')
     if cl["questions"]:
         with st.container(border=True):
             st.markdown("**Answer these to narrow it down**")

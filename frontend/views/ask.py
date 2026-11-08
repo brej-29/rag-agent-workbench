@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 import streamlit as st
 
-from services.backend_client import namespace_stats, post_upload_text, stream_chat
+from services.backend_client import StreamError, namespace_stats, post_upload_text, stream_chat
 from services.file_convert import DocumentConverter, convert_uploaded_file_to_text
 from services.presenters import (
     CROSSWALK_CAVEAT, EXAMPLES, FRAMEWORKS, REGS_EXAMPLES, REGS_NAMESPACE, chip_label, cite_markdown, citing_sentences,
@@ -84,7 +84,8 @@ def render_trace(steps: List[Dict[str, Any]]) -> None:
     for step in steps:
         line = step_line(step)
         if line:
-            st.markdown(("" if step["status"] == "running" else ":material/check_small: ") + line)
+            icon = {"running": "", "error": ":material/close_small: "}.get(step["status"], ":material/check_small: ")
+            st.markdown(icon + line)
         detail = step.get("detail") or {}
         if step["id"] == "gate" and detail.get("scores"):
             st.html(floor_bars_html(detail["scores"], detail["floor"], is_dark()))
@@ -95,7 +96,28 @@ def _floor(steps: List[Dict[str, Any]]) -> Optional[float]:
     return (gate.get("detail") or {}).get("floor") if gate else None
 
 
+def render_failed(msg: Dict[str, Any], idx: int) -> None:
+    sources = (msg.get("response") or {}).get("sources") or []
+    with st.status("Answer interrupted", state="error", expanded=False):
+        render_trace(msg.get("steps") or [])
+    if msg.get("content"):
+        st.markdown(cite_markdown(msg["content"], len(sources)) + " …")
+    st.warning(msg["error"], icon=":material/cloud_sync:")
+    with st.container(horizontal=True, gap="small", wrap=True, vertical_alignment="center"):
+        if st.button("Try again", key=f"retry-{idx}", type="primary", icon=":material/refresh:"):
+            s.retry = msg["question"]
+            del s.messages[idx - 1:idx + 1]
+            st.rerun()
+        for n, src in enumerate(sources, 1):
+            if st.button(chip_label(n, src), key=f"fsrc-{idx}-{n}", type="secondary",
+                         icon=":material/gavel:" if src.get("ref") else ":material/description:"):
+                evidence_drawer(n, src, "", _floor(msg.get("steps") or []), None, len(sources))
+
+
 def render_answer(msg: Dict[str, Any], idx: int) -> None:
+    if msg.get("failed"):
+        render_failed(msg, idx)
+        return
     resp, steps = msg.get("response") or {}, msg.get("steps") or []
     sources = resp.get("sources") or []
     abstained = bool(resp.get("insufficient_context"))
@@ -239,7 +261,7 @@ def regs_controls() -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def run_turn(question: str, settings: Dict[str, Any]) -> None:
-    history = [{"role": m["role"], "content": m["content"]} for m in s.messages]
+    history = [{"role": m["role"], "content": m["content"]} for m in s.messages if not m.get("failed")]
     s.messages.append({"role": "user", "content": question})
     with st.chat_message("user", avatar=AVATARS["user"]):
         st.markdown(question)
@@ -249,7 +271,7 @@ def run_turn(question: str, settings: Dict[str, Any]) -> None:
         payload["previous_intent"] = next((m["response"].get("intent") for m in reversed(s.messages)
                                            if m["role"] == "assistant"), None)
     steps: List[Dict[str, Any]] = []
-    text, done, error = "", None, None
+    text, done, error, sources = "", None, None, []
     with st.chat_message("assistant", avatar=AVATARS["assistant"]):
         status = st.status(":shimmer[Searching the knowledge base…]", expanded=True)
         trace = status.empty()
@@ -265,19 +287,24 @@ def run_turn(question: str, settings: Dict[str, Any]) -> None:
                     answer_box.markdown(cite_markdown(text, 99) + " ▍")
                 elif kind == "done":
                     done = data
+        except StreamError as exc:
+            error, sources = str(exc), exc.sources
         except httpx.HTTPStatusError as exc:
             code = exc.response.status_code
             error = ("The API rejected this app's key. Check API_KEY in the app settings."
                      if code in (401, 403) else f"The API returned an error ({code}). Try again in a moment.")
         except httpx.TimeoutException:
             error = "The API took too long to answer. It may still be waking up; try again in a minute."
-        except (httpx.HTTPError, RuntimeError) as exc:
-            error = f"The answer could not be completed: {exc}"
+        except (httpx.HTTPError, RuntimeError):
+            error = "The connection to the API dropped before the answer finished. Try again."
         if error or done is None:
-            status.update(label="Stopped", state="error", expanded=True)
-            answer_box.error(error or "The stream ended without an answer. Try again.", icon=":material/error:")
-            s.messages.pop()
-            return
+            # Keep the turn on screen as a failed one: no spinner left running, sources kept, one-click retry.
+            s.messages[-1]["failed"] = True
+            s.messages.append({"role": "assistant", "content": text, "failed": True, "question": question,
+                               "error": error or "The stream ended without an answer. Try again.",
+                               "steps": [x for x in steps if x["status"] != "running"],
+                               "response": {"sources": sources}})
+            st.rerun()
     s.profile.update(done.get("profile_updates") or {})
     s.messages.append({"role": "assistant", "content": str(done.get("answer") or text),
                        "response": done, "steps": steps})
@@ -336,5 +363,7 @@ if not api_key():
     note("Set API_KEY in the app's secrets to start asking.", ":material/key:")
 if s.get("example") and not s.messages:
     question = s.example
+if s.get("retry"):
+    question = s.pop("retry")
 if question:
     run_turn(question, settings)
